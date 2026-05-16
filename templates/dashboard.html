@@ -1,0 +1,1714 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard — Quantum Box{% endblock %}
+
+{% block head_extra %}
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;600&display=swap"
+  rel="stylesheet"
+/>
+<link
+  rel="stylesheet"
+  href="{{ url_for('static', filename='dashboard.css') }}"
+/>
+{% endblock %}
+
+{% block header_inner %}
+<div class="qb-dash-header-inner d-flex flex-wrap align-items-center justify-content-between w-100 gap-3">
+  <a
+    href="{{ url_for('index') }}"
+    class="qb-brand qb-brand-with-logo text-decoration-none"
+    aria-label="Quantum Box home"
+  >
+    <span class="qb-brand-mark" aria-hidden="true">
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 82 40"
+        width="82"
+        height="40"
+        focusable="false"
+      >
+        <rect
+          x="2"
+          y="2"
+          width="78"
+          height="36"
+          rx="6"
+          ry="6"
+          fill="#FFD700"
+          stroke="#333333"
+          stroke-width="1"
+        />
+        <text
+          x="20"
+          y="20"
+          dominant-baseline="central"
+          font-family="'DM Sans', system-ui, sans-serif"
+          font-size="14"
+          font-weight="700"
+          fill="#000000"
+          text-anchor="middle"
+        >SITA</text>
+        <circle cx="55" cy="20" r="16" fill="#000000" />
+        <text
+          x="55"
+          y="20"
+          dominant-baseline="central"
+          font-size="16"
+          font-family="'Noto Sans Devanagari', system-ui, sans-serif"
+          font-weight="700"
+          fill="#ffffff"
+          text-anchor="middle"
+        >राम</text>
+      </svg>
+    </span>
+    <span class="qb-brand-wordmark">Quantum <span>Box</span></span>
+  </a>
+  <div class="qb-dash-header-actions d-flex flex-wrap align-items-center gap-2 justify-content-end">
+    <div
+      id="qb-advanced-timebox"
+      class="qb-timebox"
+      role="group"
+      aria-label="Calendar and local time"
+    >
+      <div class="qb-timebox-main-row d-flex align-items-center flex-wrap gap-1">
+        <span id="qb-timebox-line-main" class="qb-timebox-main-text font-monospace">—</span>
+        <button
+          type="button"
+          id="qb-timebox-dropdown-btn"
+          class="qb-timebox-chev"
+          aria-expanded="false"
+          aria-controls="qb-timebox-extra"
+          title="Show details"
+        >
+          ▼
+        </button>
+      </div>
+      <div class="qb-timebox-controls d-flex align-items-center gap-1 mt-1 flex-wrap">
+        <span class="qb-timebox-cal-label small text-muted">Calendar</span>
+        <div class="qb-segmented" role="group" aria-label="Calendar mode">
+          <button type="button" class="qb-segmented-btn is-active" data-cal-mode="gregorian">
+            Gregorian
+          </button>
+          <button type="button" class="qb-segmented-btn" data-cal-mode="indian">Indian</button>
+        </div>
+      </div>
+      <div id="qb-timebox-extra" class="qb-timebox-extra" hidden>
+        <div id="qb-timebox-line2" class="qb-timebox-extra-line"></div>
+        <div id="qb-timebox-line3" class="qb-timebox-extra-line qb-timebox-extra-line--vs"></div>
+      </div>
+    </div>
+    <div class="qb-notification-wrap">
+      <button
+        type="button"
+        class="qb-notification-btn"
+        id="qb-notification-btn"
+        aria-label="Connection request notifications"
+        aria-expanded="false"
+      >
+        <span aria-hidden="true">🔔</span>
+        <span class="qb-notification-badge" id="qb-notification-badge" hidden>0</span>
+      </button>
+      <div class="qb-notification-menu" id="qb-notification-menu" hidden>
+        <div class="qb-notification-title">Pending Requests</div>
+        <ul class="list-unstyled mb-0" id="qb-notification-list"></ul>
+        <p class="small text-muted mb-0" id="qb-notification-empty">No pending requests.</p>
+      </div>
+    </div>
+    <form method="post" action="{{ url_for('logout') }}" class="m-0">
+      <button type="submit" class="qb-btn qb-btn-outline">Sign out</button>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block body %}
+<div class="qb-dash-shell" id="qb-dash-shell">
+  <script type="application/json" id="qb-dash-config-json">
+    {{ dash_client_config | tojson }}
+  </script>
+  <div class="qb-dash-split">
+    <div class="qb-dash-sidebar-rail" id="qb-sidebar-rail" style="width: var(--qb-sidebar-width, 24%)">
+      <aside class="qb-dash-sidebar" aria-label="Account navigation and explorer">
+        <nav class="qb-dash-nav" aria-label="Primary">
+          <button type="button" class="qb-dash-nav-btn" data-dash-tab="private">Private Account</button>
+          <button type="button" class="qb-dash-nav-btn" data-dash-tab="personal">Personal Account</button>
+          <button type="button" class="qb-dash-nav-btn is-active" data-dash-tab="public">Public Account</button>
+          <button type="button" class="qb-dash-nav-btn" data-dash-tab="global">Global Timeline</button>
+        </nav>
+
+        <div id="qb-explorer-public" class="qb-loc-explorer" hidden>
+          <div class="qb-loc-explorer-head">India</div>
+          <div class="qb-loc-explorer-scroll qb-tree-scroll">
+            <div class="qb-tree qb-tree--india qb-tree-root" id="qb-tree-public-root" aria-label="India geography tree"></div>
+          </div>
+          <p class="qb-explorer-footer small text-muted mb-1 mt-2">
+            Select a place, then open its statistics (does not change your Public timeline).
+          </p>
+          <a class="qb-view-stats-link qb-explorer-stats-link" id="qb-explorer-public-stats-link" href="#" hidden
+            >Open full statistics page (explorer)</a
+          >
+        </div>
+
+        <div id="qb-explorer-global" class="qb-loc-explorer" hidden>
+          <div class="qb-loc-explorer-head">Earth</div>
+          <div class="qb-loc-explorer-scroll qb-tree-scroll">
+            <div class="qb-tree qb-tree--earth qb-tree-root" id="qb-tree-global-root" aria-label="Earth geography tree"></div>
+          </div>
+          <p class="qb-explorer-footer small text-muted mb-1 mt-2">
+            Select a continent or country to drive the Global timeline tabs.
+          </p>
+          <a class="qb-view-stats-link qb-explorer-stats-link" id="qb-explorer-global-stats-link" href="#" hidden
+            >Open full statistics page (explorer)</a
+          >
+        </div>
+      </aside>
+    </div>
+    <div
+      class="qb-dash-resizer"
+      id="qb-dash-resizer"
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize sidebar"
+      tabindex="0"
+    ></div>
+    <div class="qb-dash-content">
+      <section
+        id="dash-panel-private"
+        class="qb-dash-panel"
+        data-dash-panel="private"
+        aria-labelledby="dash-private-heading"
+        hidden
+      >
+        <h2 id="dash-private-heading" class="h5 mb-3">Private Account</h2>
+
+        <div class="qb-panel mb-3 qb-private-profile">
+          <h3 class="h6 text-secondary text-uppercase small">Profile</h3>
+          <p class="mb-1"><strong>Name:</strong> {{ user.first_name }} {{ user.last_name }}</p>
+          <p class="mb-1"><strong>Private ID:</strong> <span class="font-monospace">{{ user.private_id }}</span></p>
+          <p class="mb-1"><strong>Public ID:</strong> <span class="font-monospace">{{ user.public_id }}</span></p>
+          <p class="mb-1"><strong>Gender:</strong> {{ user.gender }}</p>
+          <p class="mb-1"><strong>Age:</strong> {{ user.age }}</p>
+          <p class="mb-1"><strong>Age group:</strong> {{ user_life_stage }}</p>
+          <p class="mb-1">
+            <strong>Account type:</strong>
+            {% if 'account_type' in user.keys() %}{{ user.account_type }}{% else %}H_U{% endif %}
+          </p>
+          {% if 'is_admin' in user.keys() and user.is_admin %}
+          <p class="mb-1"><span class="badge bg-warning text-dark">Administrator</span></p>
+          {% endif %}
+          {% if birth_location_label %}
+          <p class="mb-1"><strong>Birth location:</strong> {{ birth_location_label }}</p>
+          {% else %}
+          <p class="mb-1 text-muted small">Birth location not set.</p>
+          {% endif %}
+          {% if current_location_label %}
+          <p class="mb-1"><strong>Current location:</strong> {{ current_location_label }}</p>
+          {% else %}
+          <p class="mb-1 text-muted small">Current location not set.</p>
+          {% endif %}
+          <p class="mb-1"><strong>Sun sign:</strong> {{ user.sun_sign }}</p>
+          <p class="mb-0"><strong>Element:</strong> {{ user.element }}</p>
+          <p class="mt-2 mb-0 small text-muted">
+            To request changes, send a message to Admin using the messaging system below.
+          </p>
+        </div>
+
+        <details class="qb-panel mb-3 qb-private-collapse" id="qb-private-education-details">
+          <summary class="qb-private-collapse-summary h6 mb-0">Education</summary>
+          <form id="qb-private-education-form" class="qb-private-extra-form mt-2">
+            <label class="form-label small" for="qb-edu-level">Education level</label>
+            <select id="qb-edu-level" class="form-select form-select-sm mb-2" name="education_level">
+              <option value="Uneducated">Uneducated</option>
+              <option value="School">School</option>
+              <option value="College">College</option>
+            </select>
+            <div id="qb-edu-school-block" class="qb-edu-conditional" hidden>
+              <label class="form-label small" for="qb-edu-school-class">Class passed (optional)</label>
+              <input type="text" id="qb-edu-school-class" class="form-control form-control-sm mb-2" name="school_class_passed" />
+              <label class="form-label small" for="qb-edu-school-year">Year of passing</label>
+              <input type="number" id="qb-edu-school-year" class="form-control form-control-sm mb-2" name="school_year" min="1950" max="2100" step="1" />
+              <label class="form-label small" for="qb-edu-school-inst">Name of institution</label>
+              <input type="text" id="qb-edu-school-inst" class="form-control form-control-sm mb-2" name="school_institution" />
+            </div>
+            <div id="qb-edu-college-block" class="qb-edu-conditional" hidden>
+              <label class="form-label small" for="qb-edu-college-degree">Degree type</label>
+              <select id="qb-edu-college-degree" class="form-select form-select-sm mb-2" name="college_degree_type">
+                <option value="Graduation">Graduation</option>
+                <option value="Post-Graduation">Post-Graduation</option>
+              </select>
+              <div class="mb-2">
+                <span class="form-label small d-block">Status</span>
+                <label class="qb-family-inline-check me-3"
+                  ><input type="checkbox" id="qb-edu-college-passed" name="college_status_passed" /> Passed</label
+                >
+                <label class="qb-family-inline-check"
+                  ><input type="checkbox" id="qb-edu-college-dropout" name="college_status_dropout" /> Drop-out</label
+                >
+              </div>
+              <label class="form-label small" for="qb-edu-college-year">Year of passing / drop-out</label>
+              <input type="number" id="qb-edu-college-year" class="form-control form-control-sm mb-2" name="college_year" min="1950" max="2100" step="1" />
+              <label class="form-label small" for="qb-edu-college-inst">Name of institution</label>
+              <input type="text" id="qb-edu-college-inst" class="form-control form-control-sm mb-2" name="college_institution" />
+            </div>
+            <button type="submit" class="qb-btn qb-btn-primary btn-sm">Save education</button>
+            <span class="small text-muted ms-2" id="qb-edu-save-status" aria-live="polite"></span>
+          </form>
+        </details>
+
+        <details class="qb-panel mb-3 qb-private-collapse" id="qb-private-work-details">
+          <summary class="qb-private-collapse-summary h6 mb-0">Work</summary>
+          <form id="qb-private-work-form" class="qb-private-extra-form mt-2">
+            <label class="form-label small" for="qb-work-status">Work status</label>
+            <select id="qb-work-status" class="form-select form-select-sm mb-2" name="work_status">
+              <option value="Unemployed">Unemployed</option>
+              <option value="Employee">Employee</option>
+              <option value="Employer">Employer</option>
+              <option value="Retired" id="qb-work-opt-retired">Retired</option>
+            </select>
+            <div id="qb-work-unemployed-block" class="qb-work-conditional" hidden>
+              <label class="form-label small" for="qb-work-unemployed-sub">Situation</label>
+              <select id="qb-work-unemployed-sub" class="form-select form-select-sm mb-2" name="unemployed_sub">
+                <option value="">Choose…</option>
+                <option value="Not interested in Employment">Not interested in Employment</option>
+                <option value="Searching Employment">Searching Employment</option>
+              </select>
+            </div>
+            <div id="qb-work-employee-block" class="qb-work-conditional" hidden>
+              <label class="form-label small" for="qb-work-emp-place">Workplace name</label>
+              <input type="text" id="qb-work-emp-place" class="form-control form-control-sm mb-2" name="employee_workplace" />
+              <label class="form-label small" for="qb-work-emp-exp">Total work experience (years / months as text)</label>
+              <input type="text" id="qb-work-emp-exp" class="form-control form-control-sm mb-2" name="employee_experience" />
+            </div>
+            <div id="qb-work-employer-block" class="qb-work-conditional" hidden>
+              <label class="form-label small" for="qb-work-org-type">Firm type</label>
+              <select id="qb-work-org-type" class="form-select form-select-sm mb-2" name="employer_org_type">
+                <option value="">Choose…</option>
+                <option value="Organised">Organised / Registered firm</option>
+                <option value="Unorganised">Unorganised sector work</option>
+              </select>
+              <div id="qb-work-employer-organised" hidden>
+                <label class="form-label small" for="qb-work-co-name">Company name</label>
+                <input type="text" id="qb-work-co-name" class="form-control form-control-sm mb-2" name="employer_company_name" />
+                <label class="form-label small" for="qb-work-co-loc">Location</label>
+                <input type="text" id="qb-work-co-loc" class="form-control form-control-sm mb-2" name="employer_location" />
+                <div class="row g-2">
+                  <div class="col-6">
+                    <label class="form-label small" for="qb-work-co-y">Years incorporated</label>
+                    <input type="number" id="qb-work-co-y" class="form-control form-control-sm" name="employer_years" min="0" max="200" />
+                  </div>
+                  <div class="col-6">
+                    <label class="form-label small" for="qb-work-co-m">Months</label>
+                    <input type="number" id="qb-work-co-m" class="form-control form-control-sm" name="employer_months" min="0" max="11" />
+                  </div>
+                </div>
+              </div>
+              <div id="qb-work-employer-unorganised" class="mt-2" hidden>
+                <label class="form-label small" for="qb-work-biz-name">Business name</label>
+                <input type="text" id="qb-work-biz-name" class="form-control form-control-sm" name="employer_business_name" />
+              </div>
+            </div>
+            <button type="submit" class="qb-btn qb-btn-primary btn-sm">Save work</button>
+            <span class="small text-muted ms-2" id="qb-work-save-status" aria-live="polite"></span>
+          </form>
+        </details>
+
+        <div class="qb-panel mb-3 qb-messaging" id="qb-messaging-root">
+          <h3 class="h6 text-secondary text-uppercase small mb-2">Messages</h3>
+          <div class="qb-msg-tabs d-flex flex-wrap gap-1 mb-2" role="tablist">
+            <button type="button" class="qb-msg-tab is-active" data-msg-tab="inbox">Inbox</button>
+            <button type="button" class="qb-msg-tab" data-msg-tab="sent">Sent</button>
+            <button type="button" class="qb-msg-tab" data-msg-tab="drafts">Drafts</button>
+            <button type="button" class="qb-msg-tab" data-msg-tab="compose">Compose</button>
+          </div>
+          <p id="qb-msg-flash" class="small text-info mb-2" role="status" aria-live="polite"></p>
+
+          <div id="qb-msg-panel-inbox" class="qb-msg-panel">
+            <ul class="list-unstyled small mb-0 qb-msg-list" id="qb-msg-inbox-list"></ul>
+          </div>
+          <div id="qb-msg-panel-sent" class="qb-msg-panel" hidden>
+            <ul class="list-unstyled small mb-0 qb-msg-list" id="qb-msg-sent-list"></ul>
+          </div>
+          <div id="qb-msg-panel-drafts" class="qb-msg-panel" hidden>
+            <ul class="list-unstyled small mb-0 qb-msg-list" id="qb-msg-drafts-list"></ul>
+          </div>
+          <div id="qb-msg-panel-compose" class="qb-msg-panel" hidden>
+            <form id="qb-msg-compose-form" class="qb-msg-compose-form">
+              <div class="mb-2">
+                <label class="form-label small mb-0" for="qb-msg-to">To (recipient Private ID)</label>
+                <input type="text" class="form-control form-control-sm font-monospace" id="qb-msg-to" name="recipient_id" autocomplete="off" />
+              </div>
+              <div class="mb-2">
+                <label class="form-label small mb-0" for="qb-msg-subject">Subject (optional)</label>
+                <input type="text" class="form-control form-control-sm" id="qb-msg-subject" name="subject" />
+              </div>
+              <div class="mb-2">
+                <label class="form-label small mb-0" for="qb-msg-body">Message</label>
+                <textarea class="form-control form-control-sm" id="qb-msg-body" name="body" rows="5" required></textarea>
+              </div>
+              <div class="d-flex flex-wrap gap-2">
+                <button type="submit" class="qb-btn qb-btn-primary btn-sm" data-send-mode="send">Send</button>
+                <button type="button" class="qb-btn qb-btn-outline btn-sm" id="qb-msg-save-draft">Save as draft</button>
+              </div>
+            </form>
+          </div>
+          <div id="qb-msg-panel-view" class="qb-msg-panel" hidden>
+            <div class="qb-msg-view-meta small text-muted mb-2" id="qb-msg-view-meta"></div>
+            <div class="qb-msg-view-subject fw-semibold mb-2" id="qb-msg-view-subject"></div>
+            <div class="qb-msg-view-body mb-3" id="qb-msg-view-body"></div>
+            <div class="d-flex flex-wrap gap-2">
+              <button type="button" class="qb-btn qb-btn-outline btn-sm" id="qb-msg-back-list">Back</button>
+              <button type="button" class="qb-btn qb-btn-primary btn-sm" id="qb-msg-reply-btn">Reply</button>
+              <button type="button" class="qb-btn btn-outline-danger btn-sm" id="qb-msg-delete-btn">Delete</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="qb-panel mb-3">
+          <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+            <h3 class="h6 mb-0">Private posts</h3>
+            <span class="small text-muted">Live or frozen at personal level</span>
+          </div>
+          <ul class="list-unstyled small mb-0">
+            {% for p in private_posts %}
+            <li class="mb-3 pb-3 border-bottom border-secondary">
+              <div class="text-muted mb-1">
+                <span class="badge bg-secondary">{{ p.status }}</span>
+                <span class="badge bg-dark">{{ p.current_level }}</span>
+                · score {{ p.total_score }}
+                · {{ p.created_at }}
+              </div>
+              <div>{{ p.content }}</div>
+            </li>
+            {% else %}
+            <li class="text-muted">No private posts yet.</li>
+            {% endfor %}
+          </ul>
+        </div>
+
+        <div class="qb-panel qb-wallet-panel mb-3">
+          <h3 class="h6 mb-3">Wallet</h3>
+          <div class="row g-2 mb-2">
+            <div class="col-sm-4">
+              <span class="small text-muted d-block">Balance</span>
+              <span class="h5 mb-0 text-info">{{ wallet_balance }} Qoins</span>
+            </div>
+            <div class="col-sm-4">
+              <span class="small text-muted d-block">Qoins earned (total)</span>
+              <span class="h5 mb-0">{{ qoins_earned_total }}</span>
+            </div>
+            <div class="col-sm-4 d-flex align-items-end">
+              <button
+                type="button"
+                class="qb-btn qb-btn-outline btn-sm"
+                data-bs-toggle="modal"
+                data-bs-target="#walletTransactionsModal"
+              >
+                Transaction statement
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section
+        id="dash-panel-personal"
+        class="qb-dash-panel"
+        data-dash-panel="personal"
+        aria-labelledby="dash-personal-heading"
+        hidden
+      >
+        <div class="qb-panel qb-personal-board">
+          <h2 id="dash-personal-heading" class="h5 mb-2">Personal Account</h2>
+          <p class="small text-info mt-1 mb-0" id="qb-personal-placeholder-status" aria-live="polite"></p>
+
+          <div id="qb-personal-stack-pcb" class="qb-personal-stack">
+            <div class="qb-personal-board-head">
+              <div>
+                <h3 class="h5 mb-1">Personal Collective Board (PCB)</h3>
+                <p class="small text-muted mb-0">
+                  Your posts and your connections&rsquo; posts stay here up to 7 days, then escalate to Village or move to history.
+                </p>
+              </div>
+              <div class="qb-personal-board-head-actions">
+                <button type="button" class="qb-btn qb-btn-outline btn-sm" id="qb-open-family-tree-btn">
+                  Family Tree
+                </button>
+                <button type="button" class="qb-btn qb-btn-outline btn-sm" id="qb-open-social-circle-btn">
+                  Social Circle
+                </button>
+                <button
+                  type="button"
+                  id="qb-new-post-open"
+                  class="qb-btn qb-btn-primary qb-new-post-btn btn-sm"
+                >
+                  + New Post
+                </button>
+              </div>
+            </div>
+
+            <div class="qb-board-tabs mt-3" role="tablist" aria-label="Personal Collective Board post state">
+              <button
+                type="button"
+                class="qb-board-tab qb-js-personal-board-tab is-active"
+                data-personal-board-state="live"
+                role="tab"
+                aria-selected="true"
+              >
+                Live
+              </button>
+              <button
+                type="button"
+                class="qb-board-tab qb-js-personal-board-tab"
+                data-personal-board-state="frozen"
+                role="tab"
+                aria-selected="false"
+              >
+                Freeze
+              </button>
+            </div>
+
+            <ul id="qb-personal-feed" class="list-unstyled small mb-0"></ul>
+            <p id="qb-personal-feed-empty" class="small text-muted mb-0" hidden>No personal posts yet.</p>
+            <section class="qb-personal-section qb-personal-section--wide mt-3">
+              <h3 class="h6 mb-2">Post History</h3>
+              <ul id="qb-post-history-list" class="list-unstyled small mb-0"></ul>
+              <p id="qb-post-history-empty" class="small text-muted mb-0" hidden>No post history yet.</p>
+            </section>
+            {% if user.is_admin %}
+            <section class="qb-personal-section mt-3">
+              <h3 class="h6 mb-2">Admin tools</h3>
+              <p class="small text-muted mb-2">
+                Review pending family removal requests from users (approve or reject).
+              </p>
+              <button
+                type="button"
+                class="qb-btn qb-btn-outline btn-sm qb-admin-only-btn"
+                id="qb-admin-removals-open"
+                title="Review pending family removal requests"
+              >
+                Admin · Removal Queue
+              </button>
+            </section>
+            {% endif %}
+          </div>
+
+          <div id="qb-personal-stack-family" class="qb-personal-stack qb-personal-aux-stack" hidden>
+            <div class="qb-personal-back-row">
+              <button type="button" class="qb-btn qb-btn-outline btn-sm" id="qb-back-to-pcb-from-family">
+                ← Back to PCB
+              </button>
+              <h3 class="h5 mb-0">Family Tree</h3>
+            </div>
+
+            <p id="qb-family-flash" class="small text-info mb-2" role="status" aria-live="polite"></p>
+
+            <div class="qb-family-initial-setup-wrap" id="qb-family-initial-setup-wrap" hidden>
+              <p class="small text-muted mb-2">
+                Welcome — tell us a little about your family situation. We will generate a starter tree with
+                placeholders you can fill in later.
+              </p>
+              <form id="qb-family-initial-setup-form" class="qb-family-form">
+                <fieldset class="mb-3">
+                  <legend class="form-label small">Relationship status <span class="text-danger">*</span></legend>
+                  <div class="qb-family-radio-row qb-family-radio-row--wrap">
+                    <label><input type="radio" name="ifs_relationship_status" value="unmarried" checked /> Unmarried</label>
+                    <label><input type="radio" name="ifs_relationship_status" value="married" /> Married</label>
+                    <label><input type="radio" name="ifs_relationship_status" value="single-parent" /> Single parent</label>
+                    <label><input type="radio" name="ifs_relationship_status" value="widowed" /> Widowed</label>
+                  </div>
+                </fieldset>
+                <fieldset class="qb-family-fieldset mb-3" id="qb-ifs-children-fieldset" hidden>
+                  <legend class="form-label small">Do you have children?</legend>
+                  <div class="qb-family-radio-row">
+                    <label><input type="radio" name="ifs_has_children" value="no" checked /> No</label>
+                    <label><input type="radio" name="ifs_has_children" value="yes" /> Yes</label>
+                  </div>
+                  <div id="qb-ifs-children-count-wrap" class="mt-2" hidden>
+                    <label class="form-label small" for="qb-ifs-children-count">Number of children (1–10)</label>
+                    <input type="number" id="qb-ifs-children-count" class="form-control form-control-sm" min="1" max="10" value="1" />
+                  </div>
+                </fieldset>
+                <fieldset class="qb-family-fieldset mb-3">
+                  <legend class="form-label small">Parents (optional)</legend>
+                  <div class="qb-family-grid-two">
+                    <div>
+                      <label class="form-label small" for="qb-ifs-father-name">Father&rsquo;s name</label>
+                      <input type="text" id="qb-ifs-father-name" class="form-control form-control-sm" maxlength="160" autocomplete="name" placeholder="Leave blank for placeholder node" />
+                    </div>
+                    <div>
+                      <label class="form-label small" for="qb-ifs-mother-name">Mother&rsquo;s name</label>
+                      <input type="text" id="qb-ifs-mother-name" class="form-control form-control-sm" maxlength="160" autocomplete="name" placeholder="Leave blank for placeholder node" />
+                    </div>
+                  </div>
+                </fieldset>
+                <fieldset class="qb-family-fieldset mb-3">
+                  <legend class="form-label small">Siblings</legend>
+                  <div class="qb-family-radio-row mb-2">
+                    <label><input type="radio" name="ifs_has_siblings" value="no" checked /> No</label>
+                    <label><input type="radio" name="ifs_has_siblings" value="yes" /> Yes</label>
+                  </div>
+                  <div id="qb-ifs-siblings-count-wrap" class="row g-2" hidden>
+                    <div class="col-6">
+                      <label class="form-label small" for="qb-ifs-brothers">Brothers</label>
+                      <input type="number" id="qb-ifs-brothers" class="form-control form-control-sm" min="0" max="20" value="0" />
+                    </div>
+                    <div class="col-6">
+                      <label class="form-label small" for="qb-ifs-sisters">Sisters</label>
+                      <input type="number" id="qb-ifs-sisters" class="form-control form-control-sm" min="0" max="20" value="0" />
+                    </div>
+                  </div>
+                  <div id="qb-ifs-sibling-name-fields" class="mt-2"></div>
+                </fieldset>
+                <div class="qb-family-form-actions d-flex gap-2 align-items-center flex-wrap">
+                  <button type="submit" class="qb-btn qb-btn-primary">Create my family tree</button>
+                  <span class="small text-muted" id="qb-ifs-status" aria-live="polite"></span>
+                </div>
+              </form>
+            </div>
+
+            <!-- Activation form (shown when family_profile.form_completed = 0) -->
+            <div class="qb-family-form-wrap" id="qb-family-form-wrap" hidden>
+              <p class="small text-muted mb-2">
+                Tell us about your immediate family. You will only need to fill this once;
+                contact an admin to reset it later.
+              </p>
+              <form id="qb-family-form" class="qb-family-form">
+                <fieldset class="mb-3">
+                  <legend class="form-label small">Your relationship status</legend>
+                  <div class="qb-family-radio-row">
+                    <label><input type="radio" name="relationship_status" value="unmarried" checked /> Unmarried</label>
+                    <label><input type="radio" name="relationship_status" value="married" /> Married</label>
+                    <label><input type="radio" name="relationship_status" value="single-parent" /> Single Parent</label>
+                  </div>
+                </fieldset>
+
+                <fieldset class="qb-family-fieldset mb-3">
+                  <legend class="form-label small">Parents</legend>
+                  <div class="qb-family-grid-two">
+                    <div>
+                      <label class="form-label small">Father’s name</label>
+                      <input type="text" class="form-control form-control-sm" data-family-field="father.name" autocomplete="off" />
+                      <label class="qb-family-inline-check">
+                        <input type="checkbox" data-family-field="father.is_dead" /> Deceased
+                      </label>
+                    </div>
+                    <div>
+                      <label class="form-label small">Mother’s name</label>
+                      <input type="text" class="form-control form-control-sm" data-family-field="mother.name" autocomplete="off" />
+                      <label class="qb-family-inline-check">
+                        <input type="checkbox" data-family-field="mother.is_dead" /> Deceased
+                      </label>
+                    </div>
+                  </div>
+                </fieldset>
+
+                <fieldset class="qb-family-fieldset mb-3">
+                  <legend class="form-label small d-flex justify-content-between align-items-center">
+                    <span>Siblings</span>
+                    <button type="button" class="qb-btn qb-btn-outline btn-sm" id="qb-family-add-sibling">+ Add sibling</button>
+                  </legend>
+                  <div id="qb-family-siblings"></div>
+                </fieldset>
+
+                <fieldset
+                  class="qb-family-fieldset mb-3"
+                  id="qb-family-spouse-fieldset"
+                  hidden
+                >
+                  <legend class="form-label small">Spouse</legend>
+                  <div class="qb-family-grid-three">
+                    <input type="text" class="form-control form-control-sm" placeholder="Name" data-family-field="spouse.name" />
+                    <select class="form-select form-select-sm" data-family-field="spouse.gender">
+                      <option value="">Gender</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                    </select>
+                    <input type="number" min="0" class="form-control form-control-sm" placeholder="Age" data-family-field="spouse.age" />
+                  </div>
+                  <label class="qb-family-inline-check">
+                    <input type="checkbox" data-family-field="spouse.is_dead" /> Deceased
+                  </label>
+                </fieldset>
+
+                <fieldset
+                  class="qb-family-fieldset mb-3"
+                  id="qb-family-spouse-parents-fieldset"
+                  hidden
+                >
+                  <legend class="form-label small">Spouse&rsquo;s parents (optional)</legend>
+                  <div class="qb-family-grid-two">
+                    <div>
+                      <label class="form-label small">Spouse&rsquo;s father&rsquo;s name</label>
+                      <input type="text" class="form-control form-control-sm" data-family-field="spouse_father.name" autocomplete="off" />
+                      <label class="qb-family-inline-check">
+                        <input type="checkbox" data-family-field="spouse_father.is_dead" /> Deceased
+                      </label>
+                    </div>
+                    <div>
+                      <label class="form-label small">Spouse&rsquo;s mother&rsquo;s name</label>
+                      <input type="text" class="form-control form-control-sm" data-family-field="spouse_mother.name" autocomplete="off" />
+                      <label class="qb-family-inline-check">
+                        <input type="checkbox" data-family-field="spouse_mother.is_dead" /> Deceased
+                      </label>
+                    </div>
+                  </div>
+                </fieldset>
+
+                <fieldset
+                  class="qb-family-fieldset mb-3"
+                  id="qb-family-has-children-fieldset"
+                  hidden
+                >
+                  <legend class="form-label small">Do you have children?</legend>
+                  <div class="qb-family-radio-row">
+                    <label><input type="radio" name="has_children" value="no" checked /> No</label>
+                    <label><input type="radio" name="has_children" value="yes" /> Yes</label>
+                  </div>
+                </fieldset>
+
+                <fieldset
+                  class="qb-family-fieldset mb-3"
+                  id="qb-family-children-fieldset"
+                  hidden
+                >
+                  <legend class="form-label small d-flex justify-content-between align-items-center">
+                    <span>Children</span>
+                    <button type="button" class="qb-btn qb-btn-outline btn-sm" id="qb-family-add-child">+ Add child</button>
+                  </legend>
+                  <p class="small text-muted mb-2">
+                    For each child, you can also record their spouse (if married) and any grandchildren.
+                  </p>
+                  <div id="qb-family-children"></div>
+                </fieldset>
+
+                <div class="qb-family-form-actions d-flex gap-2 align-items-center flex-wrap">
+                  <button type="submit" class="qb-btn qb-btn-primary">Save family details</button>
+                  <span class="small text-muted">You can mark members as deceased without filling other fields.</span>
+                </div>
+              </form>
+            </div>
+
+            <!-- Tree + actions (always mounted; D3 draws inside #qb-family-graph) -->
+            <div class="qb-family-content" id="qb-family-content">
+              <div class="qb-family-tree-section">
+                <div id="family-tree-container" class="family-tree-container">
+                  <div class="qb-family-graph-wrap">
+                    <div class="qb-family-graph" id="qb-family-graph" aria-label="Family tree graph"></div>
+                  </div>
+                </div>
+                <div class="family-buttons qb-family-actions-row" role="group" aria-label="Family tree actions">
+                  <button type="button" class="qb-btn qb-btn-primary btn-sm" id="qb-family-graph-add">
+                    Add Member in Tree
+                  </button>
+                  <button type="button" class="qb-btn qb-btn-outline btn-sm" id="qb-family-graph-mark-dead">
+                    Mark Deceased
+                  </button>
+                  <button type="button" class="qb-btn qb-btn-outline btn-sm" id="qb-family-add-general-btn">
+                    Add Family Member
+                  </button>
+                  <button type="button" class="qb-btn qb-btn-outline btn-sm" id="qb-family-view-all-btn">
+                    View All Family Members
+                  </button>
+                </div>
+              </div>
+              <p class="small text-muted mb-0 mt-2">
+                The tree shows your nuclear family. Use <strong>Add Member in Tree</strong> for parents,
+                spouse, children, siblings, and grandparents. Use <strong>Add Family Member</strong> for
+                extended relatives (they must have a Quantum Box account). View everyone in
+                <strong>View All Family Members</strong>.
+              </p>
+            </div>
+          </div>
+
+          <div id="qb-personal-stack-social" class="qb-personal-stack qb-personal-aux-stack" hidden>
+            <div class="qb-personal-back-row">
+              <button type="button" class="qb-btn qb-btn-outline btn-sm" id="qb-back-to-pcb-from-social">
+                ← Back to PCB
+              </button>
+            </div>
+            <div class="qb-personal-section-head">
+              <h3 class="h5 mb-0">Social Circle</h3>
+              <button type="button" class="qb-btn qb-btn-primary btn-sm qb-js-connection-open" data-connection-type="social">Add Social Connection</button>
+            </div>
+            <ul id="qb-social-list" class="list-unstyled small mb-0"></ul>
+            <p id="qb-social-empty" class="small text-muted mb-0" hidden>No accepted social circle connections yet.</p>
+          </div>
+        </div>
+      </section>
+
+      <section
+        id="dash-panel-public"
+        class="qb-dash-panel"
+        data-dash-panel="public"
+        aria-labelledby="dash-public-heading"
+      >
+        <h2 id="dash-public-heading" class="visually-hidden">Public account</h2>
+        {% if default_active_location_id %}
+        <section
+          class="qb-public-timeline"
+          data-default-location-id="{{ default_active_location_id }}"
+          aria-label="Public timeline for your home location"
+        >
+          <header class="qb-public-head">
+            <h3 class="qb-public-title h5 mb-1">Public Timeline</h3>
+            <p class="qb-public-location-id small font-monospace text-secondary mb-1">
+              Location ID: {{ user_current_location_id_display or "—" }}
+            </p>
+            <p class="qb-public-sub small text-muted mb-0">
+              Tabs always reflect <strong>your current living location</strong> from your profile.
+            </p>
+          </header>
+
+          <div class="qb-location-tabs qb-js-public-tabs" role="tablist" aria-label="Your location hierarchy">
+            {% for item in current_hierarchy %}
+            <button
+              type="button"
+              class="qb-location-tab qb-js-public-tab{% if item.scope == 'village' %} is-active{% endif %}"
+              data-location-id="{{ item.id }}"
+              data-scope="{{ item.scope }}"
+              role="tab"
+              aria-selected="{% if item.scope == 'village' %}true{% else %}false{% endif %}"
+            >
+              <span class="qb-location-tab-name">{{ item.name }}</span>
+              <span class="qb-location-tab-scope">{{ item.scope|capitalize }}</span>
+            </button>
+            {% endfor %}
+          </div>
+
+          <div class="qb-public-main-stats-grid">
+            <div class="qb-public-feed-col">
+              <div class="qb-panel qb-public-feed-panel qb-collective-board">
+                <div class="qb-board-head">
+                  <h4 class="qb-panel-title mb-1" id="qb-collective-board-title">CVB (Collective Village Board)</h4>
+                  <p class="small text-muted mb-0" id="qb-collective-board-subtitle">
+                    Live and frozen posts for your selected public level.
+                  </p>
+                </div>
+                <div class="qb-board-tabs" role="tablist" aria-label="Collective Board post state">
+                  <button
+                    type="button"
+                    class="qb-board-tab is-active"
+                    data-board-state="live"
+                    role="tab"
+                    aria-selected="true"
+                  >
+                    Live
+                  </button>
+                  <button
+                    type="button"
+                    class="qb-board-tab"
+                    data-board-state="frozen"
+                    role="tab"
+                    aria-selected="false"
+                  >
+                    Freeze
+                  </button>
+                </div>
+                <p class="small text-muted mb-2">
+                  Use the left explorer to browse all of India; it does not change these tabs or your post location.
+                </p>
+                <ul id="qb-public-feed" class="list-unstyled small mb-0"></ul>
+                <p id="qb-public-feed-empty" class="small text-muted mb-0" hidden>No posts at this level yet.</p>
+              </div>
+              <div class="qb-panel qb-election-panel mt-3" id="qb-election-panel" hidden>
+                <h4 class="qb-panel-title mb-1">Quantum Punch Elections</h4>
+                <p class="small text-muted mb-2">
+                  Rohini Sector‑24 village council (zodiac month). Visible on the <strong>Village</strong> tab.
+                </p>
+                <div id="qb-election-status-line" class="qb-election-status-line small mb-2" role="status"></div>
+                <div id="qb-election-nomination-block" hidden>
+                  <h5 class="h6 mt-2 mb-2">Stand for election</h5>
+                  <form id="qb-election-nominate-form" class="qb-election-form">
+                    <label class="form-label small" for="qb-election-why">Why do you want to stand for election? <span class="text-danger">*</span></label>
+                    <textarea id="qb-election-why" class="form-control form-control-sm mb-2" rows="3" required maxlength="2000"></textarea>
+                    <label class="form-label small" for="qb-election-changes">What changes do you want to bring after becoming a council member? <span class="text-danger">*</span></label>
+                    <textarea id="qb-election-changes" class="form-control form-control-sm mb-2" rows="3" required maxlength="2000"></textarea>
+                    <button type="submit" class="qb-btn qb-btn-primary btn-sm" id="qb-election-nominate-submit">Submit nomination</button>
+                    <span class="small text-muted ms-2" id="qb-election-nominate-msg" aria-live="polite"></span>
+                  </form>
+                </div>
+                <div id="qb-election-voting-block" hidden>
+                  <h5 class="h6 mt-2 mb-2">Cast your vote</h5>
+                  <p class="small text-muted mb-2">One vote per gender for this zodiac cycle.</p>
+                  <div class="qb-election-vote-col">
+                    <h6 class="small text-uppercase text-secondary mb-1">Male candidates</h6>
+                    <ul class="list-unstyled qb-election-candidate-list" id="qb-election-male-list"></ul>
+                  </div>
+                  <div class="qb-election-vote-col mt-3">
+                    <h6 class="small text-uppercase text-secondary mb-1">Female candidates</h6>
+                    <ul class="list-unstyled qb-election-candidate-list" id="qb-election-female-list"></ul>
+                  </div>
+                  <button type="button" class="qb-btn qb-btn-primary btn-sm mt-2" id="qb-election-vote-submit" disabled>Submit votes</button>
+                  <span class="small text-muted ms-2" id="qb-election-vote-msg" aria-live="polite"></span>
+                </div>
+                <div id="qb-election-postvote-block" class="small" hidden>
+                  <p class="text-info mb-0" id="qb-election-postvote-text"></p>
+                </div>
+                <div id="qb-election-closed-block" class="small" hidden>
+                  <p class="mb-0" id="qb-election-closed-text"></p>
+                </div>
+                <p class="small text-muted mb-0" id="qb-election-ineligible" hidden></p>
+              </div>
+            </div>
+            <aside class="qb-public-stats-col" aria-label="Statistics for selected tab">
+              <div class="qb-dash-inline-stats qb-panel qb-public-stats-panel">
+                <div class="qb-users-in-scope">
+                  <strong id="qb-public-total" class="text-info">—</strong>
+                  <span class="text-uppercase small ms-1">users in scope</span>
+                </div>
+                <p class="mb-2 mt-2">
+                  <a class="qb-view-stats-link" id="qb-public-village-stats-link" href="{{ user_village_stats_url }}"
+                    >Open full statistics page</a
+                  >
+                  <span class="text-muted small"> (your village)</span>
+                </p>
+                <h4 class="h6 mt-3 mb-2 text-secondary text-uppercase small">By gender</h4>
+                <div class="qb-mini-table-wrap">
+                  <table class="table table-sm table-borderless text-secondary mb-0" id="qb-public-gender-table">
+                    <tbody></tbody>
+                  </table>
+                </div>
+                <h4 class="h6 mt-3 mb-2 text-secondary text-uppercase small">By zodiac element</h4>
+                <div class="qb-mini-table-wrap">
+                  <table class="table table-sm table-borderless text-secondary mb-0" id="qb-public-element-table">
+                    <tbody></tbody>
+                  </table>
+                </div>
+                <h4 class="h6 mt-3 mb-2 text-secondary text-uppercase small">By age group</h4>
+                <div class="qb-mini-table-wrap">
+                  <table class="table table-sm table-borderless text-secondary mb-0" id="qb-public-life-table">
+                    <tbody></tbody>
+                  </table>
+                </div>
+                <div class="qb-panel qb-election-council-card mt-3" id="qb-election-council-card" hidden>
+                  <h4 class="h6 mt-0 mb-2 text-secondary text-uppercase small">Council members (Quantum Punch)</h4>
+                  <p class="small mb-1" id="qb-election-king-line"></p>
+                  <p class="small mb-2" id="qb-election-queen-line"></p>
+                  <p class="small text-muted mb-2" id="qb-election-upcoming-line"></p>
+                  <ul class="list-unstyled small mb-0 qb-election-council-zodiac" id="qb-election-council-zodiac-list"></ul>
+                </div>
+              </div>
+            </aside>
+          </div>
+        </section>
+        {% else %}
+        <p class="text-muted mb-0">
+          Set your current village in registration to use the public timeline.
+        </p>
+        {% endif %}
+      </section>
+
+      <section
+        id="dash-panel-global"
+        class="qb-dash-panel"
+        data-dash-panel="global"
+        aria-labelledby="dash-global-heading"
+        hidden
+      >
+        <h2 id="dash-global-heading" class="h5 mb-1">Global Timeline</h2>
+        <p class="qb-global-location-id small font-monospace text-secondary mb-3">
+          Global ID: {{ user_global_id_display }}
+        </p>
+        <section class="qb-global-timeline" aria-label="Global statistics">
+          <div class="qb-location-tabs qb-js-global-tabs" role="tablist" aria-label="Global levels">
+            <button
+              type="button"
+              class="qb-location-tab qb-js-global-tab is-active"
+              data-global-scope="earth"
+              data-global-id="0"
+              role="tab"
+              aria-selected="true"
+            >
+              <span class="qb-location-tab-name">Earth</span>
+              <span class="qb-location-tab-scope">Planet</span>
+            </button>
+            <button
+              type="button"
+              class="qb-location-tab qb-js-global-tab"
+              data-global-scope="continent"
+              data-global-id="{{ user_continent_id or '' }}"
+              role="tab"
+              aria-selected="false"
+            >
+              <span class="qb-location-tab-name">{% if user_continent_name %}{{ user_continent_name }}{% elif user_continent_id %}{{ user_continent_id }}{% else %}—{% endif %}</span>
+              <span class="qb-location-tab-scope">Continent</span>
+            </button>
+            <button
+              type="button"
+              class="qb-location-tab qb-js-global-tab"
+              data-global-scope="country"
+              data-global-id="{{ user_country_id or '' }}"
+              role="tab"
+              aria-selected="false"
+            >
+              <span class="qb-location-tab-name">{% if user_country_name %}{{ user_country_name }}{% elif user_country_id %}{{ user_country_id }}{% else %}—{% endif %}</span>
+              <span class="qb-location-tab-scope">Country</span>
+            </button>
+            <button
+              type="button"
+              class="qb-location-tab qb-js-global-tab qb-global-tab-zone"
+              id="qb-global-tab-zone"
+              data-global-scope="zone"
+              data-global-id=""
+              role="tab"
+              aria-selected="false"
+              {% if not user_show_zone_tab %}hidden{% endif %}
+            >
+              <span class="qb-location-tab-name">Zone</span>
+              <span class="qb-location-tab-scope">India</span>
+            </button>
+          </div>
+
+          <div class="qb-dash-inline-stats qb-panel mb-3">
+            <div class="qb-users-in-scope">
+              <strong id="qb-global-total" class="text-info">—</strong>
+              <span class="text-uppercase small ms-1">users in scope</span>
+            </div>
+            <p class="mb-2 mt-2">
+              <a class="qb-view-stats-link" id="qb-global-stats-link" href="#">Open full statistics page</a>
+            </p>
+            <h4 class="h6 mt-3 mb-2 text-secondary text-uppercase small">By gender</h4>
+            <div class="qb-mini-table-wrap">
+              <table class="table table-sm table-borderless text-secondary mb-0" id="qb-global-gender-table">
+                <tbody></tbody>
+              </table>
+            </div>
+            <h4 class="h6 mt-3 mb-2 text-secondary text-uppercase small">By zodiac element</h4>
+            <div class="qb-mini-table-wrap">
+              <table class="table table-sm table-borderless text-secondary mb-0" id="qb-global-element-table">
+                <tbody></tbody>
+              </table>
+            </div>
+            <h4 class="h6 mt-3 mb-2 text-secondary text-uppercase small">By age group</h4>
+            <div class="qb-mini-table-wrap">
+              <table class="table table-sm table-borderless text-secondary mb-0" id="qb-global-life-table">
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      </section>
+    </div>
+  </div>
+</div>
+
+{% if show_dashboard_post_form %}
+<div class="qb-modal-backdrop" id="qb-new-post-modal" hidden>
+  <div class="qb-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="qb-new-post-title">
+    <div class="qb-modal-head">
+      <h2 class="h5 mb-0" id="qb-new-post-title">New Post</h2>
+      <button type="button" class="qb-modal-close" data-qb-close-modal="qb-new-post-modal" aria-label="Close">×</button>
+    </div>
+    <form class="qb-post-form qb-js-post-form">
+      <input
+        type="hidden"
+        class="qb-js-post-location-id"
+        name="location_id"
+        value="{{ default_active_location_id }}"
+      />
+      <label class="form-label small" for="qb-new-post-content">Post content</label>
+      <textarea
+        id="qb-new-post-content"
+        class="qb-js-post-content"
+        name="content"
+        rows="6"
+        maxlength="500"
+        placeholder="Share an update (max 500 characters)."
+        required
+      ></textarea>
+      <div class="qb-modal-actions">
+        <button type="submit" class="qb-btn qb-btn-primary">Submit</button>
+        <button type="button" class="qb-btn qb-btn-outline" data-qb-close-modal="qb-new-post-modal">Cancel</button>
+        <span class="qb-post-status qb-js-post-status" aria-live="polite"></span>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+<div class="qb-modal-backdrop" id="qb-author-modal" hidden>
+  <div class="qb-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="qb-author-modal-title">
+    <div class="qb-modal-head">
+      <h2 class="h5 mb-0" id="qb-author-modal-title">User Details</h2>
+      <button type="button" class="qb-modal-close" data-qb-close-modal="qb-author-modal" aria-label="Close">×</button>
+    </div>
+    <div class="qb-author-modal-details small">
+      <p class="mb-1"><strong>User Name:</strong> <span id="qb-author-name">—</span></p>
+      <p class="mb-1"><strong>Age:</strong> <span id="qb-author-age">—</span></p>
+      <p class="mb-1"><strong>Gender:</strong> <span id="qb-author-gender">—</span></p>
+      <p class="mb-3"><strong>Location Name:</strong> <span id="qb-author-location">—</span></p>
+    </div>
+    <form id="qb-author-message-form">
+      <input type="hidden" id="qb-author-recipient-id" />
+      <input type="hidden" id="qb-author-recipient-name" />
+      <label class="form-label small" for="qb-author-message-body">Send a message to this user</label>
+      <textarea id="qb-author-message-body" rows="5" required></textarea>
+      <div class="qb-modal-actions">
+        <button type="submit" class="qb-btn qb-btn-primary">Send</button>
+        <button type="button" class="qb-btn qb-btn-outline" data-qb-close-modal="qb-author-modal">Cancel</button>
+        <span class="qb-author-message-status small text-muted" id="qb-author-message-status" aria-live="polite"></span>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="qb-modal-backdrop" id="qb-connection-modal" hidden>
+  <div class="qb-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="qb-connection-modal-title">
+    <div class="qb-modal-head">
+      <h2 class="h5 mb-0" id="qb-connection-modal-title">Add Connection</h2>
+      <button type="button" class="qb-modal-close" data-qb-close-modal="qb-connection-modal" aria-label="Close">×</button>
+    </div>
+    <input type="hidden" id="qb-connection-type" />
+    <div class="mt-2" id="qb-connection-member-type-wrap" hidden>
+      <label class="form-label small" for="qb-connection-member-type">Family Member Type <span class="text-danger">*</span></label>
+      <select id="qb-connection-member-type" class="form-select form-select-sm">
+        <option value="">— Choose —</option>
+        <option value="nuclear">Nuclear Family</option>
+        <option value="general">General Family</option>
+      </select>
+    </div>
+    <div id="qb-connection-family-profile-wrap" class="mt-2" hidden>
+      <label class="form-label small" for="qb-conn-member-name">Name <span class="text-danger">*</span></label>
+      <input type="text" id="qb-conn-member-name" class="form-control form-control-sm" autocomplete="name" />
+      <label class="form-label small mt-2" for="qb-conn-member-age">Age</label>
+      <input type="number" id="qb-conn-member-age" class="form-control form-control-sm" min="0" max="130" step="1" />
+      <label class="form-label small mt-2" for="qb-conn-member-gender">Gender</label>
+      <select id="qb-conn-member-gender" class="form-select form-select-sm">
+        <option value="">—</option>
+        <option value="Male">Male</option>
+        <option value="Female">Female</option>
+        <option value="Other">Other</option>
+      </select>
+    </div>
+    <label class="form-label small" for="qb-connection-search"><span id="qb-connection-search-label">Enter Account ID (Public ID)</span></label>
+    <div class="qb-connection-search-row">
+      <input type="text" id="qb-connection-search" class="form-control form-control-sm" autocomplete="off" />
+      <button type="button" class="qb-btn qb-btn-primary btn-sm" id="qb-connection-search-btn">Search</button>
+    </div>
+    <div id="qb-connection-suggestions" class="qb-connection-suggestions small mt-3"></div>
+    <div class="qb-relationship-wrap mt-3" id="qb-relationship-wrap" hidden>
+      <label class="form-label small" for="qb-relationship-select">Relationship <span class="text-danger">*</span></label>
+      <select id="qb-relationship-select" class="form-select form-select-sm">
+        <option value="">— Select relationship —</option>
+      </select>
+      <input
+        type="text"
+        id="qb-relationship-custom"
+        class="form-control form-control-sm mt-2"
+        placeholder="Enter relationship"
+        hidden
+      />
+    </div>
+    <div id="qb-connection-selected" class="qb-connection-selected small mt-3" hidden></div>
+    <div class="qb-modal-actions" id="qb-connection-actions" hidden>
+      <button type="button" class="qb-btn qb-btn-primary" id="qb-connection-send-btn">Send Request</button>
+      <button type="button" class="qb-btn qb-btn-outline" data-qb-close-modal="qb-connection-modal">Cancel</button>
+    </div>
+    <p id="qb-connection-status" class="small text-muted mt-2 mb-0" aria-live="polite"></p>
+  </div>
+</div>
+
+<!-- Add nuclear member from Family Tree (+) -->
+<div class="qb-modal-backdrop" id="qb-family-tree-add-modal" hidden>
+  <div class="qb-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="qb-family-tree-add-title">
+    <div class="qb-modal-head">
+      <h2 class="h5 mb-0" id="qb-family-tree-add-title">Add member in tree</h2>
+      <button type="button" class="qb-modal-close" data-qb-close-modal="qb-family-tree-add-modal" aria-label="Close">×</button>
+    </div>
+    <form id="qb-family-tree-add-form">
+      <input type="hidden" id="qb-fta-placeholder-id" value="" />
+      <input type="hidden" id="qb-fta-preset-relationship" value="" />
+      <p class="small text-muted mb-2" id="qb-fta-slot-hint"></p>
+      <label class="form-label small" for="qb-fta-name">Name <span class="text-danger">*</span></label>
+      <input type="text" id="qb-fta-name" class="form-control form-control-sm" required autocomplete="name" />
+      <label class="form-label small mt-2" for="qb-fta-age">Age (optional)</label>
+      <input type="number" id="qb-fta-age" class="form-control form-control-sm" min="0" max="130" step="1" />
+      <label class="form-label small mt-2" for="qb-fta-gender">Gender</label>
+      <select id="qb-fta-gender" class="form-select form-select-sm">
+        <option value="">—</option>
+        <option value="Male">Male</option>
+        <option value="Female">Female</option>
+        <option value="Other">Other</option>
+      </select>
+      <label class="form-label small mt-2" for="qb-fta-relationship">Relationship <span class="text-danger">*</span></label>
+      <select id="qb-fta-relationship" class="form-select form-select-sm" required></select>
+      <label class="form-label small mt-2" for="qb-fta-public-id">Account ID (Public ID, optional)</label>
+      <div class="qb-family-id-search-row">
+        <input type="text" id="qb-fta-public-id" class="form-control form-control-sm" autocomplete="off" placeholder="Link if they are registered" />
+        <button type="button" class="qb-btn qb-btn-outline btn-sm" id="qb-fta-public-search">Search</button>
+      </div>
+      <div id="qb-fta-suggestion" class="qb-connection-suggestion-list mt-2"></div>
+      <div class="qb-modal-actions mt-3">
+        <button type="submit" class="qb-btn qb-btn-primary">Add to tree</button>
+        <button type="button" class="qb-btn qb-btn-outline" data-qb-close-modal="qb-family-tree-add-modal">Cancel</button>
+        <span class="small text-muted" id="qb-fta-status" aria-live="polite"></span>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="qb-modal-backdrop" id="qb-add-grandparent-modal" hidden>
+  <div class="qb-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="qb-add-grandparent-title">
+    <div class="qb-modal-head">
+      <h2 class="h5 mb-0" id="qb-add-grandparent-title">Add Grandparent</h2>
+      <button type="button" class="qb-modal-close" data-qb-close-modal="qb-add-grandparent-modal" aria-label="Close">×</button>
+    </div>
+    <form id="qb-add-grandparent-form">
+      <input type="hidden" id="qb-grandparent-relationship" />
+      <p class="small text-muted mb-2" id="qb-grandparent-subtitle">—</p>
+      <label class="form-label small" for="qb-grandparent-name">Name</label>
+      <input type="text" id="qb-grandparent-name" class="form-control form-control-sm" autocomplete="off" required />
+      <label class="form-label small mt-2" for="qb-grandparent-gender">Gender</label>
+      <select id="qb-grandparent-gender" class="form-select form-select-sm">
+        <option value="Male">Male</option>
+        <option value="Female">Female</option>
+      </select>
+      <label class="qb-family-inline-check mt-2">
+        <input type="checkbox" id="qb-grandparent-dead" /> Deceased
+      </label>
+      <div class="qb-modal-actions">
+        <button type="submit" class="qb-btn qb-btn-primary">Save</button>
+        <button type="button" class="qb-btn qb-btn-outline" data-qb-close-modal="qb-add-grandparent-modal">Cancel</button>
+        <span class="small text-muted" id="qb-grandparent-status" aria-live="polite"></span>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="qb-modal-backdrop" id="qb-mark-deceased-modal" hidden>
+  <div class="qb-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="qb-mark-deceased-title">
+    <div class="qb-modal-head">
+      <h2 class="h5 mb-0" id="qb-mark-deceased-title">Mark family members as deceased</h2>
+      <button type="button" class="qb-modal-close" data-qb-close-modal="qb-mark-deceased-modal" aria-label="Close">×</button>
+    </div>
+    <p class="small text-muted mb-2">
+      Select one or more living family members. Only an admin can reverse a
+      deceased marking.
+    </p>
+    <ul id="qb-mark-deceased-list" class="list-unstyled small mb-0 qb-mark-deceased-list"></ul>
+    <p id="qb-mark-deceased-empty" class="small text-muted mb-0" hidden>
+      No living family members to mark.
+    </p>
+    <div class="qb-modal-actions">
+      <button type="button" class="qb-btn qb-btn-primary" id="qb-mark-deceased-submit">Mark as Deceased</button>
+      <button type="button" class="qb-btn qb-btn-outline" data-qb-close-modal="qb-mark-deceased-modal">Cancel</button>
+      <span class="small text-muted" id="qb-mark-deceased-status" aria-live="polite"></span>
+    </div>
+  </div>
+</div>
+
+<!-- General family: extended relatives (Account ID required) -->
+<div class="qb-modal-backdrop" id="qb-family-add-general-modal" hidden>
+  <div class="qb-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="qb-family-add-general-title">
+    <div class="qb-modal-head">
+      <h2 class="h5 mb-0" id="qb-family-add-general-title">Add family member</h2>
+      <button type="button" class="qb-modal-close" data-qb-close-modal="qb-family-add-general-modal" aria-label="Close">×</button>
+    </div>
+    <form id="qb-family-add-general-form">
+      <p class="small text-muted mb-2">
+        Extended relatives must be registered on Quantum Box. A connection request is sent; after they accept,
+        the person appears under <strong>View All Family Members</strong> (not in the tree).
+      </p>
+      <label class="form-label small" for="qb-fam-gen-type">Family member type <span class="text-danger">*</span></label>
+      <select id="qb-fam-gen-type" class="form-select form-select-sm mb-2" required>
+        <option value="">Choose…</option>
+        <option value="Uncle">Uncle</option>
+        <option value="Aunt">Aunt</option>
+        <option value="Cousin">Cousin</option>
+        <option value="Nephew">Nephew</option>
+        <option value="Niece">Niece</option>
+        <option value="Other">Other</option>
+      </select>
+      <div id="qb-fam-gen-custom-wrap" class="mb-2" hidden>
+        <label class="form-label small" for="qb-fam-gen-custom">Describe relationship</label>
+        <input type="text" id="qb-fam-gen-custom" class="form-control form-control-sm" maxlength="120" placeholder="e.g. Second cousin" />
+      </div>
+      <label class="form-label small" for="qb-fam-gen-public-id">Account ID (Public ID) <span class="text-danger">*</span></label>
+      <div class="qb-family-id-search-row">
+        <input type="text" id="qb-fam-gen-public-id" class="form-control form-control-sm" required autocomplete="off" placeholder="Their public ID" />
+        <button type="button" class="qb-btn qb-btn-outline btn-sm" id="qb-fam-gen-search">Search</button>
+      </div>
+      <div id="qb-fam-gen-suggestion" class="qb-connection-suggestion-list mt-2"></div>
+      <label class="form-label small mt-2" for="qb-fam-gen-name">Name <span class="text-danger">*</span></label>
+      <input type="text" id="qb-fam-gen-name" class="form-control form-control-sm mb-2" required readonly autocomplete="name" />
+      <label class="form-label small" for="qb-fam-gen-life-stage">Age (life stage)</label>
+      <select id="qb-fam-gen-life-stage" class="form-select form-select-sm mb-2" disabled>
+        <option value="">—</option>
+        <option value="Balak">Balak (0–24)</option>
+        <option value="Yuvak">Yuvak (25–49)</option>
+        <option value="Vridh">Vridh (50–75)</option>
+        <option value="Sanyas">Sanyas (75+)</option>
+      </select>
+      <label class="form-label small" for="qb-fam-gen-gender">Gender</label>
+      <select id="qb-fam-gen-gender" class="form-select form-select-sm mb-2" disabled>
+        <option value="">—</option>
+        <option value="Male">Male</option>
+        <option value="Female">Female</option>
+        <option value="Other">Other</option>
+      </select>
+      <p class="small text-muted mb-0">Use Search after entering Account ID to load name, age group, and gender from their profile.</p>
+      <div class="qb-modal-actions mt-3">
+        <button type="submit" class="qb-btn qb-btn-primary">Send request</button>
+        <button type="button" class="qb-btn qb-btn-outline" data-qb-close-modal="qb-family-add-general-modal">Cancel</button>
+        <span class="small text-muted" id="qb-fam-gen-status" aria-live="polite"></span>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- All family members (nuclear + general + connections) -->
+<div class="qb-modal-backdrop" id="qb-family-all-members-modal" hidden>
+  <div class="qb-modal-dialog qb-modal-dialog--wide" role="dialog" aria-modal="true" aria-labelledby="qb-family-all-members-title">
+    <div class="qb-modal-head">
+      <h2 class="h5 mb-0" id="qb-family-all-members-title">All family members</h2>
+      <button type="button" class="qb-modal-close" data-qb-close-modal="qb-family-all-members-modal" aria-label="Close">×</button>
+    </div>
+    <p class="small text-muted mb-2">Nuclear members also appear in the tree; general relatives appear only here.</p>
+    <ul id="qb-family-all-list-modal" class="list-unstyled small mb-0 qb-family-all-members-scroll"></ul>
+    <p id="qb-family-all-empty-modal" class="small text-muted mb-0" hidden>No family members yet.</p>
+  </div>
+</div>
+
+<!-- Edit family member (nuclear profile + link; general unlink/remove only) -->
+<div class="qb-modal-backdrop" id="qb-family-member-edit-modal" hidden>
+  <div class="qb-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="qb-family-member-edit-title">
+    <div class="qb-modal-head">
+      <h2 class="h5 mb-0" id="qb-family-member-edit-title">Edit family member</h2>
+      <button type="button" class="qb-modal-close" data-qb-close-modal="qb-family-member-edit-modal" aria-label="Close">×</button>
+    </div>
+    <input type="hidden" id="qb-fme-id" />
+    <input type="hidden" id="qb-fme-source" />
+    <input type="hidden" id="qb-fme-member-type" />
+    <div id="qb-fme-general-panel" class="mb-2" hidden>
+      <p class="small text-muted mb-1">General relative (profile comes from their account).</p>
+      <p class="mb-0"><strong id="qb-fme-gen-name">—</strong> <span class="font-monospace small text-muted" id="qb-fme-gen-pub"></span></p>
+      <p class="small mb-0"><span class="text-muted">Relationship:</span> <span id="qb-fme-gen-rel">—</span></p>
+    </div>
+    <div id="qb-fme-nuclear-panel">
+      <label class="form-label small" for="qb-fme-name">Name <span class="text-danger">*</span></label>
+      <input type="text" id="qb-fme-name" class="form-control form-control-sm mb-2" autocomplete="name" />
+      <label class="form-label small" for="qb-fme-age">Age</label>
+      <input type="number" id="qb-fme-age" class="form-control form-control-sm mb-2" min="0" max="130" step="1" />
+      <label class="form-label small" for="qb-fme-gender">Gender</label>
+      <select id="qb-fme-gender" class="form-select form-select-sm mb-2">
+        <option value="">—</option>
+        <option value="Male">Male</option>
+        <option value="Female">Female</option>
+        <option value="Other">Other</option>
+      </select>
+    </div>
+    <div id="qb-fme-link-panel" class="border-top pt-2 mt-2" hidden>
+      <p class="small text-muted mb-2" id="qb-fme-link-hint"></p>
+      <label class="form-label small" for="qb-fme-link-pid">Account ID (Public ID)</label>
+      <div class="qb-family-id-search-row">
+        <input type="text" id="qb-fme-link-pid" class="form-control form-control-sm" autocomplete="off" />
+        <button type="button" class="qb-btn qb-btn-outline btn-sm" id="qb-fme-link-search">Search</button>
+      </div>
+      <div id="qb-fme-link-suggestion" class="qb-connection-suggestion-list mt-2"></div>
+      <button type="button" class="qb-btn qb-btn-primary btn-sm mt-2" id="qb-fme-link-apply">Send link request</button>
+    </div>
+    <div class="qb-modal-actions mt-3 flex-wrap gap-2">
+      <button type="button" class="qb-btn qb-btn-primary" id="qb-fme-save">Save</button>
+      <button type="button" class="qb-btn qb-btn-outline" id="qb-fme-unlink" hidden>Unlink account</button>
+      <button type="button" class="qb-btn btn-outline-danger" id="qb-fme-remove">Remove member</button>
+      <button type="button" class="qb-btn qb-btn-outline" data-qb-close-modal="qb-family-member-edit-modal">Close</button>
+      <span class="small text-muted w-100" id="qb-fme-status" aria-live="polite"></span>
+    </div>
+  </div>
+</div>
+
+<div class="qb-modal-backdrop" id="qb-ft-graph-add-modal" hidden>
+  <div class="qb-modal-dialog qb-modal-dialog--wide" role="dialog" aria-modal="true" aria-labelledby="qb-ft-graph-add-title">
+    <div class="qb-modal-head">
+      <h2 class="h5 mb-0" id="qb-ft-graph-add-title">Add family member</h2>
+      <button type="button" class="qb-modal-close" data-qb-close-modal="qb-ft-graph-add-modal" aria-label="Close">×</button>
+    </div>
+    <form id="qb-ft-graph-add-form">
+      <h3 class="h6 mt-0">Profile</h3>
+      <label class="form-label small" for="qb-ft-add-name">Name <span class="text-danger">*</span></label>
+      <input type="text" id="qb-ft-add-name" class="form-control form-control-sm" required autocomplete="name" />
+      <label class="form-label small mt-2" for="qb-ft-add-gender">Gender</label>
+      <select id="qb-ft-add-gender" class="form-select form-select-sm">
+        <option value="">—</option>
+        <option value="Male">Male</option>
+        <option value="Female">Female</option>
+        <option value="Other">Other</option>
+      </select>
+      <label class="form-label small mt-2" for="qb-ft-add-age">Age</label>
+      <input type="number" id="qb-ft-add-age" class="form-control form-control-sm" min="0" max="130" step="1" />
+      <label class="qb-family-inline-check mt-2">
+        <input type="checkbox" id="qb-ft-add-dead" /> Deceased
+      </label>
+      <h3 class="h6 mt-3">Relationships</h3>
+      <p class="small text-muted mb-2">At most one choice per row (prototype).</p>
+      <div class="row g-2">
+        <div class="col-md-6">
+          <label class="form-label small" for="qb-ft-add-parent-of">Parent of</label>
+          <select id="qb-ft-add-parent-of" class="form-select form-select-sm"></select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small" for="qb-ft-add-child-of">Child of</label>
+          <select id="qb-ft-add-child-of" class="form-select form-select-sm"></select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small" for="qb-ft-add-spouse-of">Spouse of</label>
+          <select id="qb-ft-add-spouse-of" class="form-select form-select-sm"></select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small" for="qb-ft-add-sibling-of">Sibling of</label>
+          <select id="qb-ft-add-sibling-of" class="form-select form-select-sm"></select>
+        </div>
+      </div>
+      <div class="qb-modal-actions mt-3">
+        <button type="submit" class="qb-btn qb-btn-primary">Save</button>
+        <button type="button" class="qb-btn qb-btn-outline" data-qb-close-modal="qb-ft-graph-add-modal">Cancel</button>
+        <span class="small text-muted" id="qb-ft-add-status" aria-live="polite"></span>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="qb-modal-backdrop" id="qb-ft-graph-edit-modal" hidden>
+  <div class="qb-modal-dialog qb-modal-dialog--wide" role="dialog" aria-modal="true" aria-labelledby="qb-ft-graph-edit-title">
+    <div class="qb-modal-head">
+      <h2 class="h5 mb-0" id="qb-ft-graph-edit-title">Edit profile</h2>
+      <button type="button" class="qb-modal-close" data-qb-close-modal="qb-ft-graph-edit-modal" aria-label="Close">×</button>
+    </div>
+    <form id="qb-ft-graph-edit-form">
+      <input type="hidden" id="qb-ft-edit-id" />
+      <h3 class="h6 mt-0">Profile</h3>
+      <label class="form-label small" for="qb-ft-edit-name">Name <span class="text-danger">*</span></label>
+      <input type="text" id="qb-ft-edit-name" class="form-control form-control-sm" required autocomplete="name" />
+      <label class="form-label small mt-2" for="qb-ft-edit-gender">Gender</label>
+      <select id="qb-ft-edit-gender" class="form-select form-select-sm">
+        <option value="">—</option>
+        <option value="Male">Male</option>
+        <option value="Female">Female</option>
+        <option value="Other">Other</option>
+      </select>
+      <label class="form-label small mt-2" for="qb-ft-edit-age">Age</label>
+      <input type="number" id="qb-ft-edit-age" class="form-control form-control-sm" min="0" max="130" step="1" />
+      <label class="qb-family-inline-check mt-2">
+        <input type="checkbox" id="qb-ft-edit-dead" /> Deceased
+      </label>
+      <h3 class="h6 mt-3">Relationships</h3>
+      <div class="row g-2">
+        <div class="col-md-6">
+          <label class="form-label small" for="qb-ft-edit-parent-of">Parent of</label>
+          <select id="qb-ft-edit-parent-of" class="form-select form-select-sm"></select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small" for="qb-ft-edit-child-of">Child of</label>
+          <select id="qb-ft-edit-child-of" class="form-select form-select-sm"></select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small" for="qb-ft-edit-spouse-of">Spouse of</label>
+          <select id="qb-ft-edit-spouse-of" class="form-select form-select-sm"></select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small" for="qb-ft-edit-sibling-of">Sibling of</label>
+          <select id="qb-ft-edit-sibling-of" class="form-select form-select-sm"></select>
+        </div>
+      </div>
+      <div class="qb-modal-actions mt-3">
+        <button type="submit" class="qb-btn qb-btn-primary">Save</button>
+        <button type="button" class="qb-btn qb-btn-outline" data-qb-close-modal="qb-ft-graph-edit-modal">Cancel</button>
+        <span class="small text-muted" id="qb-ft-edit-status" aria-live="polite"></span>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Admin: delete-post-with-reason modal -->
+<div class="qb-modal-backdrop" id="qb-admin-delete-modal" hidden>
+  <div class="qb-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="qb-admin-delete-title">
+    <div class="qb-modal-head">
+      <h2 class="h5 mb-0" id="qb-admin-delete-title">Delete post (Admin)</h2>
+      <button type="button" class="qb-modal-close" data-qb-close-modal="qb-admin-delete-modal" aria-label="Close">×</button>
+    </div>
+    <form id="qb-admin-delete-form">
+      <input type="hidden" id="qb-admin-delete-post-id" />
+      <p class="small text-muted mb-2">
+        The author will be notified via their Private Account Inbox with the
+        reason you provide below.
+      </p>
+      <label class="form-label small" for="qb-admin-delete-reason">Reason for deletion</label>
+      <textarea
+        id="qb-admin-delete-reason"
+        class="form-control form-control-sm"
+        rows="3"
+        required
+        maxlength="1500"
+        placeholder="Explain why this post is being removed."
+      ></textarea>
+      <div class="qb-modal-actions">
+        <button type="submit" class="qb-btn qb-btn-danger">Delete &amp; notify</button>
+        <button type="button" class="qb-btn qb-btn-outline" data-qb-close-modal="qb-admin-delete-modal">Cancel</button>
+        <span class="small text-muted" id="qb-admin-delete-status" aria-live="polite"></span>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Family: request removal (after the 2-day direct window) -->
+<div class="qb-modal-backdrop" id="qb-family-removal-request-modal" hidden>
+  <div class="qb-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="qb-family-removal-title">
+    <div class="qb-modal-head">
+      <h2 class="h5 mb-0" id="qb-family-removal-title">Request family member removal</h2>
+      <button type="button" class="qb-modal-close" data-qb-close-modal="qb-family-removal-request-modal" aria-label="Close">×</button>
+    </div>
+    <form id="qb-family-removal-request-form">
+      <input type="hidden" id="qb-family-removal-target-id" />
+      <input type="hidden" id="qb-family-removal-target-source" />
+      <p class="small text-muted mb-2">
+        You are requesting the removal of
+        <strong id="qb-family-removal-target-label">this family member</strong>.
+        Members added more than 2 days ago can only be removed after an
+        admin approves your request.
+      </p>
+      <label class="form-label small" for="qb-family-removal-reason">Reason for removal</label>
+      <textarea
+        id="qb-family-removal-reason"
+        class="form-control form-control-sm"
+        rows="3"
+        required
+        maxlength="1500"
+        placeholder="Tell the admin why you want to remove this person."
+      ></textarea>
+      <div class="qb-modal-actions">
+        <button type="submit" class="qb-btn qb-btn-primary">Submit request</button>
+        <button type="button" class="qb-btn qb-btn-outline" data-qb-close-modal="qb-family-removal-request-modal">Cancel</button>
+        <span class="small text-muted" id="qb-family-removal-status" aria-live="polite"></span>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Family: link existing nuclear family_members row to a registered account (direct) -->
+<div class="qb-modal-backdrop" id="qb-family-link-modal" hidden>
+  <div class="qb-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="qb-family-link-title">
+    <div class="qb-modal-head">
+      <h2 class="h5 mb-0" id="qb-family-link-title">Link to registered account</h2>
+      <button type="button" class="qb-modal-close" data-qb-close-modal="qb-family-link-modal" aria-label="Close">×</button>
+    </div>
+    <p class="small text-muted mb-2">
+      Ask
+      <strong id="qb-family-link-target-name">this family member</strong>
+      to link their Quantum Box account to this tree position. They receive a bell notification and inbox message and
+      must accept before the link is active.
+    </p>
+    <label class="form-label small" for="qb-family-link-public-id">Account ID (Public ID)</label>
+    <div class="qb-family-id-search-row">
+      <input
+        type="text"
+        id="qb-family-link-public-id"
+        class="form-control form-control-sm"
+        placeholder="Search or type full ID"
+        autocomplete="off"
+      />
+      <button type="button" class="qb-btn qb-btn-outline btn-sm" id="qb-family-link-search-btn">Search</button>
+    </div>
+    <div id="qb-family-link-suggestion" class="qb-connection-suggestion-list mt-2"></div>
+    <div class="qb-modal-actions">
+      <button type="button" class="qb-btn qb-btn-primary" id="qb-family-link-send-btn" disabled>
+        Send link request
+      </button>
+      <button type="button" class="qb-btn qb-btn-outline" data-qb-close-modal="qb-family-link-modal">Cancel</button>
+      <span class="small text-muted" id="qb-family-link-status" aria-live="polite"></span>
+    </div>
+  </div>
+</div>
+
+<div class="qb-modal-backdrop" id="qb-family-link-sent-modal" hidden>
+  <div class="qb-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="qb-family-link-sent-title">
+    <div class="qb-modal-head">
+      <h2 class="h5 mb-0" id="qb-family-link-sent-title">Link request sent</h2>
+      <button type="button" class="qb-modal-close" data-qb-close-modal="qb-family-link-sent-modal" aria-label="Close">×</button>
+    </div>
+    <p class="small mb-0">Link request sent successfully. The other user will be notified and can accept or decline.</p>
+    <div class="qb-modal-actions mt-3">
+      <button type="button" class="qb-btn qb-btn-primary" data-qb-close-modal="qb-family-link-sent-modal">OK</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add nuclear / general family (tree "Add" menu; backend unchanged for close/manual) -->
+<div class="qb-modal-backdrop" id="qb-family-add-close-modal" hidden>
+  <div class="qb-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="qb-family-add-close-title">
+    <div class="qb-modal-head">
+      <h2 class="h5 mb-0" id="qb-family-add-close-title">Add family member</h2>
+      <button type="button" class="qb-modal-close" data-qb-close-modal="qb-family-add-close-modal" aria-label="Close">×</button>
+    </div>
+    <form id="qb-family-add-close-form">
+      <fieldset class="mb-3">
+        <legend class="form-label small mb-1">Member type</legend>
+        <div class="qb-family-radio-row">
+          <label class="me-3"
+            ><input type="radio" name="qb-add-family-type" value="nuclear" checked class="qb-js-add-family-type" />
+            Nuclear Family</label
+          >
+          <label
+            ><input type="radio" name="qb-add-family-type" value="general" class="qb-js-add-family-type" />
+            General Family</label
+          >
+        </div>
+      </fieldset>
+      <div id="qb-family-add-close-general-panel" class="mb-2" hidden>
+        <p class="small text-muted mb-2">
+          General relatives are added by Account ID. You will pick the relationship (General Family list) before sending the
+          request.
+        </p>
+        <button type="button" class="qb-btn qb-btn-primary w-100" id="qb-family-add-close-general-go">
+          Continue to add General Family member
+        </button>
+      </div>
+      <div id="qb-family-add-close-nuclear-block">
+      <label class="form-label small" for="qb-family-add-close-name">Name</label>
+      <input type="text" class="form-control form-control-sm mb-2" id="qb-family-add-close-name" required autocomplete="off" />
+      <label class="form-label small" for="qb-family-add-close-age">Age (optional)</label>
+      <input type="number" min="0" class="form-control form-control-sm mb-2" id="qb-family-add-close-age" />
+      <label class="form-label small" for="qb-family-add-close-gender">Gender</label>
+      <select class="form-select form-select-sm mb-2" id="qb-family-add-close-gender">
+        <option value="">—</option>
+        <option value="Male">Male</option>
+        <option value="Female">Female</option>
+      </select>
+      <label class="form-label small" for="qb-family-add-close-rel">Relationship (Nuclear Family)</label>
+      <select class="form-select form-select-sm mb-2" id="qb-family-add-close-rel" required>
+        <option value="">Choose…</option>
+        <option value="Father">Father</option>
+        <option value="Mother">Mother</option>
+        <option value="Sibling">Sibling</option>
+        <option value="Spouse">Spouse</option>
+        <option value="Child">Child</option>
+        <option value="Grandparent">Grandparent</option>
+      </select>
+      <label class="form-label small" for="qb-family-add-close-connect">Link to existing tree member (optional)</label>
+      <select class="form-select form-select-sm mb-2" id="qb-family-add-close-connect">
+        <option value="">— None —</option>
+      </select>
+      <p class="small text-muted mb-2">For a child, pick the parent row here to attach under that member.</p>
+      </div>
+      <div class="qb-modal-actions">
+        <button type="submit" class="qb-btn qb-btn-primary" id="qb-family-add-close-submit-btn">Add member</button>
+        <button type="button" class="qb-btn qb-btn-outline" data-qb-close-modal="qb-family-add-close-modal">Cancel</button>
+        <span class="small text-muted" id="qb-family-add-close-status" aria-live="polite"></span>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Edit tree connections (dropdowns per member) -->
+<div class="qb-modal-backdrop" id="qb-family-edit-tree-modal" hidden>
+  <div class="qb-modal-dialog qb-modal-dialog--wide" role="dialog" aria-modal="true" aria-labelledby="qb-family-edit-tree-title">
+    <div class="qb-modal-head">
+      <h2 class="h5 mb-0" id="qb-family-edit-tree-title">Edit tree connections</h2>
+      <button type="button" class="qb-modal-close" data-qb-close-modal="qb-family-edit-tree-modal" aria-label="Close">×</button>
+    </div>
+    <p class="small text-muted mb-2">
+      Optional links between your saved family rows (mother, father, spouse, child of). Leave blank to clear.
+    </p>
+    <div id="qb-family-edit-tree-body" class="small qb-family-edit-tree-body"></div>
+    <div class="qb-modal-actions mt-2">
+      <button type="button" class="qb-btn qb-btn-primary" id="qb-family-edit-tree-save">Save connections</button>
+      <button type="button" class="qb-btn qb-btn-outline" data-qb-close-modal="qb-family-edit-tree-modal">Cancel</button>
+      <span class="small text-muted" id="qb-family-edit-tree-status" aria-live="polite"></span>
+    </div>
+  </div>
+</div>
+
+<!-- Natural-language relationship editor (replaces mother/father dropdowns) -->
+<div class="qb-modal-backdrop" id="qb-family-edit-parents-modal" hidden>
+  <div class="qb-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="qb-family-natural-edit-title">
+    <div class="qb-modal-head">
+      <h2 class="h5 mb-0" id="qb-family-natural-edit-title">Edit relationship</h2>
+      <button type="button" class="qb-modal-close" data-qb-close-modal="qb-family-edit-parents-modal" aria-label="Close">×</button>
+    </div>
+    <form id="qb-family-natural-edit-form" class="qb-family-natural-edit-form">
+      <input type="hidden" id="qb-fne-member-id" name="member_id" />
+      <p class="small text-muted mb-3" id="qb-fne-hint">Describe how this person is related to someone else in your nuclear family.</p>
+      <div class="qb-family-natural-sentence mb-3">
+        <span class="qb-family-natural-quote" id="qb-fne-name-open">“</span><span id="qb-fne-member-name" class="fw-semibold"></span><span class="qb-family-natural-quote">”</span>
+        <span class="mx-1">is</span>
+        <select id="qb-fne-relationship" class="form-select form-select-sm d-inline-block qb-family-natural-select" aria-label="Relationship"></select>
+        <span class="mx-1">of</span>
+        <select id="qb-fne-other" class="form-select form-select-sm d-inline-block qb-family-natural-select" aria-label="Other family member"></select>
+      </div>
+      <div class="qb-modal-actions">
+        <button type="submit" class="qb-btn qb-btn-primary">Save</button>
+        <button type="button" class="qb-btn qb-btn-outline" data-qb-close-modal="qb-family-edit-parents-modal">Cancel</button>
+        <span class="small text-muted" id="qb-fne-status" aria-live="polite"></span>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Admin: family removal request queue -->
+<div class="qb-modal-backdrop" id="qb-admin-removals-modal" hidden>
+  <div class="qb-modal-dialog qb-modal-dialog--wide" role="dialog" aria-modal="true" aria-labelledby="qb-admin-removals-title">
+    <div class="qb-modal-head">
+      <h2 class="h5 mb-0" id="qb-admin-removals-title">Family removal requests</h2>
+      <button type="button" class="qb-modal-close" data-qb-close-modal="qb-admin-removals-modal" aria-label="Close">×</button>
+    </div>
+    <p class="small text-muted mb-2">
+      Approve or reject each request. Approving deletes the family member
+      from the requesting user&rsquo;s family list and notifies them. Rejecting
+      keeps the member and notifies the user with your admin note.
+    </p>
+    <ul id="qb-admin-removal-list" class="list-unstyled small mb-0 qb-admin-removal-list"></ul>
+    <p id="qb-admin-removal-empty" class="small text-muted mb-0" hidden>
+      No pending removal requests.
+    </p>
+    <div class="qb-modal-actions">
+      <button type="button" class="qb-btn qb-btn-outline" data-qb-close-modal="qb-admin-removals-modal">Close</button>
+      <span class="small text-muted" id="qb-admin-removal-status" aria-live="polite"></span>
+    </div>
+  </div>
+</div>
+
+<div
+  class="modal fade"
+  id="walletTransactionsModal"
+  tabindex="-1"
+  aria-labelledby="walletTransactionsModalLabel"
+  aria-hidden="true"
+>
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content text-bg-dark border-secondary">
+      <div class="modal-header border-secondary">
+        <h2 class="modal-title h5" id="walletTransactionsModalLabel">Recent Qoin transactions</h2>
+        <button
+          type="button"
+          class="btn-close btn-close-white"
+          data-bs-dismiss="modal"
+          aria-label="Close"
+        ></button>
+      </div>
+      <div class="modal-body">
+        {% if qoin_transactions_recent %}
+        <ul class="list-unstyled small mb-0">
+          {% for t in qoin_transactions_recent %}
+          <li class="mb-2 pb-2 border-bottom border-secondary">
+            <span class="text-info font-monospace">{{ t.amount }}</span>
+            · {{ t.reason }}<br />
+            <span class="text-muted">{{ t.created_at }}</span>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-muted mb-0 small">No transactions recorded yet.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+<script src="{{ url_for('static', filename='family_tree.js') }}"></script>
+<script src="{{ url_for('static', filename='dashboard.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block title %}{{ location_name }} — Geography stats{% endblock %}
+
+{% block body %}
+<div class="qb-location-page-grid">
+  <div class="qb-location-page-main">
+    <nav aria-label="Breadcrumb" class="mb-3">
+      <ol class="breadcrumb mb-0 small">
+        {% for c in breadcrumbs %}
+        <li class="breadcrumb-item {% if loop.last %}active{% endif %}">
+          {% if c.url and not loop.last %}
+          <a href="{{ c.url }}">{{ c.label }}</a>
+          {% else %}
+          {{ c.label }}
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ol>
+    </nav>
+
+    <div class="qb-location-back-row mb-3 d-flex flex-wrap gap-2 align-items-center">
+      <a href="{{ url_for('dashboard') }}" class="qb-btn qb-btn-outline btn-sm text-decoration-none"
+        >← Dashboard</a
+      >
+      {% if admin_members_list_url %}
+      <a
+        href="{{ admin_members_list_url }}"
+        class="qb-btn qb-btn-primary btn-sm text-decoration-none"
+        >List all members in this location</a
+      >
+      {% endif %}
+    </div>
+
+    <section class="qb-hero mb-3">
+      <h1 class="h2 mb-1">{{ location_name }}</h1>
+      <p class="qb-lead mb-2">
+        Registered users counted by <strong>current village</strong> under this geography
+        (includes all descendant villages beneath the chosen unit).
+      </p>
+      {% if geo_meta and geo_meta.zodiac_sign %}
+      <p class="text-muted small mb-0">
+        Place zodiac / element (from geography hash):
+        <span class="text-info">{{ geo_meta.zodiac_sign }}</span> ·
+        <span class="text-info">{{ geo_meta.element }}</span>
+        <span class="d-block mt-1">
+          Charts use each user’s <strong>birth Sun sign</strong> and derived element —
+          not this place assignment.
+        </span>
+      </p>
+      {% endif %}
+    </section>
+
+    {% include "_location_breakdowns.html" %}
+  </div>
+
+  <aside class="qb-location-zodiac-rail" aria-label="Zodiac sign counts by element">
+    {% if stats.zodiac_by_element %}
+    {% for grp in stats.zodiac_by_element %}
+    <div class="qb-zodiac-rail-block qb-zodiac-rail-block--{{ grp.element|lower }}">
+      <div class="qb-zodiac-rail-title">{{ grp.element }}</div>
+      <ul class="list-unstyled mb-0 qb-zodiac-count-list">
+        {% for srow in grp.signs %}
+        <li class="qb-zodiac-count-row d-flex justify-content-between gap-2 align-items-baseline">
+          <span>{{ srow.label }}</span>
+          <span class="font-monospace text-info flex-shrink-0">{{ srow.count }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endfor %}
+    {% else %}
+    {% set rail_order = ['Fire', 'Earth', 'Air', 'Water'] %}
+    {% for element in rail_order %}
+    {% set signs = signs_by_element[element] if element in signs_by_element else () %}
+    <div class="qb-zodiac-rail-block qb-zodiac-rail-block--{{ element|lower }}">
+      <div class="qb-zodiac-rail-title">{{ element }}</div>
+      <ul class="qb-zodiac-rail-signs list-unstyled mb-0">
+        {% for s in signs %}
+        <li class="qb-zodiac-rail-chip">{{ s }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endfor %}
+    {% endif %}
+    {% if wallet_key %}
+    <div class="qb-zodiac-rail-block qb-location-wallet-box">
+      <div class="qb-zodiac-rail-title">Village Wallet</div>
+      <div class="qb-location-wallet-name">{{ location_name }}</div>
+      <div class="qb-location-wallet-balance">
+        {{ wallet_balance }} <span>Qoins</span>
+      </div>
+      {% if wallet_account_id %}
+      <div class="qb-location-wallet-id font-monospace">{{ wallet_account_id }}</div>
+      {% endif %}
+    </div>
+    {% endif %}
+  </aside>
+</div>
+{% endblock %}

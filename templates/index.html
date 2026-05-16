@@ -1,0 +1,472 @@
+{% extends "base.html" %}
+
+{% block title %}Quantum Box — Explore{% endblock %}
+
+{% block body_class %}qb-page-home{% endblock %}
+
+{% block head_extra %}
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;600&display=swap"
+  rel="stylesheet"
+/>
+<link
+  rel="stylesheet"
+  href="{{ url_for('static', filename='dashboard.css') }}"
+/>
+{% endblock %}
+
+{% block header_inner %}
+<div class="qb-home-header-inner w-100">
+  <div class="qb-home-header-row">
+    <a
+      href="{{ url_for('index') }}"
+      class="qb-brand qb-brand-with-logo text-decoration-none qb-home-brand"
+      aria-label="Quantum Box home"
+    >
+      <span class="qb-brand-mark" aria-hidden="true">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 82 40"
+          width="82"
+          height="40"
+          focusable="false"
+        >
+          <rect
+            x="2"
+            y="2"
+            width="78"
+            height="36"
+            rx="6"
+            ry="6"
+            fill="#FFD700"
+            stroke="#333333"
+            stroke-width="1"
+          />
+          <text
+            x="20"
+            y="20"
+            dominant-baseline="central"
+            font-family="'DM Sans', system-ui, sans-serif"
+            font-size="14"
+            font-weight="700"
+            fill="#000000"
+            text-anchor="middle"
+          >SITA</text>
+          <circle cx="55" cy="20" r="16" fill="#000000" />
+          <text
+            x="55"
+            y="20"
+            dominant-baseline="central"
+            font-size="16"
+            font-family="'Noto Sans Devanagari', system-ui, sans-serif"
+            font-weight="700"
+            fill="#ffffff"
+            text-anchor="middle"
+          >राम</text>
+        </svg>
+      </span>
+      <span class="qb-brand-wordmark">Quantum <span>Box</span></span>
+    </a>
+
+    <div class="qb-home-header-trailing">
+      <div class="qb-home-auth">
+        {% if session.get('user_pk') %}
+        <a href="{{ url_for('dashboard') }}" class="qb-btn qb-btn-outline qb-home-btn-auth"
+          >Dashboard</a
+        >
+        <form method="post" action="{{ url_for('logout') }}" class="m-0">
+          <button type="submit" class="qb-btn qb-btn-link qb-home-btn-signout">Sign out</button>
+        </form>
+        {% else %}
+        <a href="{{ url_for('login') }}" class="qb-btn qb-btn-outline qb-home-btn-auth">Login</a>
+        <a href="{{ url_for('register') }}" class="qb-btn qb-btn-primary qb-home-btn-auth"
+          >Register</a
+        >
+        {% endif %}
+      </div>
+      <nav class="qb-home-text-links" aria-label="Site links">
+        <a href="{{ url_for('about') }}" class="qb-home-text-link">About</a>
+        <a href="{{ url_for('contact') }}" class="qb-home-text-link">Contact</a>
+      </nav>
+      <div
+        id="qb-advanced-timebox"
+        class="qb-timebox qb-home-timebox"
+        role="group"
+        aria-label="Calendar and local time"
+      >
+        <div class="qb-timebox-main-row d-flex align-items-center flex-wrap gap-1">
+          <span id="qb-timebox-line-main" class="qb-timebox-main-text font-monospace">—</span>
+          <button
+            type="button"
+            id="qb-timebox-dropdown-btn"
+            class="qb-timebox-chev"
+            aria-expanded="false"
+            aria-controls="qb-timebox-extra"
+            title="Show details"
+          >
+            ▼
+          </button>
+        </div>
+        <div class="qb-timebox-controls d-flex align-items-center gap-1 mt-1 flex-wrap">
+          <span class="qb-timebox-cal-label small text-muted">Calendar</span>
+          <div class="qb-segmented" role="group" aria-label="Calendar mode">
+            <button type="button" class="qb-segmented-btn is-active" data-cal-mode="gregorian">
+              Gregorian
+            </button>
+            <button type="button" class="qb-segmented-btn" data-cal-mode="indian">Indian</button>
+          </div>
+        </div>
+        <div id="qb-timebox-extra" class="qb-timebox-extra" hidden>
+          <div id="qb-timebox-line2" class="qb-timebox-extra-line"></div>
+          <div id="qb-timebox-line3" class="qb-timebox-extra-line qb-timebox-extra-line--vs"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block body %}
+<div class="qb-home-mega-hero">
+  <section class="qb-hero qb-home-welcome" aria-labelledby="hero-heading">
+    <div class="hero-section-inner">
+      <div class="hero-overlay">
+        <h1 id="hero-heading">Welcome to Quantum Box</h1>
+        <p class="qb-lead hero-overlay__lead">
+          A prototype for early testers. Register to receive a Private ID for sign-in and a Public ID on
+          your dashboard — then explore how participants are distributed across states (from current
+          location).
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <div class="qb-humans-band">
+    <div class="qb-cards qb-cards-humans" aria-label="Total human beings by region">
+    <div class="qb-card">
+      <div class="qb-card-stat">{{ total_users_earth }}</div>
+      <div class="qb-card-label qb-card-label-sentence">Total Human Beings on Earth</div>
+    </div>
+    <div class="qb-card">
+      <div class="qb-card-stat">{{ total_users_asia }}</div>
+      <div class="qb-card-label qb-card-label-sentence">Total Human Beings in Asia</div>
+    </div>
+    <div class="qb-card">
+      <div class="qb-card-stat">{{ total_users_india }}</div>
+      <div class="qb-card-label qb-card-label-sentence">Total Human Beings in India</div>
+    </div>
+  </div>
+  </div>
+
+  <section class="qb-panel qb-explorer qb-explorer--mega mb-4" aria-labelledby="explorer-heading">
+  <h2 id="explorer-heading" class="h4 mb-3">Global data explorer</h2>
+  <p class="text-muted small mb-3 qb-home-mega-muted">
+    Explore registered participants by continent and country (counts use each person’s
+    <strong>current country</strong>).
+  </p>
+  <form method="get" action="{{ url_for('index') }}" class="row g-3 align-items-end">
+    <div class="col-md-4">
+      <label class="form-label small" for="explorer_continent">Continent</label>
+      <select
+        class="form-select qb-form-control"
+        id="explorer_continent"
+        name="explorer_continent"
+        onchange="this.form.submit()"
+      >
+        {% for c in continents_list %}
+        <option value="{{ c.id }}" {% if c.id == explorer.continent_id %}selected{% endif %}>
+          {{ c.name }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label small" for="explorer_country">Country</label>
+      <select
+        class="form-select qb-form-control"
+        id="explorer_country"
+        name="explorer_country"
+        onchange="this.form.submit()"
+      >
+        {% for c in countries_list %}
+        <option value="{{ c.id }}" {% if c.id == explorer.country_id %}selected{% endif %}>
+          {{ c.name }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-4">
+      <button type="submit" class="qb-btn qb-btn-outline w-100">Refresh</button>
+    </div>
+  </form>
+  <div class="row g-3 mt-2">
+    <div class="col-md-6">
+      <div class="qb-card mb-0">
+        <div class="qb-card-stat">{{ explorer.continent_users }}</div>
+        <div class="qb-card-label qb-card-label-sentence">Total in {{ explorer.continent_name }}</div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="qb-card mb-0">
+        <div class="qb-card-stat">{{ explorer.country_users }}</div>
+        <div class="qb-card-label qb-card-label-sentence">Total in {{ explorer.country_name }}</div>
+      </div>
+    </div>
+  </div>
+  <p class="text-muted small mt-3 mb-0 qb-home-mega-muted">
+    Explore the growing global community of Quantum Box.
+  </p>
+</section>
+</div>
+
+<section id="about" class="qb-about mb-4">
+  <h2>About Quantum Box</h2>
+  <div class="qb-about-intro">
+    <p>
+      Quantum Box is a public digital governance system designed to give every citizen a voice,
+      every village transparency, and every community the power to participate in decisions that
+      affect their lives.
+    </p>
+    <p>
+      It is not a private app, not a social media platform, and not a government portal. It is a
+      shared public infrastructure placed in villages and towns to make governance visible,
+      participatory, and accountable.
+    </p>
+  </div>
+
+  <div class="qb-about-card">
+    <h3>
+      <svg class="qb-about-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="10" />
+        <path d="M12 16v-4M12 8h.01" />
+      </svg>
+      <span>Why Quantum Box Exists</span>
+    </h3>
+    <p>
+      Today, many citizens feel disconnected from governance. Public funds are hard to track.
+      Raising issues is difficult. Decision-making feels distant.
+    </p>
+    <p class="mb-0">Quantum Box exists to remove this gap between people and power.</p>
+  </div>
+
+  <div class="qb-about-card">
+    <h3>
+      <svg class="qb-about-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+      </svg>
+      <span>How It Works</span>
+    </h3>
+    <ul>
+      <li>A public Quantum Box kiosk is placed in every village or locality.</li>
+      <li>Every citizen receives a secure digital identity.</li>
+      <li>Citizens can vote regularly, raise issues, and track public funds.</li>
+      <li>Every action is recorded transparently.</li>
+      <li>No middlemen. No hidden processes.</li>
+    </ul>
+  </div>
+
+  <div class="qb-about-card">
+    <h3>
+      <svg class="qb-about-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+      </svg>
+      <span>What Makes It Different</span>
+    </h3>
+    <ul>
+      <li>Track every rupee of public spending</li>
+      <li>Participate in decision-making regularly, not once in five years</li>
+      <li>Local digital economy support through Qoin</li>
+      <li>Recognition of community service and participation</li>
+      <li>Equal access for people without smartphones or technical skills</li>
+    </ul>
+  </div>
+
+  <div class="qb-about-card">
+    <h3>
+      <svg class="qb-about-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+      </svg>
+      <span>For Villages. For Citizens. For Transparency.</span>
+    </h3>
+    <p class="mb-0">
+      Quantum Box is designed so that a farmer, a teacher, a worker, or a student can walk to the
+      kiosk, speak their concern, and be heard at the right level of administration.
+    </p>
+  </div>
+
+  <div class="qb-about-card">
+    <h3>
+      <svg class="qb-about-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="3" />
+        <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+      </svg>
+      <span>Built by SITA Foundation</span>
+    </h3>
+    <p class="mb-0">
+      Quantum Box is developed by SITA Foundation (Sekyor Intelligence Tantra), a research initiative
+      working on ethical technology, transparent governance, and community-driven systems for the
+      public good.
+    </p>
+  </div>
+
+  <hr class="qb-about-rule" />
+
+  <p class="qb-about-closing">
+    Quantum Box invites every citizen to be a participant, not just a spectator, in the governance of
+    their community.
+  </p>
+  <p class="qb-about-cta">
+    <a class="qb-btn qb-btn-primary" href="{{ url_for('about_details') }}">Learn More</a>
+  </p>
+</section>
+
+<div class="qb-panel">
+  <h2>National view</h2>
+  <p class="text-muted small mb-3">
+    See every registered participant (all current villages pooled) with the same demographics charts
+    used on geography pages.
+  </p>
+  <p>
+    <a
+      class="qb-btn qb-btn-primary"
+      href="{{ url_for('location_country', country_id='IND') }}"
+      >India statistics</a
+    >
+  </p>
+</div>
+
+<div class="qb-panel mb-4">
+  <h2>Jump to a place</h2>
+  <p class="text-muted small mb-2">
+    Type at least two letters of any zone, state, district, tehsil, or village name; pick a hit to
+    open its stats page.
+  </p>
+  <label class="form-label visually-hidden" for="geo-q">Search geography</label>
+  <input
+    type="search"
+    id="geo-q"
+    class="form-control qb-form-control"
+    placeholder="Search e.g. Delhi, Odisha…"
+    autocomplete="off"
+  />
+  <ul id="geo-results" class="list-unstyled mt-3 small qb-search-hit-list"></ul>
+</div>
+
+<div class="qb-panel">
+  <h2>Registered users by state</h2>
+  <p class="text-muted small mb-3">
+    Based on each user’s current village, rolled up to state (requires valid geography links in
+    <code class="text-secondary">indiaq.db</code>).
+  </p>
+  <div class="qb-chart-wrap">
+    <canvas id="landingStateChart" aria-label="Users per state chart"></canvas>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<script id="landing-chart-json" type="application/json">{{ chart_states|tojson }}</script>
+<script>
+  (function () {
+    var el = document.getElementById("landing-chart-json");
+    var data = JSON.parse(el.textContent);
+    var ctx = document.getElementById("landingStateChart");
+    var labels = data.labels || [];
+    var values = data.values || [];
+    new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: "Users",
+            data: values,
+            backgroundColor: "rgba(94, 234, 212, 0.45)",
+            borderColor: "rgba(45, 212, 191, 0.95)",
+            borderWidth: 1,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+        },
+        scales: {
+          x: {
+            ticks: {
+              maxRotation: 65,
+              minRotation: 45,
+              color: "#8b9cb3",
+            },
+            grid: { color: "rgba(141, 156, 179, 0.12)" },
+          },
+          y: {
+            beginAtZero: true,
+            ticks: { color: "#8b9cb3", precision: 0 },
+            grid: { color: "rgba(141, 156, 179, 0.12)" },
+          },
+        },
+      },
+    });
+  })();
+</script>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='dashboard.js') }}"></script>
+<script>
+  (function () {
+    var inp = document.getElementById("geo-q");
+    var ul = document.getElementById("geo-results");
+    if (!inp || !ul) return;
+    var t = null;
+    function escapeHtml(s) {
+      return String(s)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;");
+    }
+    inp.addEventListener("input", function () {
+      clearTimeout(t);
+      var q = inp.value.trim();
+      ul.innerHTML = "";
+      if (q.length < 2) return;
+      t = setTimeout(function () {
+        fetch("/api/geo-search?q=" + encodeURIComponent(q))
+          .then(function (r) {
+            return r.json();
+          })
+          .then(function (rows) {
+            ul.innerHTML = "";
+            if (!rows.length) {
+              ul.innerHTML =
+                '<li class="text-muted px-2 py-1">No matches — try another spelling.</li>';
+              return;
+            }
+            rows.forEach(function (row) {
+              var li = document.createElement("li");
+              li.className = "px-2 py-1 qb-search-hit";
+              li.innerHTML =
+                '<a class="link-info text-decoration-none" href="' +
+                escapeHtml(row.url) +
+                '">' +
+                escapeHtml(row.name) +
+                ' <span class="text-muted">(' +
+                escapeHtml(row.kind) +
+                ")</span></a>";
+              ul.appendChild(li);
+            });
+          })
+          .catch(function () {
+            ul.innerHTML =
+              '<li class="text-danger px-2 py-1">Search failed — try again.</li>';
+          });
+      }, 220);
+    });
+  })();
+</script>
+{% endblock %}

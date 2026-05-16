@@ -1,0 +1,224 @@
+{# Expects: stats (dict), chart_prefix (str). Used by location.html and dashboard. #}
+<div class="qb-cards mb-4">
+  <div class="qb-card">
+    <div class="qb-card-stat">{{ stats.total_users }}</div>
+    <div class="qb-card-label">Users in scope</div>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-md-6">
+    <div class="qb-panel h-100">
+      <h2 class="h6 mb-3">Gender</h2>
+      <div class="qb-chart-wrap" style="height: 260px">
+        <canvas id="{{ chart_prefix }}-gender" aria-label="Gender breakdown"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="qb-panel h-100">
+      <h2 class="h6 mb-3">Sun element</h2>
+      <div class="qb-chart-wrap" style="height: 260px">
+        <canvas id="{{ chart_prefix }}-element" aria-label="Element breakdown"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-12 col-lg-6">
+    <div class="qb-panel">
+      <h2 class="h6 mb-3">Life stage</h2>
+      <div class="qb-chart-wrap" style="height: 340px">
+        <canvas id="{{ chart_prefix }}-age" aria-label="Age group breakdown"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-lg-6">
+    <div class="qb-panel">
+      <h2 class="h6 mb-3">Sun sign</h2>
+      <div class="qb-chart-wrap" style="height: 340px">
+        <canvas id="{{ chart_prefix }}-sign" aria-label="Sun sign breakdown"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-md-6">
+    <div class="qb-panel">
+      <h2 class="h6 mb-3">Gender (table)</h2>
+      <div class="table-responsive">
+        <table class="table table-sm table-borderless text-secondary">
+          <thead>
+            <tr><th>Label</th><th class="text-end">Count</th><th class="text-end">%</th></tr>
+          </thead>
+          <tbody>
+            {% for r in stats.gender %}
+            <tr>
+              <td>{{ r.label }}</td>
+              <td class="text-end">{{ r.count }}</td>
+              <td class="text-end">{{ r.pct }}%</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="qb-panel">
+      <h2 class="h6 mb-3">Life stage (table)</h2>
+      <div class="table-responsive">
+        <table class="table table-sm table-borderless text-secondary">
+          <thead>
+            <tr><th>Label</th><th class="text-end">Count</th><th class="text-end">%</th></tr>
+          </thead>
+          <tbody>
+            {% for r in stats.age_group %}
+            <tr>
+              <td>{{ r.label }}</td>
+              <td class="text-end">{{ r.count }}</td>
+              <td class="text-end">{{ r.pct }}%</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="qb-panel">
+      <h2 class="h6 mb-3">Sun element (table)</h2>
+      <div class="table-responsive">
+        <table class="table table-sm table-borderless text-secondary">
+          <thead>
+            <tr><th>Label</th><th class="text-end">Count</th><th class="text-end">%</th></tr>
+          </thead>
+          <tbody>
+            {% for r in stats.sun_element %}
+            <tr>
+              <td>{{ r.label }}</td>
+              <td class="text-end">{{ r.count }}</td>
+              <td class="text-end">{{ r.pct }}%</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="qb-panel">
+      <h2 class="h6 mb-3">Sun sign (table)</h2>
+      <div class="table-responsive">
+        <table class="table table-sm table-borderless text-secondary">
+          <thead>
+            <tr><th>Label</th><th class="text-end">Count</th><th class="text-end">%</th></tr>
+          </thead>
+          <tbody>
+            {% for r in stats.sun_sign %}
+            <tr>
+              <td>{{ r.label }}</td>
+              <td class="text-end">{{ r.count }}</td>
+              <td class="text-end">{{ r.pct }}%</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<script id="stats-json-{{ chart_prefix }}" type="application/json">{{ stats|tojson }}</script>
+<script>
+  (function () {
+    var prefix = {{ chart_prefix|tojson }};
+    var el = document.getElementById("stats-json-" + prefix);
+    if (!el) return;
+    var stats = JSON.parse(el.textContent);
+    var palette = [
+      "rgba(94, 234, 212, 0.75)",
+      "rgba(45, 212, 191, 0.75)",
+      "rgba(56, 189, 248, 0.75)",
+      "rgba(129, 140, 248, 0.75)",
+      "rgba(251, 191, 36, 0.75)",
+      "rgba(248, 113, 113, 0.75)",
+    ];
+    function doughnut(canvasId, rows, label) {
+      var ctx = document.getElementById(canvasId);
+      if (!ctx) return;
+      new Chart(ctx, {
+        type: "doughnut",
+        data: {
+          labels: rows.map(function (r) {
+            return r.label;
+          }),
+          datasets: [
+            {
+              label: label,
+              data: rows.map(function (r) {
+                return r.count;
+              }),
+              backgroundColor: rows.map(function (_, i) {
+                return palette[i % palette.length];
+              }),
+              borderColor: "rgba(15, 20, 25, 0.9)",
+              borderWidth: 1,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { position: "bottom", labels: { color: "#8b9cb3" } } },
+        },
+      });
+    }
+    function barChart(canvasId, rows, label) {
+      var ctx = document.getElementById(canvasId);
+      if (!ctx) return;
+      new Chart(ctx, {
+        type: "bar",
+        data: {
+          labels: rows.map(function (r) {
+            return r.label;
+          }),
+          datasets: [
+            {
+              label: label,
+              data: rows.map(function (r) {
+                return r.count;
+              }),
+              backgroundColor: "rgba(94, 234, 212, 0.45)",
+              borderColor: "rgba(45, 212, 191, 0.95)",
+              borderWidth: 1,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: {
+              ticks: { color: "#8b9cb3", maxRotation: 60, minRotation: 45 },
+              grid: { color: "rgba(141,156,179,0.1)" },
+            },
+            y: {
+              beginAtZero: true,
+              ticks: { color: "#8b9cb3", precision: 0 },
+              grid: { color: "rgba(141,156,179,0.1)" },
+            },
+          },
+        },
+      });
+    }
+    doughnut(prefix + "-gender", stats.gender, "Gender");
+    doughnut(prefix + "-element", stats.sun_element, "Element");
+    barChart(prefix + "-age", stats.age_group, "Life stage");
+    barChart(prefix + "-sign", stats.sun_sign, "Sign");
+  })();
+</script>

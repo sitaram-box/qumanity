@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}Global viewer — Quantum Box{% endblock %}
+
+{% block body %}
+<section class="qb-hero">
+  <h1>Global viewer</h1>
+  <p class="qb-lead mb-0">
+    You are registered as a global explorer.
+  </p>
+</section>
+
+<div class="qb-panel mb-4">
+  <h2 class="h5 mb-3">Your IDs</h2>
+  <p class="mb-2">
+    <span class="text-muted">Private ID (login):</span>
+    <span class="font-monospace ms-1">{{ user.private_id }}</span>
+  </p>
+  <p class="mb-0">
+    <span class="text-muted">Public ID:</span>
+    <span class="font-monospace ms-1">{{ user.public_id }}</span>
+  </p>
+</div>
+
+<p class="mb-3">
+  <a class="qb-btn qb-btn-primary" href="{{ url_for('index') }}"
+    >Homepage — global data explorer</a
+  >
+</p>
+
+<p class="text-muted small mb-0">
+  Full dashboard features are currently only available to residents of India.
+  Thank you for your interest in Quantum Box.
+</p>
+{% endblock %}

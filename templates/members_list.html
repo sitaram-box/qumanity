@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}Members — {{ location_title }}{% endblock %}
+
+{% block body %}
+<div class="qb-members-list-page px-2 px-sm-3 py-3" style="max-width: 1200px; margin: 0 auto">
+  <nav class="mb-3 d-flex flex-wrap gap-2 align-items-center">
+    <a href="{{ url_for('dashboard') }}" class="qb-btn qb-btn-outline btn-sm text-decoration-none">← Dashboard</a>
+    <button type="button" class="qb-btn qb-btn-outline btn-sm" id="qb-members-history-back">Back</button>
+  </nav>
+  <header class="mb-3">
+    <h1 class="h4 mb-1">Members in location</h1>
+    <p class="text-secondary small mb-0">
+      <strong>{{ location_title }}</strong>
+      <span class="font-monospace ms-1">({{ location_scope }} · {{ location_id }})</span>
+    </p>
+    <p class="small text-muted mb-0 mt-2">
+      Users whose present location falls under this geography (same rule as member counts on the statistics page).
+    </p>
+  </header>
+
+  <div class="table-responsive qb-panel p-2 p-sm-3" style="background: rgba(26, 35, 50, 0.78); border: 1px solid var(--qb-border); border-radius: 12px">
+    <table class="table table-sm table-dark table-borderless align-middle mb-0">
+      <thead>
+        <tr class="text-secondary small text-uppercase">
+          <th scope="col">User name</th>
+          <th scope="col">Gender</th>
+          <th scope="col">Age</th>
+          <th scope="col">Age group</th>
+          <th scope="col">Zodiac</th>
+          <th scope="col">Private ID</th>
+          <th scope="col">Public ID</th>
+          <th scope="col">Birth location ID</th>
+          <th scope="col">Present location ID</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in members %}
+        <tr>
+          <td>{{ m.full_name }}</td>
+          <td>{{ m.gender }}</td>
+          <td class="font-monospace">{{ m.age }}</td>
+          <td>{{ m.life_stage }}</td>
+          <td>{{ m.sun_sign }}</td>
+          <td class="font-monospace small">{{ m.private_id }}</td>
+          <td class="font-monospace small">{{ m.public_id }}</td>
+          <td class="font-monospace small">{{ m.birth_location_id }}</td>
+          <td class="font-monospace small">{{ m.current_location_id }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="9" class="text-muted py-4">No users in this scope.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    var b = document.getElementById("qb-members-history-back");
+    if (b) {
+      b.addEventListener("click", function () {
+        if (window.history.length > 1) {
+          window.history.back();
+        } else {
+          window.location.href = {{ url_for("dashboard")|tojson }};
+        }
+      });
+    }
+  })();
+</script>
+{% endblock %}

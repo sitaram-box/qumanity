@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}About — Quantum Box{% endblock %}
+
+{% block body %}
+<section class="qb-hero">
+  <h1>About Quantum Box</h1>
+  <p class="qb-lead mb-3">
+    Quantum Box is a public digital governance prototype. For the full story on the home page, see
+    <a href="{{ url_for('index') }}#about">About Quantum Box</a> on the landing page, or the
+    <a href="{{ url_for('about_details') }}">extended notes</a> page.
+  </p>
+  <p class="mb-0 text-muted small">
+    This page is a lightweight overview; detailed copy may be expanded later.
+  </p>
+</section>
+{% endblock %}
