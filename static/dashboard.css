@@ -1941,7 +1941,215 @@
   background: rgba(250, 204, 21, 0.08);
 }
 
+.qb-election-candidate-profiles {
+  border: 1px solid var(--qb-border);
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  background: rgba(15, 20, 25, 0.35);
+}
+
+.qb-election-profile-card {
+  line-height: 1.45;
+}
+
+.qb-private-election-village {
+  border: 1px solid rgba(94, 234, 212, 0.18);
+  border-radius: 10px;
+}
+
+.qb-private-manage-elections .qb-btn + .qb-btn {
+  margin-left: 0;
+}
+
 .qb-election-council-pair {
   display: block;
   line-height: 1.35;
+}
+
+.qb-timeline-head-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+}
+
+.qb-timeline-head-main {
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+
+.qb-timeline-user-identity {
+  flex: 0 1 auto;
+  white-space: nowrap;
+  color: var(--qb-text);
+}
+
+.qb-private-msg-wrap {
+  position: relative;
+}
+
+.qb-qoin-wallet-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.65rem;
+  border: 1px solid var(--qb-border);
+  border-radius: 999px;
+  background: rgba(15, 20, 25, 0.55);
+  color: var(--qb-text);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.qb-qoin-wallet-btn:hover {
+  border-color: rgba(94, 234, 212, 0.45);
+  background: rgba(94, 234, 212, 0.1);
+}
+
+.qb-qoin-wallet-symbol {
+  font-size: 1.05rem;
+  line-height: 1;
+  color: #fbbf24;
+}
+
+.qb-profile-readonly {
+  padding: 0.65rem 0.85rem;
+  border: 1px solid rgba(94, 234, 212, 0.15);
+  border-radius: 8px;
+  background: rgba(15, 20, 25, 0.4);
+  line-height: 1.5;
+}
+
+#qb-admin-village-suggest .qb-btn {
+  font-size: 0.75rem;
+}
+
+.qb-private-msg-btn {
+  position: relative;
+  width: 2.35rem;
+  height: 2.35rem;
+  border: 1px solid var(--qb-border);
+  border-radius: 999px;
+  background: rgba(15, 20, 25, 0.55);
+  color: var(--qb-text);
+  cursor: pointer;
+}
+
+.qb-private-msg-badge {
+  position: absolute;
+  top: -0.35rem;
+  right: -0.35rem;
+  min-width: 1.2rem;
+  padding: 0.05rem 0.25rem;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.15rem;
+}
+
+.qb-private-msg-menu {
+  position: absolute;
+  top: calc(100% + 0.45rem);
+  right: 0;
+  z-index: 1080;
+  min-width: 9rem;
+  padding: 0.35rem;
+  border: 1px solid rgba(94, 234, 212, 0.24);
+  border-radius: 10px;
+  background: rgba(15, 20, 25, 0.98);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+}
+
+.qb-private-msg-menu-item {
+  display: block;
+  width: 100%;
+  padding: 0.45rem 0.65rem;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--qb-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.qb-private-msg-menu-item:hover {
+  background: rgba(94, 234, 212, 0.12);
+}
+
+.qb-modal-dialog--wide {
+  width: min(42rem, 96vw);
+}
+
+.qb-messaging--modal {
+  max-height: min(70vh, 32rem);
+  overflow: auto;
+}
+
+.qb-global-main-stats-grid {
+  margin-top: 0.75rem;
+}
+
+.qb-admin-nom-item {
+  line-height: 1.45;
+}
+
+.qb-nom-status-badge {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  vertical-align: middle;
+}
+
+.qb-nom-status--pending {
+  background: rgba(251, 191, 36, 0.2);
+  color: #fbbf24;
+}
+
+.qb-nom-status--approved {
+  background: rgba(52, 211, 153, 0.18);
+  color: #34d399;
+}
+
+.qb-nom-status--rejected {
+  background: rgba(248, 113, 113, 0.18);
+  color: #f87171;
+}
+
+.qb-modal-dialog--scroll {
+  max-height: min(88vh, 40rem);
+  overflow: auto;
+}
+
+.qb-admin-members-table-wrap {
+  max-height: min(60vh, 28rem);
+  overflow: auto;
+  border: 1px solid var(--qb-border);
+  border-radius: 10px;
+  background: rgba(15, 20, 25, 0.45);
+}
+
+.qb-admin-members-table-wrap th,
+.qb-admin-members-table-wrap td {
+  white-space: nowrap;
+}
+
+.qb-admin-private-details-body p {
+  margin-bottom: 0.35rem;
+}
+
+@media (max-width: 820px) {
+  .qb-timeline-user-identity {
+    white-space: normal;
+    text-align: left;
+    width: 100%;
+  }
 }

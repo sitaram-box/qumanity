@@ -31,6 +31,19 @@ Tables applied by this script (in order):
      via ``app.migrate_*`` helpers
  13. Quantum Punch elections — ``election_cycles``, ``election_candidates``,
      ``election_votes``, ``village_council`` (``election_scheduler.migrate_election_tables``)
+
+``users`` must include ``age``, ``age_group``, and ``sun_sign`` (core ``USER_TABLE_SQL``) for
+election nomination (Yuvak + matching sign) and voting (age 13+ + matching sign + village).
+
+``election_candidates.status`` is ``pending`` | ``approved`` | ``rejected`` (plus optional
+``rejection_reason``, ``reviewed_at`` via ``election_scheduler.migrate_election_tables``).
+
+Admin profile (``H_U_ADMIN``): ``migrate_admin_user_profile`` sets DOB 1990-07-30, birth time
+07:05, computed age/age_group, sun sign Leo, element Fire (idempotent; other users unchanged).
+
+``users.is_active`` — existing rows set active on migration; new Human Users activate after
+registration donation (``/register/donation``). ``qoin_core.migrate_qoin_transactions`` extends
+``qoin_transactions`` with recipient_type, rupee_value, etc.
 """
 
 from __future__ import annotations
@@ -39,11 +52,13 @@ import argparse
 import sqlite3
 
 import election_scheduler
+import qoin_core
 from app import (
     BASE_DIR,
     FAMILY_RELATIONSHIPS_SQL,
     POST_TABLE_SQL,
     USER_TABLE_SQL,
+    migrate_admin_user_profile,
     migrate_connection_requests_life_stage,
     migrate_connection_requests_table,
     migrate_connection_requests_accepted_at,
@@ -216,8 +231,11 @@ def main() -> None:
         ensure_posts_escalation_columns(conn)
         migrate_posts_deletion_columns(conn)
         election_scheduler.migrate_election_tables(conn)
+        migrate_admin_user_profile(conn)
+        qoin_core.migrate_qoin_transactions(conn)
         conn.commit()
         print(f"Core tables ready in {DB_PATH.resolve()}")
+        print("Admin profile migration applied (H_U_ADMIN DOB / Leo / Fire).")
         print("Optional: python3 init_calendar_2026.py")
     finally:
         conn.close()

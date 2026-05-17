@@ -16,6 +16,7 @@ import sys
 from datetime import date, timedelta
 
 import bcrypt
+import qoin_core
 
 from app import (
     DB_PATH,
@@ -224,8 +225,8 @@ def insert_user(
             current_continent_id, current_country_id,
             country, email, password_hash,
             account_type, mentor_level, manager_level, leader_level, agent_level,
-            is_admin
-        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            is_admin, is_active
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)
         """,
         (
             private_id,
@@ -267,6 +268,7 @@ def main() -> None:
     conn = sqlite3.connect(DB_PATH)
     try:
         migrate_users_app_extensions(conn)
+        qoin_core.migrate_qoin_transactions(conn)
         migrate_messages_table(conn)
 
         if not village_exists(conn, VILLAGE_ID):
@@ -321,7 +323,7 @@ def main() -> None:
         if row_ad:
             print("Admin user H_U_ADMIN already exists; skipped.")
         else:
-            admin_dob = date(1988, 6, 15)
+            admin_dob = date(1990, 7, 30)
             insert_user(
                 conn,
                 private_id="H_U_ADMIN",
@@ -330,14 +332,24 @@ def main() -> None:
                 last_name="Mudgal",
                 gender="Male",
                 dob=admin_dob,
-                birth_time="09:00",
+                birth_time="07:05",
                 life_stage="Yuvak",
                 account_type="H_U",
                 password_plain="Admin@123",
                 is_admin=1,
             )
             conn.commit()
+            qoin_core.credit_signup_bonus(conn, "H_U_ADMIN")
+            conn.commit()
             print("Inserted admin user H_U_ADMIN (public_id ADMIN-PUBLIC).")
+
+        for row in conn.execute(
+            "SELECT private_id FROM users WHERE COALESCE(is_active,0) = 1"
+        ):
+            pid = str(row[0])
+            if qoin_core.wallet_balance(conn, "user", pid) == 0:
+                qoin_core.credit_signup_bonus(conn, pid)
+        conn.commit()
 
         total = int(conn.execute("SELECT COUNT(*) FROM users").fetchone()[0])
         demo_n = int(

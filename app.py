@@ -23,6 +23,7 @@ import bcrypt
 
 import calendar_time
 import election_scheduler
+import qoin_core
 import social_core
 from flask import (
     Flask,
@@ -590,6 +591,7 @@ def migrate_users_app_extensions(conn: sqlite3.Connection) -> None:
         ("leader_level", "INTEGER NOT NULL DEFAULT 0"),
         ("agent_level", "INTEGER NOT NULL DEFAULT 0"),
         ("is_admin", "INTEGER NOT NULL DEFAULT 0"),
+        ("is_active", "INTEGER NOT NULL DEFAULT 0"),
     ]
     for col_name, decl in additions:
         if col_name in cols:
@@ -598,6 +600,12 @@ def migrate_users_app_extensions(conn: sqlite3.Connection) -> None:
             conn.execute(f"ALTER TABLE users ADD COLUMN {col_name} {decl}")
         except sqlite3.OperationalError:
             pass
+    try:
+        conn.execute(
+            "UPDATE users SET is_active = 1 WHERE COALESCE(is_active, 0) = 0"
+        )
+    except sqlite3.OperationalError:
+        pass
     conn.commit()
 
 
@@ -754,6 +762,23 @@ def migrate_user_education_table(conn: sqlite3.Connection) -> None:
 
 def migrate_user_work_table(conn: sqlite3.Connection) -> None:
     conn.executescript(USER_WORK_SQL)
+    conn.commit()
+
+
+def migrate_user_education_work_v2(conn: sqlite3.Connection) -> None:
+    """Ensure education/work tables exist and have created_at where missing."""
+    migrate_user_education_table(conn)
+    migrate_user_work_table(conn)
+    for table, col in (("user_education", "created_at"), ("user_work", "created_at")):
+        cols = _table_columns(conn, table)
+        if col in cols:
+            continue
+        try:
+            conn.execute(
+                f"ALTER TABLE {table} ADD COLUMN {col} TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+            )
+        except sqlite3.OperationalError:
+            pass
     conn.commit()
 
 
@@ -1073,6 +1098,47 @@ def zone_like_prefix_full(zone_full_id: str) -> str:
     else:
         swapped = raw.replace(".", "/", 1)
     return full_id_from_raw(swapped)
+
+
+INDIA_ZONE_NAMES: dict[str, str] = {
+    "CS": "Central State (UT&North-East)",
+    "NS": "North India State",
+    "WS": "West India State",
+    "SS": "South India State",
+    "ES": "East India State",
+}
+
+
+def zone_code_from_village_location_id(location_id: str) -> str | None:
+    """Extract zone code (e.g. CS) from ``0.राम|IND/CS/DL.5.4.1E``."""
+    rp = raw_path((location_id or "").strip())
+    if "IND/" not in rp:
+        return None
+    tail = rp.split("IND/", 1)[1]
+    if not tail:
+        return None
+    head = tail.split("/", 1)[0]
+    letters = "".join(ch for ch in head if ch.isalpha())
+    return letters.upper() if letters else None
+
+
+def user_zone_info(
+    conn: sqlite3.Connection, user_row: sqlite3.Row
+) -> dict[str, str | None]:
+    try:
+        cloc = str(user_row["current_location_id"] or "").strip()
+    except (KeyError, IndexError):
+        cloc = ""
+    code = zone_code_from_village_location_id(cloc)
+    if not code:
+        return {"zone_code": None, "zone_id": None, "zone_name": None}
+    zid = full_id_from_raw(f"IND.{code}")
+    name = INDIA_ZONE_NAMES.get(code, code)
+    if _geo_table_exists(conn, "zone"):
+        meta = _geo_row_optional_meta(conn, "zone", zid)
+        if meta.get("name"):
+            name = str(meta["name"])
+    return {"zone_code": code, "zone_id": zid, "zone_name": name}
 
 
 def user_location_predicate_fk(scope: str, full_id: str) -> tuple[str, tuple]:
@@ -2293,6 +2359,11 @@ def user_dashboard_geo_displays(
         global_id = f"{PATH_PREFIX}{earth_slug}.?.?"
 
     show_zone_tab = ctry_id == "IND"
+    zinfo = user_zone_info(conn, user_row) if show_zone_tab else {
+        "zone_code": None,
+        "zone_id": None,
+        "zone_name": None,
+    }
 
     return {
         "user_current_location_id_display": cloc,
@@ -2302,6 +2373,9 @@ def user_dashboard_geo_displays(
         "user_country_id": ctry_id or None,
         "user_country_name": ctry_name,
         "user_show_zone_tab": show_zone_tab,
+        "user_zone_code": zinfo.get("zone_code"),
+        "user_zone_id": zinfo.get("zone_id"),
+        "user_zone_name": zinfo.get("zone_name"),
     }
 
 
@@ -2318,6 +2392,7 @@ COLLECTIVE_BOARD_LEVELS = (
     "tehsil",
     "district",
     "state",
+    "zone",
     "country",
     "continent",
     "earth",
@@ -2603,6 +2678,25 @@ def login_required(view):
             return redirect(url_for("login"))
         g.current_user = user
         _session_sync_admin_flag(user)
+        try:
+            is_active = int(user["is_active"] or 0)
+        except (KeyError, TypeError, ValueError):
+            is_active = 1
+        try:
+            is_admin = int(user["is_admin"] or 0)
+        except (KeyError, TypeError, ValueError):
+            is_admin = 0
+        if not is_active and not is_admin:
+            allowed = {
+                "register_donation",
+                "api_register_donate",
+            }
+            if request.endpoint not in allowed:
+                session.clear()
+                if (request.path or "").startswith("/api/"):
+                    return jsonify({"error": "Account not activated. Complete registration donation."}), 403
+                flash("Your account is not active. Complete the registration donation.", "error")
+                return redirect(url_for("register_donation"))
         return view(*args, **kwargs)
 
     return wrapped
@@ -2633,10 +2727,11 @@ def _before_request() -> None:
     migrate_family_removal_requests_table(conn)
     migrate_link_requests_table(conn)
     migrate_user_family_setup_table(conn)
-    migrate_user_education_table(conn)
-    migrate_user_work_table(conn)
+    migrate_user_education_work_v2(conn)
     migrate_connection_requests_life_stage(conn)
     election_scheduler.migrate_election_tables(conn)
+    social_core.ensure_wallet_and_vote_tables(conn)
+    qoin_core.migrate_qoin_transactions(conn)
     try:
         election_scheduler.process_election_cycles(
             conn, send_system_message_fn=send_system_message
@@ -2681,6 +2776,13 @@ def _geo_statistics_page(scope: str, geo_id: str) -> str:
         "continent",
         "earth",
     )
+    village_wallet_qoins = 0
+    village_wallet_rupees = 0
+    if scope == "village":
+        vid = geo_id.strip()
+        qoin_core.ensure_wallet(conn, "village", vid)
+        village_wallet_qoins = qoin_core.wallet_balance(conn, "village", vid)
+        village_wallet_rupees = qoin_core.wallet_rupee_total(conn, "village", vid)
     if scope in wallet_scopes:
         direct_wallet_id = geo_id.strip()
         direct_wallet_row = conn.execute(
@@ -2723,6 +2825,8 @@ def _geo_statistics_page(scope: str, geo_id: str) -> str:
         wallet_account_id=wallet_account_id,
         signs_by_element=SIGNS_BY_ELEMENT,
         admin_members_list_url=admin_members_list_url,
+        village_wallet_qoins=village_wallet_qoins,
+        village_wallet_rupees=village_wallet_rupees,
     )
 
 
@@ -3176,6 +3280,11 @@ def _validate_collective_board_request(
         user_continent = str(user_row["current_continent_id"] or "").strip()
         if location_id != user_continent:
             return False, location_id, "location_id must match your continent"
+    elif level == "zone":
+        zinfo = user_zone_info(conn, user_row)
+        user_zone_id = str(zinfo.get("zone_id") or "").strip()
+        if not user_zone_id or location_id != user_zone_id:
+            return False, location_id, "location_id must match your India zone"
     return True, location_id, ""
 
 
@@ -3224,6 +3333,51 @@ def _collective_board_rows(
     # author's Personal Account (PCB) for the first 7 days.
     if level == "personal":
         return []
+    if level == "zone":
+        zone_pred, zone_params = user_location_predicate(conn, "zone", location_id)
+        never_p = _collective_board_never_personal_sql("p")
+        not_del = _posts_not_deleted_sql(conn, "p")
+        if board_state == "live":
+            query = f"""
+                SELECT p.*, u.public_id AS author_public_id, u.first_name AS author_first,
+                       u.last_name AS author_last, u.age AS author_age,
+                       u.gender AS author_gender, u.current_location_id AS author_current_location_id,
+                       v.vote_value AS current_user_vote
+                FROM posts p
+                JOIN users u ON u.private_id = p.user_private_id
+                LEFT JOIN post_votes v
+                  ON v.post_id = p.id AND v.voter_private_id = ?
+                WHERE p.status = 'live'
+                  AND p.current_level != 'personal'
+                  AND p.current_level NOT LIKE 'personal\\_%' ESCAPE '\\'
+                  AND ({zone_pred})
+                  {never_p}
+                  {not_del}
+                ORDER BY datetime(p.created_at) DESC, p.id DESC
+                LIMIT 100
+            """
+            params: list[Any] = [voter_private_id, *zone_params]
+            return list(conn.execute(query, tuple(params)))
+        query = f"""
+            SELECT p.*, u.public_id AS author_public_id, u.first_name AS author_first,
+                   u.last_name AS author_last, u.age AS author_age,
+                   u.gender AS author_gender, u.current_location_id AS author_current_location_id,
+                   v.vote_value AS current_user_vote
+            FROM posts p
+            JOIN users u ON u.private_id = p.user_private_id
+            LEFT JOIN post_votes v
+              ON v.post_id = p.id AND v.voter_private_id = ?
+            WHERE p.status = 'frozen'
+              AND p.current_level != 'personal'
+              AND p.current_level NOT LIKE 'personal\\_%' ESCAPE '\\'
+              AND ({zone_pred})
+              {never_p}
+              {not_del}
+            ORDER BY datetime(p.created_at) DESC, p.id DESC
+            LIMIT 100
+        """
+        return list(conn.execute(query, tuple([voter_private_id, *zone_params])))
+
     col = _collective_board_origin_column(level)
     location_clause = ""
     if col is not None:
@@ -4065,6 +4219,56 @@ def _election_user_location_match(user_row: sqlite3.Row) -> bool:
     )
 
 
+def _election_active_zodiac_sign(today: date | None = None) -> str | None:
+    active = election_scheduler.sun_sign_for_election_day(today or date.today())
+    return str(active[0]) if active else None
+
+
+def _election_user_sun_sign_matches_cycle(
+    user_row: sqlite3.Row, zodiac_sign: str | None
+) -> bool:
+    if not zodiac_sign:
+        return False
+    return str(user_row["sun_sign"] or "").strip() == str(zodiac_sign).strip()
+
+
+def _election_user_can_vote(
+    user_row: sqlite3.Row, zodiac_sign: str | None = None
+) -> bool:
+    if not _election_user_location_match(user_row):
+        return False
+    sign = zodiac_sign if zodiac_sign is not None else _election_active_zodiac_sign()
+    if not sign or not _election_user_sun_sign_matches_cycle(user_row, sign):
+        return False
+    try:
+        age = int(user_row["age"])
+    except (TypeError, ValueError):
+        return False
+    return age >= 13
+
+
+def _election_user_can_nominate(
+    user_row: sqlite3.Row, zodiac_sign: str | None = None
+) -> bool:
+    if not _election_user_can_vote(user_row, zodiac_sign):
+        return False
+    if str(user_row["age_group"] or "").strip() != "Yuvak":
+        return False
+    return election_scheduler.election_bucket_gender(str(user_row["gender"] or "")) is not None
+
+
+def _user_karma_index(user_row: sqlite3.Row) -> int:
+    try:
+        return (
+            int(user_row["mentor_level"] or 0)
+            + int(user_row["manager_level"] or 0)
+            + int(user_row["leader_level"] or 0)
+            + int(user_row["agent_level"] or 0)
+        )
+    except (KeyError, TypeError, ValueError):
+        return 0
+
+
 def _election_cycle_row_for_today(
     conn: sqlite3.Connection,
 ) -> tuple[sqlite3.Row | None, tuple[str, date, date] | None]:
@@ -4096,11 +4300,18 @@ def _election_candidate_public(
                c.status,
                u.first_name,
                u.last_name,
-               u.public_id
+               u.public_id,
+               u.age,
+               u.age_group,
+               u.sun_sign,
+               u.mentor_level,
+               u.manager_level,
+               u.leader_level,
+               u.agent_level
         FROM election_candidates c
         JOIN users u ON u.private_id = c.candidate_private_id
         WHERE c.election_cycle_id = ?
-          AND c.status IN ('approved', 'pending')
+          AND c.status = 'approved'
         ORDER BY c.gender, c.id
         """,
         (cycle_id,),
@@ -4108,27 +4319,164 @@ def _election_candidate_public(
     for r in cur:
         mid = r["manifest"] or ""
         manifest = election_scheduler.parse_manifest(str(mid))
+        cand_pid = str(r["candidate_private_id"])
         vote_count = conn.execute(
             """
             SELECT COUNT(*) AS n FROM election_votes
             WHERE election_cycle_id = ? AND candidate_private_id = ?
             """,
-            (cycle_id, str(r["candidate_private_id"])),
+            (cycle_id, cand_pid),
         ).fetchone()
+        social_core.ensure_wallet(conn, "user", cand_pid)
+        wallet_balance = social_core.get_wallet_balance(conn, "user", cand_pid)
+        try:
+            age = int(r["age"])
+        except (TypeError, ValueError):
+            age = 0
+        age_group = str(r["age_group"] or "")
+        if not age_group and age:
+            age_group = life_stage_from_age(age)
         out.append(
             {
                 "id": int(r["candidate_row_id"]),
-                "candidate_private_id": str(r["candidate_private_id"]),
+                "candidate_private_id": cand_pid,
                 "gender": str(r["gender"]),
                 "manifest": manifest,
                 "status": str(r["status"]),
                 "first_name": str(r["first_name"] or ""),
                 "last_name": str(r["last_name"] or ""),
                 "public_id": str(r["public_id"] or ""),
+                "age": age,
+                "age_group": age_group,
+                "sun_sign": str(r["sun_sign"] or ""),
+                "karma_index": _user_karma_index(r),
+                "wallet_balance": wallet_balance,
                 "vote_count": int(vote_count["n"]) if vote_count else 0,
             }
         )
     return out
+
+
+def _election_format_date_label(iso_date: str, *, end_of_day: bool = False) -> str:
+    raw = (iso_date or "").strip()[:10]
+    try:
+        d = date.fromisoformat(raw)
+    except ValueError:
+        return raw or "—"
+    time_s = "23:59" if end_of_day else "00:00"
+    return f"{d.day} {d.strftime('%b %Y')} {time_s}"
+
+
+def _election_phase_window_label(phase: str, cycle_row: sqlite3.Row) -> str:
+    ph = (phase or "").strip().lower()
+    if ph == "nomination":
+        start = str(cycle_row["nomination_start"] or "")
+        end = str(cycle_row["nomination_end"] or "")
+        title = "Nomination"
+    elif ph == "voting":
+        start = str(cycle_row["voting_start"] or "")
+        end = str(cycle_row["voting_end"] or "")
+        title = "Voting"
+    elif ph == "closed":
+        start = str(cycle_row["voting_start"] or "")
+        end = str(cycle_row["voting_end"] or "")
+        title = "Results / closed"
+    else:
+        start = str(cycle_row["start_date"] or "")
+        end = str(cycle_row["end_date"] or "")
+        title = ph.capitalize() or "Cycle"
+    if not start and not end:
+        return title
+    return (
+        f"{title}: {_election_format_date_label(start)} – "
+        f"{_election_format_date_label(end, end_of_day=True)}"
+    )
+
+
+def _election_status_label(phase: str) -> str:
+    labels = {
+        "nomination": "Nomination open",
+        "voting": "Voting open",
+        "closed": "Results announced",
+        "upcoming": "Upcoming",
+    }
+    return labels.get((phase or "").strip().lower(), "Election closed")
+
+
+def _election_display_from_cycle(cycle_row: sqlite3.Row | None) -> dict[str, Any]:
+    if not cycle_row:
+        return {
+            "status_label": "No active election",
+            "phase": None,
+            "zodiac_sign": None,
+            "current_phase_window": "",
+            "next_phase_label": "",
+            "next_phase_start": "",
+        }
+    phase = str(cycle_row["status"] or "")
+    zodiac = str(cycle_row["zodiac_sign"] or "")
+    next_label = ""
+    next_start = ""
+    if phase == "nomination":
+        next_label = "Voting"
+        next_start = str(cycle_row["voting_start"] or "")
+    elif phase == "voting":
+        next_label = "Results"
+        next_start = str(cycle_row["voting_end"] or "")
+    next_start_display = (
+        _election_format_date_label(next_start) if next_start else ""
+    )
+    return {
+        "status_label": _election_status_label(phase),
+        "phase": phase,
+        "zodiac_sign": zodiac,
+        "current_phase_window": _election_phase_window_label(phase, cycle_row),
+        "next_phase_label": next_label,
+        "next_phase_start": next_start,
+        "next_phase_start_display": next_start_display,
+    }
+
+
+def migrate_admin_user_profile(conn: sqlite3.Connection) -> None:
+    """One-time correction for the default admin account (H_U_ADMIN)."""
+    row = conn.execute(
+        "SELECT 1 FROM users WHERE private_id = ? COLLATE NOCASE",
+        ("H_U_ADMIN",),
+    ).fetchone()
+    if not row:
+        return
+    dob = date(1990, 7, 30)
+    age = compute_age(dob)
+    age_group = life_stage_from_age(age)
+    sun = sun_sign_for_date(dob)
+    moon = moon_sign_simplified(dob)
+    elem = element_for_sun(sun)
+    conn.execute(
+        """
+        UPDATE users
+        SET date_of_birth = ?,
+            birth_time = ?,
+            age = ?,
+            age_group = ?,
+            sun_sign = ?,
+            moon_sign = ?,
+            element = ?,
+            is_active = 1
+        WHERE private_id = ? COLLATE NOCASE
+        """,
+        (
+            dob.isoformat(),
+            "07:05",
+            age,
+            age_group,
+            sun,
+            moon,
+            elem,
+            "H_U_ADMIN",
+        ),
+    )
+    if qoin_core.wallet_balance(conn, "user", "H_U_ADMIN") == 0:
+        qoin_core.credit_signup_bonus(conn, "H_U_ADMIN")
 
 
 @app.get("/api/election/status")
@@ -4140,14 +4488,18 @@ def api_election_status():
     in_village = _election_user_location_match(user)
     sun = str(user["sun_sign"] or "")
     cycle_row, active_period = _election_cycle_row_for_today(conn)
-    eligible = bool(
-        in_village and active_period and sun == str(active_period[0])
-    )
+    active_sign = str(active_period[0]) if active_period else None
+    eligible_vote = _election_user_can_vote(user, active_sign)
+    eligible_nominate = _election_user_can_nominate(user, active_sign)
     payload: dict[str, Any] = {
         "target_village_id": election_scheduler.TARGET_VILLAGE_ID,
         "user_in_target_village": in_village,
         "user_sun_sign": sun,
-        "eligible_for_current_cycle": eligible,
+        "user_age": int(user["age"]) if user["age"] is not None else None,
+        "user_age_group": str(user["age_group"] or ""),
+        "eligible_for_current_cycle": eligible_vote,
+        "eligible_to_vote": eligible_vote,
+        "eligible_to_nominate": eligible_nominate,
         "active_period": None,
         "cycle": None,
         "phase": None,
@@ -4178,6 +4530,7 @@ def api_election_status():
         "female_winner_private_id": cycle_row["female_winner_private_id"],
     }
     payload["phase"] = str(cycle_row["status"])
+    payload["election_display"] = _election_display_from_cycle(cycle_row)
     payload["candidates"] = _election_candidate_public(conn, cid)
     for vr in conn.execute(
         """
@@ -4200,23 +4553,49 @@ def api_election_status():
     return jsonify(payload)
 
 
+@app.get("/api/election/history")
+@login_required
+def api_election_history():
+    """Prototype placeholder — past cycles will be listed here later."""
+    return jsonify(
+        {
+            "past_nominations": [],
+            "past_voting_results": [],
+            "past_winners": [],
+            "message": "No data available",
+        }
+    )
+
+
 @app.post("/api/election/nominate")
 @login_required
 def api_election_nominate():
     conn = get_db()
     user = g.current_user
-    if not _election_user_location_match(user):
-        return jsonify({"error": "Elections are for Rohini Sector-24 residents only"}), 403
+    cycle_row, active = _election_cycle_row_for_today(conn)
+    if not cycle_row or not active:
+        return jsonify({"error": "No active election cycle"}), 400
+    active_sign = str(active[0])
+    if not _election_user_can_nominate(user, active_sign):
+        if not _election_user_location_match(user):
+            return jsonify({"error": "Elections are for Rohini Sector-24 residents only"}), 403
+        if str(user["age_group"] or "").strip() != "Yuvak":
+            return jsonify(
+                {"error": "Only Yuvak residents (ages 25–49) may submit a nomination"}
+            ), 403
+        if not _election_user_sun_sign_matches_cycle(user, active_sign):
+            return jsonify({"error": "Your sun sign does not match this cycle"}), 403
+        bucket = election_scheduler.election_bucket_gender(str(user["gender"] or ""))
+        if not bucket:
+            return jsonify(
+                {"error": "Only Male or Female cohort candidates can stand in this prototype"}
+            ), 400
+        return jsonify({"error": "You are not eligible to nominate in this cycle"}), 403
     bucket = election_scheduler.election_bucket_gender(str(user["gender"] or ""))
     if not bucket:
         return jsonify(
             {"error": "Only Male or Female cohort candidates can stand in this prototype"}
         ), 400
-    cycle_row, active = _election_cycle_row_for_today(conn)
-    if not cycle_row or not active:
-        return jsonify({"error": "No active election cycle"}), 400
-    if str(user["sun_sign"] or "") != str(active[0]):
-        return jsonify({"error": "Your sun sign does not match this cycle"}), 403
     st = str(cycle_row["status"] or "")
     if st != "nomination":
         return jsonify({"error": "Nominations are closed"}), 400
@@ -4234,18 +4613,436 @@ def api_election_nominate():
         (cid, str(user["private_id"])),
     ).fetchone()
     if exists:
-        return jsonify({"error": "You are already a candidate"}), 400
+        return jsonify(
+            {
+                "error": "You have already submitted a nomination for this zodiac cycle. You cannot submit again."
+            }
+        ), 400
     manifest = json.dumps({"why_stand": why, "changes": changes}, ensure_ascii=False)
     conn.execute(
         """
         INSERT INTO election_candidates (
             election_cycle_id, candidate_private_id, gender, manifest, status
-        ) VALUES (?, ?, ?, ?, 'approved')
+        ) VALUES (?, ?, ?, ?, 'pending')
         """,
         (cid, str(user["private_id"]), bucket, manifest),
     )
     conn.commit()
-    return jsonify({"ok": True, "election_cycle_id": cid})
+    return jsonify({"ok": True, "election_cycle_id": cid, "status": "pending"})
+
+
+def _admin_election_cycle_for_management(conn: sqlite3.Connection) -> sqlite3.Row | None:
+    """Resolve the election cycle admins manage (current zodiac month)."""
+    cycle_row, _active = _election_cycle_row_for_today(conn)
+    if cycle_row:
+        return cycle_row
+    sign = _election_active_zodiac_sign()
+    if not sign:
+        return None
+    return conn.execute(
+        """
+        SELECT * FROM election_cycles
+        WHERE village_id = ? AND zodiac_sign = ?
+        ORDER BY start_date DESC
+        LIMIT 1
+        """,
+        (election_scheduler.TARGET_VILLAGE_ID, sign),
+    ).fetchone()
+
+
+def _admin_nomination_row_dict(conn: sqlite3.Connection, row: sqlite3.Row) -> dict[str, Any]:
+    mid = row["manifest"] or ""
+    manifest = election_scheduler.parse_manifest(str(mid))
+    why = manifest.get("why_stand") or manifest.get("text") or ""
+    changes = manifest.get("changes") or ""
+    parts = [p for p in (why, changes) if p]
+    try:
+        age = int(row["age"]) if row["age"] is not None else None
+    except (TypeError, ValueError):
+        age = None
+    age_group = str(row["age_group"] or "")
+    if not age_group and age is not None:
+        age_group = life_stage_from_age(age)
+    return {
+        "id": int(row["candidate_row_id"]),
+        "election_cycle_id": int(row["election_cycle_id"]),
+        "candidate_private_id": str(row["candidate_private_id"]),
+        "gender": str(row["gender"] or ""),
+        "manifest": manifest,
+        "manifest_text": "\n\n".join(parts),
+        "why_stand": why,
+        "changes": changes,
+        "status": str(row["status"] or ""),
+        "rejection_reason": str(row["rejection_reason"] or "")
+        if row["rejection_reason"]
+        else "",
+        "first_name": str(row["first_name"] or ""),
+        "last_name": str(row["last_name"] or ""),
+        "public_id": str(row["public_id"] or ""),
+        "sun_sign": str(row["sun_sign"] or ""),
+        "zodiac_sign": str(row["cycle_zodiac"] or row["zodiac_sign"] or ""),
+        "age": age,
+        "age_group": age_group,
+        "created_at": str(row["created_at"] or ""),
+    }
+
+
+def _admin_nominations_list_payload(conn: sqlite3.Connection) -> dict[str, Any]:
+    cycle_row = _admin_election_cycle_for_management(conn)
+    if not cycle_row:
+        return {"nominations": [], "cycle": None}
+    cid = int(cycle_row["id"])
+    status_filter = (request.args.get("status") or "all").strip().lower()
+    sql = """
+        SELECT c.id AS candidate_row_id, c.election_cycle_id, c.candidate_private_id,
+               c.gender, c.manifest, c.status, c.created_at, c.rejection_reason,
+               u.first_name, u.last_name, u.public_id, u.age, u.age_group, u.sun_sign,
+               ec.zodiac_sign AS cycle_zodiac
+        FROM election_candidates c
+        JOIN users u ON u.private_id = c.candidate_private_id
+        JOIN election_cycles ec ON ec.id = c.election_cycle_id
+        WHERE c.election_cycle_id = ?
+    """
+    params: list[Any] = [cid]
+    if status_filter and status_filter != "all":
+        sql += " AND c.status = ?"
+        params.append(status_filter)
+    sql += " ORDER BY c.created_at ASC, c.id ASC"
+    cur = conn.execute(sql, tuple(params))
+    return {
+        "cycle": {
+            "id": cid,
+            "zodiac_sign": str(cycle_row["zodiac_sign"]),
+            "status": str(cycle_row["status"]),
+        },
+        "nominations": [_admin_nomination_row_dict(conn, r) for r in cur],
+    }
+
+
+@app.get("/api/admin/nominations/pending")
+@app.get("/api/admin/nominations")
+@admin_required
+def api_admin_nominations_list():
+    conn = get_db()
+    return jsonify(_admin_nominations_list_payload(conn))
+
+
+@app.post("/api/admin/nomination/approve/<int:candidate_id>")
+@admin_required
+def api_admin_nomination_approve(candidate_id: int):
+    conn = get_db()
+    cycle_row = _admin_election_cycle_for_management(conn)
+    if not cycle_row:
+        return jsonify({"error": "No active election cycle"}), 400
+    cid = int(cycle_row["id"])
+    row = conn.execute(
+        """
+        SELECT * FROM election_candidates
+        WHERE id = ? AND election_cycle_id = ? AND status IN ('pending', 'rejected')
+        """,
+        (candidate_id, cid),
+    ).fetchone()
+    if not row:
+        return jsonify({"error": "Nomination not found or already approved"}), 404
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    conn.execute(
+        """
+        UPDATE election_candidates
+        SET status = 'approved', reviewed_at = ?, rejection_reason = NULL
+        WHERE id = ?
+        """,
+        (now, candidate_id),
+    )
+    conn.commit()
+    return jsonify({"ok": True, "candidate_id": candidate_id, "status": "approved"})
+
+
+@app.post("/api/admin/nomination/reject/<int:candidate_id>")
+@admin_required
+def api_admin_nomination_reject(candidate_id: int):
+    conn = get_db()
+    payload = request.get_json(silent=True) or {}
+    reason = str(payload.get("reason") or "").strip()
+    if not reason:
+        return jsonify({"error": "Rejection reason is required"}), 400
+    cycle_row = _admin_election_cycle_for_management(conn)
+    if not cycle_row:
+        return jsonify({"error": "No active election cycle"}), 400
+    cid = int(cycle_row["id"])
+    row = conn.execute(
+        """
+        SELECT * FROM election_candidates
+        WHERE id = ? AND election_cycle_id = ? AND status IN ('pending', 'approved')
+        """,
+        (candidate_id, cid),
+    ).fetchone()
+    if not row:
+        return jsonify({"error": "Nomination not found or already rejected"}), 404
+    cand_pid = str(row["candidate_private_id"])
+    zodiac = str(cycle_row["zodiac_sign"] or "")
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    conn.execute(
+        """
+        UPDATE election_candidates
+        SET status = 'rejected', rejection_reason = ?, reviewed_at = ?
+        WHERE id = ?
+        """,
+        (reason, now, candidate_id),
+    )
+    body = (
+        f"Your nomination for the {zodiac} Quantum Punch village council election "
+        f"was not approved.\n\nReason: {reason}"
+    )
+    send_system_message(conn, cand_pid, "Nomination Rejected", body)
+    conn.commit()
+    return jsonify({"ok": True, "candidate_id": candidate_id, "status": "rejected"})
+
+
+@app.post("/api/admin/nomination/edit_manifest/<int:candidate_id>")
+@admin_required
+def api_admin_nomination_edit_manifest(candidate_id: int):
+    conn = get_db()
+    cycle_row = _admin_election_cycle_for_management(conn)
+    if not cycle_row:
+        return jsonify({"error": "No active election cycle"}), 400
+    cid = int(cycle_row["id"])
+    row = conn.execute(
+        """
+        SELECT * FROM election_candidates
+        WHERE id = ? AND election_cycle_id = ?
+        """,
+        (candidate_id, cid),
+    ).fetchone()
+    if not row:
+        return jsonify({"error": "Nomination not found"}), 404
+    payload = request.get_json(silent=True) or {}
+    why = str(payload.get("why_stand") or payload.get("manifest_why") or "").strip()
+    changes = str(payload.get("changes") or payload.get("manifest_changes") or "").strip()
+    if not why and not changes:
+        existing = election_scheduler.parse_manifest(str(row["manifest"] or ""))
+        why = str(existing.get("why_stand") or existing.get("text") or "").strip()
+        changes = str(existing.get("changes") or "").strip()
+    if not why:
+        return jsonify({"error": "Manifest text (why_stand) is required"}), 400
+    manifest = json.dumps(
+        {"why_stand": why, "changes": changes}, ensure_ascii=False
+    )
+    conn.execute(
+        "UPDATE election_candidates SET manifest = ? WHERE id = ?",
+        (manifest, candidate_id),
+    )
+    conn.commit()
+    return jsonify({"ok": True, "candidate_id": candidate_id})
+
+
+@app.post("/api/admin/nomination/remove/<int:candidate_id>")
+@admin_required
+def api_admin_nomination_remove(candidate_id: int):
+    conn = get_db()
+    cycle_row = _admin_election_cycle_for_management(conn)
+    if not cycle_row:
+        return jsonify({"error": "No active election cycle"}), 400
+    cid = int(cycle_row["id"])
+    row = conn.execute(
+        """
+        SELECT * FROM election_candidates
+        WHERE id = ? AND election_cycle_id = ?
+        """,
+        (candidate_id, cid),
+    ).fetchone()
+    if not row:
+        return jsonify({"error": "Nomination not found"}), 404
+    payload = request.get_json(silent=True) or {}
+    notify = payload.get("notify", True) is not False
+    cand_pid = str(row["candidate_private_id"])
+    zodiac = str(cycle_row["zodiac_sign"] or "")
+    conn.execute("DELETE FROM election_candidates WHERE id = ?", (candidate_id,))
+    if notify:
+        body = (
+            f"Your nomination for the {zodiac} Quantum Punch village council election "
+            "was removed by an administrator."
+        )
+        send_system_message(conn, cand_pid, "Nomination Removed", body)
+    conn.commit()
+    return jsonify({"ok": True, "candidate_id": candidate_id, "removed": True})
+
+
+@app.get("/api/user/private_details")
+@admin_required
+def api_user_private_details():
+    private_id = (request.args.get("private_id") or "").strip()
+    if not private_id:
+        return jsonify({"error": "private_id is required"}), 400
+    conn = get_db()
+    user_row = conn.execute(
+        "SELECT * FROM users WHERE private_id = ?",
+        (private_id,),
+    ).fetchone()
+    if not user_row:
+        return jsonify({"error": "User not found"}), 404
+    try:
+        age = int(user_row["age"])
+    except (TypeError, ValueError):
+        age = 0
+    life_stage = life_stage_from_age(age)
+    birth_vid = str(user_row["birth_location_id"] or "").strip()
+    current_vid = str(user_row["current_location_id"] or "").strip()
+    birth_hier = current_location_hierarchy(conn, birth_vid) if birth_vid else []
+    current_hier = current_location_hierarchy(conn, current_vid) if current_vid else []
+
+    def hierarchy_dict(hier: list[dict[str, str]]) -> dict[str, dict[str, str]]:
+        return {
+            str(item["scope"]): {
+                "id": str(item["id"] or ""),
+                "name": str(item["name"] or ""),
+            }
+            for item in hier
+        }
+
+    social_core.ensure_wallet(conn, "user", private_id)
+    wallet_balance = social_core.get_wallet_balance(conn, "user", private_id)
+    tx_rows = conn.execute(
+        """
+        SELECT id, amount, reason, created_at
+        FROM qoin_transactions
+        WHERE user_private_id = ?
+        ORDER BY datetime(created_at) DESC
+        LIMIT 10
+        """,
+        (private_id,),
+    ).fetchall()
+    recent_transactions = [
+        {
+            "id": int(tr["id"]),
+            "amount": int(tr["amount"]),
+            "reason": str(tr["reason"] or ""),
+            "created_at": str(tr["created_at"] or ""),
+        }
+        for tr in tx_rows
+    ]
+    account_type = "H_U"
+    try:
+        account_type = str(user_row["account_type"] or "H_U")
+    except (KeyError, IndexError):
+        pass
+    return jsonify(
+        {
+            "first_name": str(user_row["first_name"] or ""),
+            "last_name": str(user_row["last_name"] or ""),
+            "full_name": (
+                f'{user_row["first_name"] or ""} {user_row["last_name"] or ""}'.strip()
+            ),
+            "private_id": private_id,
+            "public_id": str(user_row["public_id"] or ""),
+            "gender": str(user_row["gender"] or ""),
+            "age": age,
+            "age_group": str(user_row["age_group"] or life_stage),
+            "life_stage": life_stage,
+            "sun_sign": str(user_row["sun_sign"] or ""),
+            "element": str(user_row["element"] or ""),
+            "karma_index": _user_karma_index(user_row),
+            "account_type": account_type,
+            "is_admin": bool(int(user_row["is_admin"] or 0)),
+            "birth_location_label": location_display_label(conn, birth_vid)
+            if birth_vid
+            else "",
+            "current_location_label": location_display_label(conn, current_vid)
+            if current_vid
+            else "",
+            "birth_location_hierarchy": hierarchy_dict(birth_hier),
+            "current_location_hierarchy": hierarchy_dict(current_hier),
+            "wallet_balance": wallet_balance,
+            "recent_transactions": recent_transactions,
+        }
+    )
+
+
+def _location_members_for_scope(
+    conn: sqlite3.Connection, location_type: str, location_id: str
+) -> tuple[str, list[dict[str, Any]]]:
+    lt = location_type.strip().lower()
+    lid = (location_id or "").strip()
+    allowed_admin_scopes = frozenset(
+        {"earth", "continent", "country", "zone", "state", "district", "tehsil", "village", "india"}
+    )
+    if lt not in allowed_admin_scopes:
+        raise ValueError("invalid location scope")
+    if lt == "india":
+        if lid.upper() != "IND":
+            raise ValueError("invalid India scope id")
+        pred, tup = _indian_users_predicate(conn)
+        page_title = "India (national)"
+    else:
+        tbl = GEO_ROUTE_TABLE.get(lt)
+        if not tbl or not _geo_table_exists(conn, tbl):
+            raise ValueError("location table missing")
+        if conn.execute(f"SELECT 1 FROM {tbl} WHERE id = ?", (lid,)).fetchone() is None:
+            raise ValueError("location not found")
+        pred, tup = user_location_predicate(conn, lt, lid)
+        page_title = str(_geo_row_optional_meta(conn, tbl, lid)["name"])
+    cur = conn.execute(
+        f"""
+        SELECT first_name, last_name, gender, age, sun_sign, private_id, public_id,
+               birth_location_id, current_location_id
+        FROM users u
+        WHERE ({pred})
+        ORDER BY COALESCE(last_name, ''), COALESCE(first_name, '')
+        """,
+        tup,
+    )
+    members: list[dict[str, Any]] = []
+    for r in cur:
+        try:
+            ag = int(r["age"])
+        except (TypeError, ValueError):
+            ag = 0
+        members.append(
+            {
+                "full_name": f'{r["first_name"] or ""} {r["last_name"] or ""}'.strip(),
+                "gender": str(r["gender"] or ""),
+                "age": ag,
+                "life_stage": life_stage_from_age(ag),
+                "sun_sign": str(r["sun_sign"] or ""),
+                "private_id": str(r["private_id"] or ""),
+                "public_id": str(r["public_id"] or ""),
+                "birth_location_id": str(r["birth_location_id"] or "")
+                if r["birth_location_id"]
+                else "—",
+                "current_location_id": str(r["current_location_id"] or "")
+                if r["current_location_id"]
+                else "—",
+            }
+        )
+    return page_title, members
+
+
+@app.get("/api/admin/location_members")
+@admin_required
+def api_admin_location_members_json():
+    conn = get_db()
+    lt = (request.args.get("location_type") or "village").strip().lower()
+    lid = (request.args.get("location_id") or "").strip()
+    if not lid:
+        user_row = g.current_user
+        lid = str(user_row["current_location_id"] or "").strip()
+        if not lid:
+            return jsonify({"error": "No current village for this user"}), 400
+        lt = "village"
+    try:
+        page_title, members = _location_members_for_scope(conn, lt, lid)
+    except ValueError as exc:
+        msg = str(exc)
+        if "not found" in msg:
+            return jsonify({"error": "Location not found"}), 404
+        return jsonify({"error": msg}), 400
+    return jsonify(
+        {
+            "location_type": lt,
+            "location_id": lid,
+            "location_title": page_title,
+            "members": members,
+        }
+    )
 
 
 @app.post("/api/election/vote")
@@ -4254,13 +5051,22 @@ def api_election_vote():
     conn = get_db()
     user = g.current_user
     uid = str(user["private_id"])
-    if not _election_user_location_match(user):
-        return jsonify({"error": "Only village residents may vote"}), 403
     cycle_row, active = _election_cycle_row_for_today(conn)
     if not cycle_row or not active:
         return jsonify({"error": "No active election cycle"}), 400
-    if str(user["sun_sign"] or "") != str(active[0]):
-        return jsonify({"error": "Your sun sign does not match this cycle"}), 403
+    active_sign = str(active[0])
+    if not _election_user_can_vote(user, active_sign):
+        if not _election_user_location_match(user):
+            return jsonify({"error": "Only village residents may vote"}), 403
+        try:
+            age = int(user["age"])
+        except (TypeError, ValueError):
+            age = -1
+        if age < 13:
+            return jsonify({"error": "You must be at least 13 years old to vote"}), 403
+        if not _election_user_sun_sign_matches_cycle(user, active_sign):
+            return jsonify({"error": "Your sun sign does not match this cycle"}), 403
+        return jsonify({"error": "You are not eligible to vote in this cycle"}), 403
     if str(cycle_row["status"] or "") != "voting":
         return jsonify({"error": "Voting is not open"}), 400
     payload = request.get_json(silent=True) or {}
@@ -4275,12 +5081,12 @@ def api_election_vote():
         """
         SELECT * FROM election_candidates
         WHERE election_cycle_id = ? AND candidate_private_id = ?
-          AND status IN ('approved', 'pending')
+          AND status = 'approved'
         """,
         (cid, cand_pid),
     ).fetchone()
     if not target:
-        return jsonify({"error": "Candidate not found"}), 404
+        return jsonify({"error": "Candidate not found or not approved"}), 404
     if str(target["gender"]) != gender_slot:
         return jsonify({"error": "Candidate gender mismatch"}), 400
     cand_loc = conn.execute(
@@ -6463,6 +7269,28 @@ def _work_row_to_dict(row: sqlite3.Row | None) -> dict[str, Any]:
     }
 
 
+@app.get("/api/user/education")
+@login_required
+def api_user_education_get():
+    conn = get_db()
+    pid = str(g.current_user["private_id"])
+    row = conn.execute(
+        "SELECT * FROM user_education WHERE user_private_id = ?", (pid,)
+    ).fetchone()
+    return jsonify({"education": _education_row_to_dict(row)})
+
+
+@app.get("/api/user/work")
+@login_required
+def api_user_work_get():
+    conn = get_db()
+    pid = str(g.current_user["private_id"])
+    row = conn.execute(
+        "SELECT * FROM user_work WHERE user_private_id = ?", (pid,)
+    ).fetchone()
+    return jsonify({"work": _work_row_to_dict(row)})
+
+
 @app.get("/api/user/private_info")
 @login_required
 def api_user_private_info():
@@ -6609,6 +7437,122 @@ def api_user_work_save():
     conn.commit()
     row = conn.execute("SELECT * FROM user_work WHERE user_private_id = ?", (pid,)).fetchone()
     return jsonify({"ok": True, "work": _work_row_to_dict(row)})
+
+
+@app.get("/api/wallet/balance")
+@login_required
+def api_wallet_balance():
+    conn = get_db()
+    pid = str(g.current_user["private_id"])
+    qoin_core.ensure_wallet(conn, "user", pid)
+    bal = qoin_core.wallet_balance(conn, "user", pid)
+    rupees = qoin_core.wallet_rupee_total(conn, "user", pid)
+    return jsonify(
+        {
+            "balance_qoins": bal,
+            "total_rupees": rupees,
+            "coins": _user_wallet_coin_breakdown(conn, pid),
+        }
+    )
+
+
+def _user_wallet_coin_breakdown(conn: sqlite3.Connection, pid: str) -> list[dict[str, Any]]:
+    cur = conn.execute(
+        """
+        SELECT rupee_value, COUNT(*) AS n
+        FROM qoin_transactions
+        WHERE recipient_type = 'user' AND recipient_id = ?
+          AND COALESCE(rupee_value, 0) > 0
+        GROUP BY rupee_value
+        ORDER BY rupee_value DESC
+        """,
+        (pid,),
+    )
+    return [
+        {"rupee_value": int(r["rupee_value"]), "count": int(r["n"])}
+        for r in cur
+    ]
+
+
+@app.post("/api/qoin/donate")
+@login_required
+def api_qoin_donate():
+    conn = get_db()
+    payload = request.get_json(silent=True) or {}
+    try:
+        amount = int(payload.get("amount") or 0)
+    except (TypeError, ValueError):
+        return jsonify({"error": "amount must be an integer (rupees)"}), 400
+    if amount < 1 or amount > 500:
+        return jsonify({"error": "Donation must be between ₹1 and ₹500"}), 400
+    pid = str(g.current_user["private_id"])
+    village_id = str(g.current_user["current_location_id"] or "").strip() or None
+    try:
+        result = qoin_core.process_donation(
+            conn, donor_private_id=pid, amount_rupees=amount, village_id=village_id
+        )
+        conn.commit()
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify({"ok": True, **result})
+
+
+@app.get("/api/village/wallet")
+@login_required
+def api_village_wallet():
+    village_id = (request.args.get("village_id") or "").strip()
+    if not village_id:
+        return jsonify({"error": "village_id is required"}), 400
+    conn = get_db()
+    if not village_exists(conn, village_id):
+        return jsonify({"error": "Village not found"}), 404
+    qoin_core.ensure_wallet(conn, "village", village_id)
+    return jsonify(
+        {
+            "village_id": village_id,
+            "balance_qoins": qoin_core.wallet_balance(conn, "village", village_id),
+            "total_rupees": qoin_core.wallet_rupee_total(conn, "village", village_id),
+        }
+    )
+
+
+@app.get("/api/admin/village_donations")
+@admin_required
+def api_admin_village_donations():
+    village_id = (request.args.get("village_id") or "").strip()
+    if not village_id:
+        return jsonify({"error": "village_id is required"}), 400
+    conn = get_db()
+    if not village_exists(conn, village_id):
+        return jsonify({"error": "Village not found"}), 404
+    return jsonify(qoin_core.village_donation_report(conn, village_id))
+
+
+@app.get("/api/admin/villages/search")
+@admin_required
+def api_admin_villages_search():
+    q = (request.args.get("q") or "").strip()
+    conn = get_db()
+    if not q:
+        return jsonify({"villages": []})
+    like = f"%{q}%"
+    cur = conn.execute(
+        """
+        SELECT id, name FROM village
+        WHERE id LIKE ? OR name LIKE ?
+        ORDER BY name COLLATE NOCASE
+        LIMIT 20
+        """,
+        (like, like),
+    )
+    return jsonify(
+        {
+            "villages": [
+                {"id": str(r["id"]), "name": str(r["name"] or r["id"])}
+                for r in cur
+            ]
+        }
+    )
 
 
 @app.post("/api/family/unlink_account")
@@ -8492,6 +9436,18 @@ def api_dashboard_global_stats():
     else:
         return jsonify({"error": "invalid scope"}), 400
 
+    zone_name: str | None = None
+    zone_code: str | None = None
+    if scope == "zone":
+        rp = raw_path(geo_id)
+        if "." in rp:
+            zone_code = rp.split(".", 1)[1].upper()
+        zone_name = INDIA_ZONE_NAMES.get(zone_code or "", zone_code)
+        if _geo_table_exists(conn, "zone"):
+            meta = _geo_row_optional_meta(conn, "zone", geo_id)
+            if meta.get("name"):
+                zone_name = str(meta["name"])
+
     return jsonify(
         {
             "total_users": bundle["total_users"],
@@ -8500,6 +9456,78 @@ def api_dashboard_global_stats():
             "life_stage_counts": {str(r["label"]): int(r["count"]) for r in bundle["age_group"]},
             "stats_url": build_geo_public_url(scope, url_id),
             "scope": scope,
+            "zone_name": zone_name,
+            "zone_code": zone_code,
+        }
+    )
+
+
+@app.get("/api/messages/unread_count")
+@login_required
+def api_messages_unread_count():
+    conn = get_db()
+    me = str(g.current_user["private_id"])
+    row = conn.execute(
+        """
+        SELECT COUNT(*) AS c FROM messages
+         WHERE recipient_id = ? COLLATE NOCASE
+           AND is_draft = 0
+           AND is_deleted_by_recipient = 0
+           AND read_at IS NULL
+        """,
+        (me,),
+    ).fetchone()
+    return jsonify({"unread_count": int(row["c"]) if row else 0})
+
+
+@app.get("/api/messages")
+@login_required
+def api_messages_folder():
+    """Unified folder fetch: ``?folder=inbox|sent|drafts``."""
+    conn = get_db()
+    me = str(g.current_user["private_id"])
+    folder = (request.args.get("folder") or "inbox").strip().lower()
+    if folder == "sent":
+        cur = conn.execute(
+            """
+            SELECT * FROM messages
+             WHERE sender_id = ? COLLATE NOCASE
+               AND is_draft = 0
+               AND is_deleted_by_sender = 0
+             ORDER BY datetime(created_at) DESC
+             LIMIT 200
+            """,
+            (me,),
+        )
+    elif folder == "drafts":
+        cur = conn.execute(
+            """
+            SELECT * FROM messages
+             WHERE sender_id = ? COLLATE NOCASE
+               AND is_draft = 1
+               AND is_deleted_by_sender = 0
+             ORDER BY datetime(created_at) DESC
+             LIMIT 200
+            """,
+            (me,),
+        )
+    else:
+        folder = "inbox"
+        cur = conn.execute(
+            """
+            SELECT * FROM messages
+             WHERE recipient_id = ? COLLATE NOCASE
+               AND is_draft = 0
+               AND is_deleted_by_recipient = 0
+             ORDER BY datetime(created_at) DESC
+             LIMIT 200
+            """,
+            (me,),
+        )
+    return jsonify(
+        {
+            "folder": folder,
+            "messages": [_message_row_to_dict(r) for r in cur],
         }
     )
 
@@ -8581,11 +9609,15 @@ def api_messages_send():
         return jsonify({"error": "recipient_id is required"}), 400
 
     row_r = conn.execute(
-        "SELECT private_id FROM users WHERE private_id = ? COLLATE NOCASE",
-        (recipient_raw,),
+        """
+        SELECT private_id FROM users
+         WHERE private_id = ? COLLATE NOCASE
+            OR public_id = ? COLLATE NOCASE
+        """,
+        (recipient_raw, recipient_raw),
     ).fetchone()
     if not row_r:
-        return jsonify({"error": "Recipient Private ID not found"}), 400
+        return jsonify({"error": "Recipient Private ID or Public ID not found"}), 400
     recipient_id = str(row_r["private_id"])
 
     if not is_draft and recipient_id == me:
@@ -8802,89 +9834,139 @@ def register():
 
     pw_hash = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("ascii")
 
+    session["pending_registration"] = {
+        "first_name": first_name,
+        "last_name": last_name,
+        "gender": gender,
+        "dob_iso": dob_iso,
+        "birth_time": birth_time,
+        "age": age,
+        "agroup": agroup,
+        "sun": sun,
+        "moon": moon,
+        "elem": elem,
+        "birth_loc": birth_loc,
+        "curr_loc": curr_loc,
+        "birth_cont": birth_cont,
+        "birth_ctry": birth_ctry,
+        "curr_cont": curr_cont,
+        "curr_ctry": curr_ctry,
+        "legacy_country_text": legacy_country_text,
+        "email_raw": email_raw,
+        "password_hash": pw_hash,
+    }
+    return redirect(url_for("register_donation"))
+
+
+def _finalize_registration_with_donation(
+    conn: sqlite3.Connection, pending: dict[str, Any], donation_rupees: int
+) -> tuple[str, str]:
+    private_id = allocate_private_id(
+        conn,
+        pending["first_name"],
+        pending["dob_iso"],
+        pending["birth_time"],
+        pending.get("birth_loc"),
+        birth_country_id=pending.get("birth_ctry"),
+        birth_continent_id=pending.get("birth_cont"),
+    )
+    public_id = allocate_public_id(conn)
+    conn.execute(
+        """
+        INSERT INTO users (
+            private_id, public_id, first_name, last_name, gender,
+            date_of_birth, birth_time, age, age_group,
+            sun_sign, moon_sign, element,
+            birth_location_id, current_location_id,
+            birth_continent_id, birth_country_id,
+            current_continent_id, current_country_id,
+            country, email, password_hash,
+            account_type, is_active
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'H_U', 1)
+        """,
+        (
+            private_id,
+            public_id,
+            pending["first_name"],
+            pending["last_name"],
+            pending["gender"],
+            pending["dob_iso"],
+            pending["birth_time"],
+            pending["age"],
+            pending["agroup"],
+            pending["sun"],
+            pending["moon"],
+            pending["elem"],
+            pending.get("birth_loc"),
+            pending.get("curr_loc"),
+            pending.get("birth_cont"),
+            pending.get("birth_ctry"),
+            pending.get("curr_cont"),
+            pending.get("curr_ctry"),
+            pending.get("legacy_country_text"),
+            pending.get("email_raw"),
+            pending["password_hash"],
+        ),
+    )
+    qoin_core.process_donation(
+        conn,
+        donor_private_id=private_id,
+        amount_rupees=donation_rupees,
+        village_id=str(pending.get("curr_loc") or "").strip() or None,
+    )
+    conn.commit()
+    return private_id, public_id
+
+
+@app.route("/register/donation", methods=["GET"])
+def register_donation():
+    pending = session.get("pending_registration")
+    if not pending:
+        flash("Complete the registration form first.", "error")
+        return redirect(url_for("register"))
+    return render_template(
+        "register_donation.html",
+        donation_amounts=[1, 2, 5, 10, 20, 50, 100, 200, 500],
+        pending_name=pending.get("first_name", ""),
+    )
+
+
+@app.post("/api/register/donate")
+def api_register_donate():
+    pending = session.get("pending_registration")
+    if not pending:
+        return jsonify({"error": "No pending registration. Start at /register."}), 400
+    payload = request.get_json(silent=True) or {}
     try:
-        private_id = allocate_private_id(
-            conn,
-            first_name,
-            dob_iso,
-            birth_time,
-            birth_loc,
-            birth_country_id=birth_ctry,
-            birth_continent_id=birth_cont,
+        amount = int(payload.get("amount") or 0)
+    except (TypeError, ValueError):
+        return jsonify({"error": "amount must be an integer"}), 400
+    if amount < 1 or amount > 500:
+        return jsonify({"error": "Donation must be between ₹1 and ₹500"}), 400
+    conn = get_db()
+    try:
+        private_id, public_id = _finalize_registration_with_donation(
+            conn, pending, amount
         )
-        public_id = allocate_public_id(conn)
-        conn.execute(
-            """
-            INSERT INTO users (
-                private_id,
-                public_id,
-                first_name,
-                last_name,
-                gender,
-                date_of_birth,
-                birth_time,
-                age,
-                age_group,
-                sun_sign,
-                moon_sign,
-                element,
-                birth_location_id,
-                current_location_id,
-                birth_continent_id,
-                birth_country_id,
-                current_continent_id,
-                current_country_id,
-                country,
-                email,
-                password_hash
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                private_id,
-                public_id,
-                first_name,
-                last_name,
-                gender,
-                dob_iso,
-                birth_time,
-                age,
-                agroup,
-                sun,
-                moon,
-                elem,
-                birth_loc,
-                curr_loc,
-                birth_cont,
-                birth_ctry,
-                curr_cont,
-                curr_ctry,
-                legacy_country_text,
-                email_raw,
-                pw_hash,
-            ),
-        )
-        conn.commit()
     except sqlite3.IntegrityError:
         conn.rollback()
-        errors.append("Could not create account (collision). Please try again.")
-        return render_template(
-            "register.html",
-            gender_options=GENDER_OPTIONS,
-            continents=continents_form,
-            form=form,
-            errors=errors,
-            new_private_id=None,
-            new_public_id=None,
-        )
-
-    return render_template(
-        "register.html",
-        gender_options=GENDER_OPTIONS,
-        continents=continents_form,
-        form={},
-        errors=None,
-        new_private_id=private_id,
-        new_public_id=public_id,
+        return jsonify({"error": "Could not create account. Try again."}), 400
+    except ValueError as exc:
+        conn.rollback()
+        return jsonify({"error": str(exc)}), 400
+    session.pop("pending_registration", None)
+    row = conn.execute(
+        "SELECT id FROM users WHERE private_id = ?", (private_id,)
+    ).fetchone()
+    if row:
+        session["user_pk"] = int(row["id"])
+    return jsonify(
+        {
+            "ok": True,
+            "private_id": private_id,
+            "public_id": public_id,
+            "redirect": url_for("dashboard"),
+        }
     )
 
 
@@ -9019,6 +10101,10 @@ def dashboard():
 
     user_life_stage = life_stage_from_age(int(user_row["age"]))
 
+    active_zodiac = _election_active_zodiac_sign()
+    election_nomination_eligible = _election_user_can_nominate(user_row, active_zodiac)
+    election_vote_eligible = _election_user_can_vote(user_row, active_zodiac)
+
     geo_displays = user_dashboard_geo_displays(conn, user_row)
     dash_client_config: dict[str, Any] = {
         "userHierarchy": [dict(item) for item in current_hierarchy],
@@ -9032,11 +10118,20 @@ def dashboard():
         "userShowZoneTab": bool(geo_displays.get("user_show_zone_tab")),
         "isAdmin": is_admin_user(user_row),
         "userPrivateId": str(user_row["private_id"] or ""),
+        "electionNominationEligible": election_nomination_eligible,
+        "electionVoteEligible": election_vote_eligible,
+        "userDisplayName": display_name,
+        "userPublicId": str(user_row["public_id"] or ""),
+        "userZoneId": geo_displays.get("user_zone_id") or "",
+        "userZoneName": geo_displays.get("user_zone_name") or "",
+        "userZoneCode": geo_displays.get("user_zone_code") or "",
     }
 
     return render_template(
         "dashboard.html",
         user=user_row,
+        election_nomination_eligible=election_nomination_eligible,
+        election_vote_eligible=election_vote_eligible,
         display_name=display_name,
         birth_location_label=birth_location_label,
         current_location_label=current_location_label,
@@ -9050,6 +10145,7 @@ def dashboard():
         private_posts=private_posts,
         show_dashboard_post_form=bool(default_vid),
         dash_client_config=dash_client_config,
+        quantum_punch_village_id=election_scheduler.TARGET_VILLAGE_ID,
         **geo_displays,
     )
 
@@ -9062,59 +10158,10 @@ def admin_location_members(location_type: str, location_id: str):
     conn = get_db()
     lt = location_type.strip().lower()
     lid = (location_id or "").strip()
-    allowed_admin_scopes = frozenset(
-        {"earth", "continent", "country", "zone", "state", "district", "tehsil", "village", "india"}
-    )
-    if lt not in allowed_admin_scopes:
+    try:
+        page_title, members = _location_members_for_scope(conn, lt, lid)
+    except ValueError:
         abort(404)
-
-    if lt == "india":
-        if lid.upper() != "IND":
-            abort(404)
-        pred, tup = _indian_users_predicate(conn)
-        page_title = "India (national)"
-    else:
-        tbl = GEO_ROUTE_TABLE.get(lt)
-        if not tbl or not _geo_table_exists(conn, tbl):
-            abort(404)
-        if conn.execute(f"SELECT 1 FROM {tbl} WHERE id = ?", (lid,)).fetchone() is None:
-            abort(404)
-        pred, tup = user_location_predicate(conn, lt, lid)
-        page_title = str(_geo_row_optional_meta(conn, tbl, lid)["name"])
-
-    cur = conn.execute(
-        f"""
-        SELECT first_name, last_name, gender, age, sun_sign, private_id, public_id,
-               birth_location_id, current_location_id
-        FROM users u
-        WHERE ({pred})
-        ORDER BY COALESCE(last_name, ''), COALESCE(first_name, '')
-        """,
-        tup,
-    )
-    members: list[dict[str, Any]] = []
-    for r in cur:
-        try:
-            ag = int(r["age"])
-        except (TypeError, ValueError):
-            ag = 0
-        members.append(
-            {
-                "full_name": f'{r["first_name"] or ""} {r["last_name"] or ""}'.strip(),
-                "gender": str(r["gender"] or ""),
-                "age": ag,
-                "life_stage": life_stage_from_age(ag),
-                "sun_sign": str(r["sun_sign"] or ""),
-                "private_id": str(r["private_id"] or ""),
-                "public_id": str(r["public_id"] or ""),
-                "birth_location_id": str(r["birth_location_id"] or "")
-                if r["birth_location_id"]
-                else "—",
-                "current_location_id": str(r["current_location_id"] or "")
-                if r["current_location_id"]
-                else "—",
-            }
-        )
     return render_template(
         "members_list.html",
         location_scope=lt,

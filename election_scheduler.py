@@ -164,6 +164,9 @@ def migrate_election_tables(conn: sqlite3.Connection) -> None:
         ("election_cycles", "nomination_notice_sent", "INTEGER NOT NULL DEFAULT 0"),
         ("election_cycles", "voting_notice_sent", "INTEGER NOT NULL DEFAULT 0"),
         ("election_cycles", "results_notice_sent", "INTEGER NOT NULL DEFAULT 0"),
+        ("election_candidates", "status", "TEXT NOT NULL DEFAULT 'pending'"),
+        ("election_candidates", "rejection_reason", "TEXT"),
+        ("election_candidates", "reviewed_at", "TIMESTAMP"),
     ):
         cols = {str(r[1]) for r in conn.execute(f"PRAGMA table_info({table})")}
         if col in cols:

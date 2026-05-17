@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}Activate account — Donation{% endblock %}
+
+{% block body %}
+<section class="qb-hero mb-4">
+  <h1>Activate your account</h1>
+  <p class="qb-lead">
+    Human User accounts require a one-time donation of <strong>₹1–₹500</strong> to activate.
+    Qoins are credited to your wallet; part may go to your current village wallet.
+  </p>
+  {% if pending_name %}
+  <p class="small text-muted mb-0">Registering as: <strong>{{ pending_name }}</strong></p>
+  {% endif %}
+</section>
+
+<div class="qb-panel p-3 mb-3" style="max-width: 36rem">
+  <h2 class="h6 mb-3">Select donation amount (₹)</h2>
+  <div class="d-flex flex-wrap gap-2 mb-3" id="reg-donation-amounts">
+    {% for amt in donation_amounts %}
+    <button type="button" class="qb-btn qb-btn-outline btn-sm reg-donation-amt" data-amount="{{ amt }}">
+      ₹{{ amt }}
+    </button>
+    {% endfor %}
+  </div>
+  <p class="small text-info mb-2" id="reg-donation-preview" role="status" aria-live="polite"></p>
+  <p class="small text-danger mb-2" id="reg-donation-error" hidden></p>
+  <button type="button" class="qb-btn qb-btn-primary" id="reg-donation-submit" disabled>
+    Complete registration &amp; donate
+  </button>
+  <p class="small text-muted mt-3 mb-0">
+    <a href="{{ url_for('register') }}">← Back to registration form</a>
+  </p>
+</div>
+
+<script>
+  (function () {
+    var selected = 0;
+    var preview = document.getElementById("reg-donation-preview");
+    var errEl = document.getElementById("reg-donation-error");
+    var submitBtn = document.getElementById("reg-donation-submit");
+    document.querySelectorAll(".reg-donation-amt").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        selected = parseInt(btn.getAttribute("data-amount"), 10) || 0;
+        document.querySelectorAll(".reg-donation-amt").forEach(function (b) {
+          b.classList.toggle("qb-btn-primary", b === btn);
+          b.classList.toggle("qb-btn-outline", b !== btn);
+        });
+        if (preview) preview.textContent = "Selected: ₹" + selected;
+        if (submitBtn) submitBtn.disabled = !selected;
+        if (errEl) errEl.hidden = true;
+      });
+    });
+    if (submitBtn) {
+      submitBtn.addEventListener("click", function () {
+        if (!selected) return;
+        submitBtn.disabled = true;
+        if (preview) preview.textContent = "Processing…";
+        fetch("/api/register/donate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({ amount: selected }),
+        })
+          .then(function (r) {
+            return r.json().then(function (b) {
+              return { ok: r.ok, b: b };
+            });
+          })
+          .then(function (x) {
+            if (!x.ok) throw new Error((x.b && x.b.error) || "Donation failed");
+            alert(
+              "Account created.\nPrivate ID: " +
+                (x.b.private_id || "") +
+                "\nPublic ID: " +
+                (x.b.public_id || "") +
+                "\nSave your Private ID before closing."
+            );
+            window.location.href = x.b.redirect || "/dashboard";
+          })
+          .catch(function (err) {
+            if (errEl) {
+              errEl.textContent = err.message || "Error";
+              errEl.hidden = false;
+            }
+            submitBtn.disabled = false;
+            if (preview) preview.textContent = "";
+          });
+      });
+    }
+  })();
+</script>
+{% endblock %}

@@ -49,6 +49,13 @@
         </span>
       </p>
       {% endif %}
+      {% if scope == 'village' and village_wallet_qoins is defined %}
+      <p class="small mb-0 mt-2">
+        <strong>Village Wallet:</strong>
+        <span class="text-info">{{ village_wallet_qoins }}</span> Qoins
+        <span class="text-muted">(₹{{ village_wallet_rupees }})</span>
+      </p>
+      {% endif %}
     </section>
 
     {% include "_location_breakdowns.html" %}
