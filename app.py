@@ -21,10 +21,12 @@ from typing import Any
 
 import bcrypt
 
+import birth_chart
 import calendar_time
 import election_scheduler
 import qoin_core
 import social_core
+import zodiac_calendar
 from flask import (
     Flask,
     abort,
@@ -87,6 +89,12 @@ SIGNS_BY_ELEMENT: dict[str, tuple[str, str, str]] = {
     "Air": ("Gemini", "Libra", "Aquarius"),
     "Water": ("Cancer", "Scorpio", "Pisces"),
 }
+
+UPGRADE_ACCOUNT_TYPES = frozenset(
+    {"Volunteer", "Agent", "Manager", "Leader", "Mentor"}
+)
+
+DEMO_ACCOUNT_TYPE_PREFIX = "D_U"
 
 # Legacy registration IDs (U-XXXXXXXX); login accepts any stored private_id shape.
 PRIVATE_ID_RE = re.compile(r"^\s*(U-[A-Za-z0-9]{8})\s*$", re.I)
@@ -157,7 +165,11 @@ CREATE TABLE IF NOT EXISTS posts (
     origin_country_id TEXT,
     origin_continent_id TEXT,
     freeze_level TEXT,
-    qoins_settled INTEGER NOT NULL DEFAULT 0
+    qoins_settled INTEGER NOT NULL DEFAULT 0,
+    original_post_id INTEGER,
+    frozen_at_level TEXT,
+    archived_at_level TEXT,
+    level_end_time TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_posts_user_private_id ON posts(user_private_id);
 CREATE INDEX IF NOT EXISTS idx_posts_location_id ON posts(location_id);
@@ -167,6 +179,8 @@ CREATE INDEX IF NOT EXISTS idx_posts_status_location ON posts(status, location_i
 CREATE INDEX IF NOT EXISTS idx_posts_level_start_time ON posts(level_start_time);
 CREATE INDEX IF NOT EXISTS idx_posts_freeze_level ON posts(freeze_level);
 CREATE INDEX IF NOT EXISTS idx_posts_origin_village ON posts(origin_village_id);
+CREATE INDEX IF NOT EXISTS idx_posts_user_status_level ON posts(user_private_id, status, current_level);
+CREATE INDEX IF NOT EXISTS idx_posts_original_post_id ON posts(original_post_id);
 """
 
 CONNECTION_REQUESTS_SQL = """
@@ -460,6 +474,37 @@ app.logger.setLevel(logging.INFO)
 _last_escalation_check = 0.0
 
 
+def _api_json_error(message: str, status: int = 500):
+    return jsonify({"error": message}), status
+
+
+@app.errorhandler(404)
+def _handle_api_404(err):
+    if (request.path or "").startswith("/api/"):
+        return _api_json_error("Not found", 404)
+    return err
+
+
+@app.errorhandler(500)
+def _handle_api_500(err):
+    if (request.path or "").startswith("/api/"):
+        app.logger.exception("Unhandled API error")
+        return _api_json_error("Internal server error", 500)
+    return err
+
+
+try:
+    from werkzeug.exceptions import HTTPException
+
+    @app.errorhandler(HTTPException)
+    def _handle_api_http_exception(err: HTTPException):
+        if (request.path or "").startswith("/api/"):
+            return jsonify({"error": err.description or err.name}), err.code
+        return err
+except ImportError:
+    pass
+
+
 def get_db() -> sqlite3.Connection:
     if "db" not in g:
         conn = sqlite3.connect(DB_PATH)
@@ -592,6 +637,9 @@ def migrate_users_app_extensions(conn: sqlite3.Connection) -> None:
         ("agent_level", "INTEGER NOT NULL DEFAULT 0"),
         ("is_admin", "INTEGER NOT NULL DEFAULT 0"),
         ("is_active", "INTEGER NOT NULL DEFAULT 0"),
+        ("registered_by_admin", "INTEGER NOT NULL DEFAULT 0"),
+        ("birth_latitude", "REAL"),
+        ("birth_longitude", "REAL"),
     ]
     for col_name, decl in additions:
         if col_name in cols:
@@ -2428,6 +2476,44 @@ def _post_datetime(value: Any) -> datetime | None:
     return dt.astimezone(timezone.utc)
 
 
+def _escalation_label_for_frozen(post: sqlite3.Row | dict[str, Any]) -> str:
+    """Human label for a frozen post row (e.g. Escalated to Village)."""
+    if isinstance(post, sqlite3.Row):
+        d = dict(post)
+    else:
+        d = post
+    frozen_at = str(
+        d.get("frozen_at_level") or d.get("freeze_level") or ""
+    ).strip().lower()
+    if not frozen_at:
+        cl = str(d.get("current_level") or "").strip().lower()
+        if cl.endswith("_frozen"):
+            frozen_at = cl[: -len("_frozen")]
+    if not frozen_at:
+        return "Frozen"
+    try:
+        idx = social_core.POST_LEVEL_ORDER.index(frozen_at)
+    except ValueError:
+        return "Frozen"
+    if frozen_at == "earth":
+        return "Journey complete"
+    if idx + 1 < len(social_core.POST_LEVEL_ORDER):
+        nxt = social_core.POST_LEVEL_ORDER[idx + 1]
+        return f"Escalated to {nxt.title()}"
+    return "Frozen"
+
+
+def _archived_level_label(post: sqlite3.Row | dict[str, Any]) -> str:
+    if isinstance(post, sqlite3.Row):
+        d = dict(post)
+    else:
+        d = post
+    level = str(d.get("archived_at_level") or "").strip().lower()
+    if level:
+        return f"Archived from {level.title()}"
+    return "Previous post"
+
+
 def _iso_dt(dt: datetime | None) -> str:
     if dt is None:
         return ""
@@ -2455,7 +2541,11 @@ def _collective_board_progress(post: sqlite3.Row, level: str, state: str) -> dic
     else:
         base = created_at or level_start or datetime.now(timezone.utc)
         start_dt = base + timedelta(days=COLLECTIVE_BOARD_LEVEL_OFFSETS.get(level, 0))
-    end_dt = start_dt + timedelta(days=duration_days)
+    level_end = _post_datetime(post["level_end_time"]) if "level_end_time" in post.keys() else None
+    if state == "frozen" and level_end is not None:
+        end_dt = level_end
+    else:
+        end_dt = start_dt + timedelta(days=duration_days)
     now = datetime.now(timezone.utc)
     total_seconds = max(1.0, (end_dt - start_dt).total_seconds())
     elapsed_seconds = (now - start_dt).total_seconds()
@@ -2549,6 +2639,9 @@ def _collective_board_post_json(
         (is_own and within) or (is_own and viewer_is_admin)
     )
     d["can_admin_delete"] = bool(viewer_is_admin and not is_own)
+    if board_state == "frozen":
+        d["escalation_label"] = _escalation_label_for_frozen(r)
+        d["is_read_only"] = True
     return d
 
 
@@ -2661,6 +2754,23 @@ def _unauthorized_api_response():
     return jsonify({"error": "Unauthorized"}), 401
 
 
+def _api_handle_errors(view):
+    """Wrap API handlers so failures return JSON instead of HTML error pages."""
+
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        try:
+            return view(*args, **kwargs)
+        except sqlite3.Error:
+            app.logger.exception("Database error in %s", view.__name__)
+            return _api_json_error("Database error", 500)
+        except Exception as exc:
+            app.logger.exception("API error in %s", view.__name__)
+            return _api_json_error(str(exc) or "Internal server error", 500)
+
+    return wrapped
+
+
 def login_required(view):
     @wraps(view)
     def wrapped(*args, **kwargs):
@@ -2702,6 +2812,18 @@ def login_required(view):
     return wrapped
 
 
+def api_login_required(view):
+    """Alias for :func:`login_required` — API routes must never redirect to HTML login."""
+    return login_required(view)
+
+
+def _safe_escalate_posts(conn: sqlite3.Connection) -> None:
+    try:
+        social_core.escalate_posts(conn)
+    except sqlite3.Error:
+        app.logger.exception("post escalation failed")
+
+
 @app.before_request
 def _before_request() -> None:
     """
@@ -2713,42 +2835,47 @@ def _before_request() -> None:
     # Public diagnostic — no DB so /debug/check works even if migrations fail.
     if request.path == "/debug/check":
         return
-    conn = get_db()
-    ensure_users_table(conn)
-    ensure_users_country_column(conn)
-    migrate_users_app_extensions(conn)
-    migrate_messages_table(conn)
-    migrate_connection_requests_table(conn)
-    migrate_connection_requests_accepted_at(conn)
-    migrate_connection_requests_family_member_type(conn)
-    migrate_connection_requests_request_member_profile(conn)
-    migrate_family_tables(conn)
-    migrate_family_relationships_table(conn)
-    migrate_family_removal_requests_table(conn)
-    migrate_link_requests_table(conn)
-    migrate_user_family_setup_table(conn)
-    migrate_user_education_work_v2(conn)
-    migrate_connection_requests_life_stage(conn)
-    election_scheduler.migrate_election_tables(conn)
-    social_core.ensure_wallet_and_vote_tables(conn)
-    qoin_core.migrate_qoin_transactions(conn)
     try:
-        election_scheduler.process_election_cycles(
-            conn, send_system_message_fn=send_system_message
-        )
-    except sqlite3.Error:
-        app.logger.exception("election cycle processing failed")
-    social_core.ensure_wallet_and_vote_tables(conn)
-    social_core.ensure_posts_escalation_columns(conn)
-    migrate_posts_deletion_columns(conn)
-    global _last_escalation_check
-    now = time.monotonic()
-    if now - _last_escalation_check >= 60:
-        _last_escalation_check = now
+        conn = get_db()
+        ensure_users_table(conn)
+        ensure_users_country_column(conn)
+        migrate_users_app_extensions(conn)
+        migrate_messages_table(conn)
+        migrate_connection_requests_table(conn)
+        migrate_connection_requests_accepted_at(conn)
+        migrate_connection_requests_family_member_type(conn)
+        migrate_connection_requests_request_member_profile(conn)
+        migrate_family_tables(conn)
+        migrate_family_relationships_table(conn)
+        migrate_family_removal_requests_table(conn)
+        migrate_link_requests_table(conn)
+        migrate_user_family_setup_table(conn)
+        migrate_user_education_work_v2(conn)
+        migrate_connection_requests_life_stage(conn)
+        election_scheduler.migrate_election_tables(conn)
+        social_core.ensure_wallet_and_vote_tables(conn)
+        qoin_core.migrate_qoin_transactions(conn)
+        qoin_core.migrate_cash_donations(conn)
+        zodiac_calendar.migrate_calendar_event_tables(conn)
         try:
-            social_core.escalate_posts(conn)
+            election_scheduler.process_election_cycles(
+                conn, send_system_message_fn=send_system_message
+            )
         except sqlite3.Error:
-            app.logger.exception("post escalation checkpoint failed")
+            app.logger.exception("election cycle processing failed")
+        social_core.ensure_wallet_and_vote_tables(conn)
+        social_core.ensure_posts_escalation_columns(conn)
+        migrate_posts_deletion_columns(conn)
+        conn.commit()
+        global _last_escalation_check
+        now = time.monotonic()
+        if now - _last_escalation_check >= 60:
+            _last_escalation_check = now
+            _safe_escalate_posts(conn)
+    except sqlite3.Error:
+        app.logger.exception("before_request schema bootstrap failed")
+    except Exception:
+        app.logger.exception("before_request bootstrap failed")
 
 
 def _geo_statistics_page(scope: str, geo_id: str) -> str:
@@ -3239,7 +3366,7 @@ def api_post_vote():
         "SELECT total_score FROM posts WHERE id = ?", (post_id,)
     ).fetchone()
     ts = int(row["total_score"]) if row else 0
-    social_core.escalate_posts(conn)
+    _safe_escalate_posts(conn)
     return jsonify(
         {
             "ok": True,
@@ -3304,12 +3431,12 @@ def _collective_board_never_personal_sql(alias: str = "p") -> str:
     """SQL fragment: exclude any post still in a personal PCB phase.
 
     Collective boards (Village CVB and above) must not surface rows whose
-    level is ``personal``, ``personal_history``, or legacy ``personal_*``
-    prefixes — even if ``current_level = ?`` were mis-bound elsewhere.
+    level is ``personal``, ``personal_history``, ``private_history``, or legacy
+    ``personal_*`` prefixes — even if ``current_level = ?`` were mis-bound elsewhere.
     """
     return (
         f" AND (NOT (LOWER(TRIM(COALESCE({alias}.current_level,''))) IN "
-        f"('personal','personal_history')) "
+        f"('personal','personal_history','private_history')) "
         f"AND NOT (LOWER(TRIM(COALESCE({alias}.current_level,''))) "
         f"LIKE 'personal\\_%' ESCAPE '\\'))"
     )
@@ -3481,17 +3608,9 @@ def _personal_board_rows(
             base_select
             + f"""
               WHERE p.user_private_id IN ({placeholders})
-                AND p.current_level != 'personal_history'
-                AND (
-                  p.status = 'frozen'
-                  OR p.previous_levels = 'personal'
-                  OR p.previous_levels LIKE 'personal,%'
-                  OR p.previous_levels LIKE '%,personal'
-                  OR p.previous_levels LIKE '%,personal,%'
-                  OR p.previous_levels LIKE 'personal:%'
-                  OR p.previous_levels LIKE '%,personal:%'
-                )
-              ORDER BY datetime(p.created_at) DESC, p.id DESC
+                AND p.status = 'frozen'
+                AND p.current_level = 'personal_frozen'
+              ORDER BY datetime(COALESCE(p.level_end_time, p.created_at)) DESC, p.id DESC
               LIMIT 100
             """,
             (user_private_id, *author_ids),
@@ -3501,11 +3620,12 @@ def _personal_board_rows(
 
 @app.get("/api/personal_board")
 @login_required
+@_api_handle_errors
 def api_personal_board():
     conn = get_db()
     if not user_has_full_dashboard(conn, g.current_user):
         return jsonify({"error": "Dashboard features are limited to India residents."}), 403
-    social_core.escalate_posts(conn)
+    _safe_escalate_posts(conn)
 
     board_state = (request.args.get("state") or "live").strip().lower()
     if board_state == "freeze":
@@ -4232,13 +4352,29 @@ def _election_user_sun_sign_matches_cycle(
     return str(user_row["sun_sign"] or "").strip() == str(zodiac_sign).strip()
 
 
+def _element_for_zodiac_sign(zodiac_sign: str | None) -> str | None:
+    if not zodiac_sign:
+        return None
+    return ELEMENT_BY_SIGN.get(str(zodiac_sign).strip())
+
+
+def _election_user_element_matches_cycle(
+    user_row: sqlite3.Row, zodiac_sign: str | None
+) -> bool:
+    if not zodiac_sign:
+        return False
+    cycle_element = _element_for_zodiac_sign(zodiac_sign)
+    user_element = str(user_row["element"] or "").strip()
+    return bool(cycle_element and user_element == cycle_element)
+
+
 def _election_user_can_vote(
     user_row: sqlite3.Row, zodiac_sign: str | None = None
 ) -> bool:
     if not _election_user_location_match(user_row):
         return False
     sign = zodiac_sign if zodiac_sign is not None else _election_active_zodiac_sign()
-    if not sign or not _election_user_sun_sign_matches_cycle(user_row, sign):
+    if not sign or not _election_user_element_matches_cycle(user_row, sign):
         return False
     try:
         age = int(user_row["age"])
@@ -4247,14 +4383,75 @@ def _election_user_can_vote(
     return age >= 13
 
 
+def _election_voting_ineligible_message(
+    user_row: sqlite3.Row, zodiac_sign: str | None
+) -> str:
+    element = _element_for_zodiac_sign(zodiac_sign) or "matching"
+    if not _election_user_location_match(user_row):
+        return "Elections apply to residents of Rohini Sector‑24 only."
+    try:
+        age = int(user_row["age"])
+    except (TypeError, ValueError):
+        age = 0
+    if age < 13:
+        return "You must be at least 13 years old to vote in village elections."
+    if zodiac_sign and not _election_user_element_matches_cycle(user_row, zodiac_sign):
+        return (
+            f"Voting is open only to {element} sign members for this election."
+        )
+    return "You are not eligible to vote in this election cycle."
+
+
 def _election_user_can_nominate(
     user_row: sqlite3.Row, zodiac_sign: str | None = None
 ) -> bool:
-    if not _election_user_can_vote(user_row, zodiac_sign):
+    if not _election_user_location_match(user_row):
+        return False
+    sign = zodiac_sign if zodiac_sign is not None else _election_active_zodiac_sign()
+    if not sign or not _election_user_sun_sign_matches_cycle(user_row, sign):
         return False
     if str(user_row["age_group"] or "").strip() != "Yuvak":
         return False
     return election_scheduler.election_bucket_gender(str(user_row["gender"] or "")) is not None
+
+
+def _user_account_badges(user_row: sqlite3.Row) -> list[str]:
+    badges: list[str] = []
+    try:
+        at = str(user_row["account_type"] or "").strip()
+    except (KeyError, IndexError):
+        at = "H_U"
+    if at in UPGRADE_ACCOUNT_TYPES:
+        badges.append(at)
+    try:
+        if int(user_row["mentor_level"] or 0) > 0 and "Mentor" not in badges:
+            badges.append("Mentor")
+        if int(user_row["leader_level"] or 0) > 0 and "Leader" not in badges:
+            badges.append("Leader")
+        if int(user_row["manager_level"] or 0) > 0 and "Manager" not in badges:
+            badges.append("Manager")
+        if int(user_row["agent_level"] or 0) > 0 and "Agent" not in badges:
+            badges.append("Agent")
+    except (KeyError, TypeError, ValueError):
+        pass
+    return badges
+
+
+def _is_demo_account_type(account_type: str | None) -> bool:
+    return str(account_type or "").strip().upper().startswith(DEMO_ACCOUNT_TYPE_PREFIX)
+
+
+def _validate_agent_public_id(conn: sqlite3.Connection, agent_public_id: str) -> bool:
+    pid = (agent_public_id or "").strip()
+    if not pid:
+        return False
+    row = conn.execute(
+        "SELECT account_type FROM users WHERE public_id = ? COLLATE NOCASE",
+        (pid,),
+    ).fetchone()
+    if not row:
+        return False
+    return str(row["account_type"] or "").strip() == "Agent"
 
 
 def _user_karma_index(user_row: sqlite3.Row) -> int:
@@ -4461,7 +4658,9 @@ def migrate_admin_user_profile(conn: sqlite3.Connection) -> None:
             sun_sign = ?,
             moon_sign = ?,
             element = ?,
-            is_active = 1
+            is_active = 1,
+            mentor_level = 1,
+            leader_level = 1
         WHERE private_id = ? COLLATE NOCASE
         """,
         (
@@ -4481,6 +4680,7 @@ def migrate_admin_user_profile(conn: sqlite3.Connection) -> None:
 
 @app.get("/api/election/status")
 @login_required
+@_api_handle_errors
 def api_election_status():
     conn = get_db()
     user = g.current_user
@@ -4491,15 +4691,22 @@ def api_election_status():
     active_sign = str(active_period[0]) if active_period else None
     eligible_vote = _election_user_can_vote(user, active_sign)
     eligible_nominate = _election_user_can_nominate(user, active_sign)
+    cycle_element = _element_for_zodiac_sign(active_sign)
+    user_element = str(user["element"] or "")
     payload: dict[str, Any] = {
         "target_village_id": election_scheduler.TARGET_VILLAGE_ID,
         "user_in_target_village": in_village,
         "user_sun_sign": sun,
+        "user_element": user_element,
+        "cycle_element": cycle_element,
         "user_age": int(user["age"]) if user["age"] is not None else None,
         "user_age_group": str(user["age_group"] or ""),
         "eligible_for_current_cycle": eligible_vote,
         "eligible_to_vote": eligible_vote,
         "eligible_to_nominate": eligible_nominate,
+        "voting_ineligible_message": _election_voting_ineligible_message(
+            user, active_sign
+        ),
         "active_period": None,
         "cycle": None,
         "phase": None,
@@ -4709,13 +4916,24 @@ def _admin_nominations_list_payload(conn: sqlite3.Connection) -> dict[str, Any]:
         params.append(status_filter)
     sql += " ORDER BY c.created_at ASC, c.id ASC"
     cur = conn.execute(sql, tuple(params))
+    all_rows = [_admin_nomination_row_dict(conn, r) for r in cur]
+    pending = [n for n in all_rows if n["status"] == "pending"]
+    approved = [n for n in all_rows if n["status"] == "approved"]
+    if status_filter == "pending":
+        listed = pending
+    elif status_filter == "approved":
+        listed = approved
+    else:
+        listed = pending + approved
     return {
         "cycle": {
             "id": cid,
             "zodiac_sign": str(cycle_row["zodiac_sign"]),
             "status": str(cycle_row["status"]),
         },
-        "nominations": [_admin_nomination_row_dict(conn, r) for r in cur],
+        "nominations": listed,
+        "pending": pending,
+        "approved": approved,
     }
 
 
@@ -4753,6 +4971,15 @@ def api_admin_nomination_approve(candidate_id: int):
         """,
         (now, candidate_id),
     )
+    cand_pid = str(row["candidate_private_id"])
+    zodiac = str(cycle_row["zodiac_sign"] or "")
+    body = (
+        f"Congratulations! Your nomination for {zodiac} council member has been "
+        "approved. You will appear on the voting ballot."
+    )
+    send_system_message(
+        conn, cand_pid, "Your nomination has been approved", body
+    )
     conn.commit()
     return jsonify({"ok": True, "candidate_id": candidate_id, "status": "approved"})
 
@@ -4778,6 +5005,8 @@ def api_admin_nomination_reject(candidate_id: int):
     ).fetchone()
     if not row:
         return jsonify({"error": "Nomination not found or already rejected"}), 404
+    if str(row["status"] or "") == "rejected":
+        return jsonify({"error": "Nomination already rejected"}), 400
     cand_pid = str(row["candidate_private_id"])
     zodiac = str(cycle_row["zodiac_sign"] or "")
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
@@ -4789,10 +5018,7 @@ def api_admin_nomination_reject(candidate_id: int):
         """,
         (reason, now, candidate_id),
     )
-    body = (
-        f"Your nomination for the {zodiac} Quantum Punch village council election "
-        f"was not approved.\n\nReason: {reason}"
-    )
+    body = f"Your nomination was not approved.\n\nReason: {reason}"
     send_system_message(conn, cand_pid, "Nomination Rejected", body)
     conn.commit()
     return jsonify({"ok": True, "candidate_id": candidate_id, "status": "rejected"})
@@ -6756,6 +6982,7 @@ def api_family_all_members():
 
 @app.get("/api/family/tree")
 @login_required
+@_api_handle_errors
 def api_family_tree():
     conn = get_db()
     pid = str(g.current_user["private_id"])
@@ -7485,16 +7712,44 @@ def api_qoin_donate():
         return jsonify({"error": "amount must be an integer (rupees)"}), 400
     if amount < 1 or amount > 500:
         return jsonify({"error": "Donation must be between ₹1 and ₹500"}), 400
+    method = str(payload.get("method") or "upi").strip().lower()
+    if method not in ("cash", "upi"):
+        return jsonify({"error": "method must be cash or upi"}), 400
+    agent_id = str(payload.get("agent_id") or "").strip()
+    if method == "cash":
+        if not agent_id:
+            return jsonify({"error": "Agent Account ID is required for cash donations"}), 400
+        if not _validate_agent_public_id(conn, agent_id):
+            return jsonify(
+                {"error": "Agent Account ID must belong to an Agent account"}
+            ), 400
     pid = str(g.current_user["private_id"])
     village_id = str(g.current_user["current_location_id"] or "").strip() or None
     try:
         result = qoin_core.process_donation(
-            conn, donor_private_id=pid, amount_rupees=amount, village_id=village_id
+            conn,
+            donor_private_id=pid,
+            amount_rupees=amount,
+            village_id=village_id,
+            method=method,
+            agent_public_id=agent_id if method == "cash" else None,
         )
         conn.commit()
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
     return jsonify({"ok": True, **result})
+
+
+@app.get("/api/qoin/transactions")
+@login_required
+def api_qoin_transactions():
+    conn = get_db()
+    pid = str(g.current_user["private_id"])
+    try:
+        limit = min(int(request.args.get("limit") or 50), 100)
+    except (TypeError, ValueError):
+        limit = 50
+    return jsonify({"transactions": qoin_core.user_transactions(conn, pid, limit=limit)})
 
 
 @app.get("/api/village/wallet")
@@ -7526,6 +7781,153 @@ def api_admin_village_donations():
     if not village_exists(conn, village_id):
         return jsonify({"error": "Village not found"}), 404
     return jsonify(qoin_core.village_donation_report(conn, village_id))
+
+
+@app.get("/api/user/birth_chart")
+@login_required
+def api_user_birth_chart():
+    """Birth chart JSON for the logged-in user (never HTML)."""
+    user = g.current_user
+    try:
+        lat = float(user["birth_latitude"]) if user["birth_latitude"] is not None else None
+    except (KeyError, TypeError, ValueError):
+        lat = None
+    try:
+        lon = float(user["birth_longitude"]) if user["birth_longitude"] is not None else None
+    except (KeyError, TypeError, ValueError):
+        lon = None
+    try:
+        is_admin = bool(int(user["is_admin"] or 0))
+    except (KeyError, TypeError, ValueError):
+        is_admin = False
+    try:
+        payload = birth_chart.compute_birth_chart(
+            date_of_birth=str(user["date_of_birth"] or "2000-01-01"),
+            birth_time=str(user["birth_time"] or "12:00"),
+            sun_sign=str(user["sun_sign"] or ""),
+            moon_sign=str(user["moon_sign"] or ""),
+            latitude=lat,
+            longitude=lon,
+            private_id=str(user["private_id"] or ""),
+            is_admin=is_admin,
+        )
+    except Exception as exc:
+        app.logger.exception("birth chart endpoint failed")
+        if birth_chart._is_admin_reference_user(
+            str(user["private_id"] or ""),
+            str(user["date_of_birth"] or ""),
+            str(user["birth_time"] or ""),
+            is_admin=is_admin,
+        ):
+            payload = birth_chart.admin_reference_chart()
+        else:
+            payload = birth_chart.compute_birth_chart(
+                date_of_birth=str(user["date_of_birth"] or "2000-01-01"),
+                birth_time=str(user["birth_time"] or "12:00"),
+                sun_sign=str(user["sun_sign"] or ""),
+                moon_sign=str(user["moon_sign"] or ""),
+                latitude=lat,
+                longitude=lon,
+                private_id=str(user["private_id"] or ""),
+                is_admin=is_admin,
+            )
+        payload["error"] = "Chart calculation failed"
+        payload["details"] = str(exc)
+    resp = jsonify(payload)
+    resp.headers["Content-Type"] = "application/json; charset=utf-8"
+    return resp
+
+
+@app.get("/api/admin/users/search")
+@admin_required
+def api_admin_users_search():
+    q = (request.args.get("q") or "").strip()
+    if len(q) < 2:
+        return jsonify({"users": []})
+    conn = get_db()
+    like = f"%{q}%"
+    cur = conn.execute(
+        """
+        SELECT private_id, public_id, first_name, last_name, account_type
+        FROM users
+        WHERE public_id LIKE ? COLLATE NOCASE
+           OR private_id LIKE ? COLLATE NOCASE
+           OR first_name LIKE ? COLLATE NOCASE
+           OR last_name LIKE ? COLLATE NOCASE
+           OR (first_name || ' ' || last_name) LIKE ? COLLATE NOCASE
+        ORDER BY last_name, first_name
+        LIMIT 20
+        """,
+        (like, like, like, like, like),
+    )
+    users: list[dict[str, Any]] = []
+    for r in cur:
+        at = str(r["account_type"] or "")
+        if _is_demo_account_type(at):
+            continue
+        users.append(
+            {
+                "private_id": str(r["private_id"]),
+                "public_id": str(r["public_id"]),
+                "full_name": f'{r["first_name"] or ""} {r["last_name"] or ""}'.strip(),
+                "account_type": at,
+            }
+        )
+    return jsonify({"users": users})
+
+
+@app.post("/api/admin/upgrade_user")
+@admin_required
+def api_admin_upgrade_user():
+    payload = request.get_json(silent=True) or {}
+    lookup = str(payload.get("public_id") or payload.get("private_id") or "").strip()
+    new_type = str(payload.get("new_account_type") or "").strip()
+    if not lookup:
+        return jsonify({"error": "public_id or private_id is required"}), 400
+    if new_type not in UPGRADE_ACCOUNT_TYPES:
+        return jsonify(
+            {
+                "error": "new_account_type must be one of: "
+                + ", ".join(sorted(UPGRADE_ACCOUNT_TYPES))
+            }
+        ), 400
+    conn = get_db()
+    row = conn.execute(
+        """
+        SELECT * FROM users
+        WHERE public_id = ? COLLATE NOCASE OR private_id = ? COLLATE NOCASE
+        """,
+        (lookup, lookup),
+    ).fetchone()
+    if not row:
+        return jsonify({"error": "User not found"}), 404
+    at = str(row["account_type"] or "")
+    if _is_demo_account_type(at):
+        return jsonify({"error": "Demo users cannot be upgraded"}), 400
+    if at not in ("H_U",) and at not in UPGRADE_ACCOUNT_TYPES:
+        return jsonify({"error": "Only Human User accounts can be upgraded"}), 400
+    pid = str(row["private_id"])
+    conn.execute(
+        "UPDATE users SET account_type = ? WHERE private_id = ?",
+        (new_type, pid),
+    )
+    nm = f'{row["first_name"] or ""} {row["last_name"] or ""}'.strip() or pid
+    send_system_message(
+        conn,
+        pid,
+        "Account upgraded",
+        f"Your Quantum Box account has been upgraded to {new_type} by an administrator.",
+    )
+    conn.commit()
+    return jsonify(
+        {
+            "ok": True,
+            "private_id": pid,
+            "public_id": str(row["public_id"]),
+            "account_type": new_type,
+            "full_name": nm,
+        }
+    )
 
 
 @app.get("/api/admin/villages/search")
@@ -8876,33 +9278,81 @@ def api_admin_family_removal_reject(request_id: int):
 @app.get("/api/post_history")
 @login_required
 def api_post_history():
+    """Legacy alias — archived posts for the signed-in author."""
+    return api_my_posts_previous()
+
+
+@app.get("/api/my_posts/previous")
+@login_required
+def api_my_posts_previous():
     conn = get_db()
+    if not user_has_full_dashboard(conn, g.current_user):
+        return jsonify({"error": "Dashboard features are limited to India residents."}), 403
     pid = str(g.current_user["private_id"])
     cur = conn.execute(
         """
         SELECT id, content, current_level, status, total_score, created_at,
-               freeze_level, previous_levels
+               level_start_time, level_end_time, archived_at_level, previous_levels
         FROM posts
         WHERE user_private_id = ?
-          AND (
-            current_level = 'personal_history'
-            OR status = 'completed'
-          )
-        ORDER BY datetime(created_at) DESC, id DESC
+          AND status = 'archived'
+          AND current_level = 'private_history'
+        ORDER BY datetime(COALESCE(level_end_time, created_at)) DESC, id DESC
         LIMIT 100
         """,
         (pid,),
     )
-    return jsonify({"posts": [dict(r) for r in cur]})
+    posts = []
+    for r in cur:
+        d = dict(r)
+        d["archive_label"] = _archived_level_label(r)
+        posts.append(d)
+    return jsonify({"posts": posts})
+
+
+@app.get("/api/my_posts/active")
+@login_required
+def api_my_posts_active():
+    conn = get_db()
+    if not user_has_full_dashboard(conn, g.current_user):
+        return jsonify({"error": "Dashboard features are limited to India residents."}), 403
+    pid = str(g.current_user["private_id"])
+    cur = conn.execute(
+        """
+        SELECT p.*, u.public_id AS author_public_id, u.first_name AS author_first,
+               u.last_name AS author_last, u.age AS author_age,
+               u.gender AS author_gender, u.current_location_id AS author_current_location_id,
+               v.vote_value AS current_user_vote
+        FROM posts p
+        JOIN users u ON u.private_id = p.user_private_id
+        LEFT JOIN post_votes v
+          ON v.post_id = p.id AND v.voter_private_id = ?
+        WHERE p.user_private_id = ?
+          AND p.status = 'live'
+          AND p.current_level = 'personal'
+        ORDER BY datetime(p.created_at) DESC, p.id DESC
+        LIMIT 80
+        """,
+        (pid, pid),
+    )
+    rows = list(cur)
+    return jsonify(
+        {
+            "posts": _filter_board_posts(
+                rows, conn, g.current_user, "personal", "live"
+            ),
+        }
+    )
 
 
 @app.get("/api/collective_board")
 @login_required
+@_api_handle_errors
 def api_collective_board():
     conn = get_db()
     if not user_has_full_dashboard(conn, g.current_user):
         return jsonify({"error": "Dashboard features are limited to India residents."}), 403
-    social_core.escalate_posts(conn)
+    _safe_escalate_posts(conn)
 
     level = (request.args.get("level") or "").strip().lower()
     location_id = (request.args.get("location_id") or "").strip()
@@ -8939,11 +9389,12 @@ def api_collective_board():
 
 @app.get("/api/posts")
 @login_required
+@_api_handle_errors
 def api_posts():
     conn = get_db()
     if not user_has_full_dashboard(conn, g.current_user):
         return jsonify({"error": "Dashboard features are limited to India residents."}), 403
-    social_core.escalate_posts(conn)
+    _safe_escalate_posts(conn)
 
     level = (request.args.get("level") or "").strip().lower()
     location_id = (request.args.get("location_id") or "").strip()
@@ -8970,23 +9421,12 @@ def api_my_posts():
     conn = get_db()
     if not user_has_full_dashboard(conn, g.current_user):
         return jsonify({"error": "Dashboard features are limited to India residents."}), 403
-    pid = str(g.current_user["private_id"])
-    cur = conn.execute(
-        """
-        SELECT id, content, current_level, status, total_score, created_at
-        FROM posts
-        WHERE user_private_id = ?
-          AND (
-            (status = 'live' AND current_level = 'personal')
-            OR (status = 'frozen')
-          )
-        ORDER BY datetime(created_at) DESC
-        LIMIT 80
-        """,
-        (pid,),
-    )
-    rows = [dict(r) for r in cur]
-    return jsonify({"posts": rows})
+    scope = (request.args.get("scope") or "active").strip().lower()
+    if scope in {"previous", "archived", "history"}:
+        return api_my_posts_previous()
+    if scope in {"active", "current", "live"}:
+        return api_my_posts_active()
+    return jsonify({"error": "scope must be active or previous"}), 400
 
 
 @app.get("/debug/check")
@@ -9031,8 +9471,9 @@ def debug_post_visibility():
             "visibility": {
                 "pcb_live_for_author": level == "personal" and status == "live",
                 "village_cvb": level == "village" and status == "live",
-                "any_collective_board": level not in {"personal", "personal_history"}
-                and status in {"live", "frozen"},
+                "any_collective_board": level not in {"personal", "personal_history", "private_history"}
+                and not level.endswith("_frozen")
+                and status == "live",
             },
         }
     )
@@ -9352,6 +9793,7 @@ def api_locations_global_children():
 
 @app.get("/api/dashboard/public_stats")
 @login_required
+@_api_handle_errors
 def api_dashboard_public_stats():
     conn = get_db()
     if not user_has_full_dashboard(conn, g.current_user):
@@ -9374,6 +9816,40 @@ def api_dashboard_public_stats():
             "life_stage_counts": {str(r["label"]): int(r["count"]) for r in bundle["age_group"]},
             "stats_url": build_geo_public_url(scope, lid),
             "scope": scope,
+        }
+    )
+
+
+@app.get("/api/location/member_count")
+@app.get("/api/location/stats")
+@login_required
+@_api_handle_errors
+def api_location_member_count():
+    """Member count for a village/tehsil/district/etc. (JSON alias for dashboard stats)."""
+    conn = get_db()
+    if not user_has_full_dashboard(conn, g.current_user):
+        return jsonify({"error": "Dashboard features are limited to India residents."}), 403
+    lid = (request.args.get("location_id") or "").strip()
+    if not lid:
+        return jsonify({"error": "location_id is required"}), 400
+    allowed = user_public_allowed_location_ids(conn, g.current_user)
+    if lid not in allowed:
+        return jsonify({"error": "location_id must be your profile hierarchy"}), 403
+    scope = infer_geo_scope_from_full_id(conn, lid)
+    if not scope:
+        return jsonify({"error": "location not found"}), 404
+    bundle = location_statistics_bundle(conn, scope, lid)
+    total = int(bundle["total_users"])
+    return jsonify(
+        {
+            "count": total,
+            "total_users": total,
+            "location_id": lid,
+            "scope": scope,
+            "gender_counts": {str(r["label"]): int(r["count"]) for r in bundle["gender"]},
+            "element_counts": {str(r["label"]): int(r["count"]) for r in bundle["sun_element"]},
+            "life_stage_counts": {str(r["label"]): int(r["count"]) for r in bundle["age_group"]},
+            "stats_url": build_geo_public_url(scope, lid),
         }
     )
 
@@ -9859,7 +10335,12 @@ def register():
 
 
 def _finalize_registration_with_donation(
-    conn: sqlite3.Connection, pending: dict[str, Any], donation_rupees: int
+    conn: sqlite3.Connection,
+    pending: dict[str, Any],
+    donation_rupees: int,
+    *,
+    method: str = "upi",
+    agent_public_id: str | None = None,
 ) -> tuple[str, str]:
     private_id = allocate_private_id(
         conn,
@@ -9913,9 +10394,16 @@ def _finalize_registration_with_donation(
         donor_private_id=private_id,
         amount_rupees=donation_rupees,
         village_id=str(pending.get("curr_loc") or "").strip() or None,
+        method=method,
+        agent_public_id=agent_public_id,
     )
     conn.commit()
     return private_id, public_id
+
+
+@app.route("/donation-required")
+def donation_required():
+    return redirect(url_for("register_donation"))
 
 
 @app.route("/register/donation", methods=["GET"])
@@ -9943,10 +10431,25 @@ def api_register_donate():
         return jsonify({"error": "amount must be an integer"}), 400
     if amount < 1 or amount > 500:
         return jsonify({"error": "Donation must be between ₹1 and ₹500"}), 400
+    method = str(payload.get("method") or "upi").strip().lower()
+    if method not in ("cash", "upi"):
+        return jsonify({"error": "method must be cash or upi"}), 400
+    agent_id = str(payload.get("agent_id") or "").strip()
     conn = get_db()
+    if method == "cash":
+        if not agent_id:
+            return jsonify({"error": "Agent Account ID is required for cash donations"}), 400
+        if not _validate_agent_public_id(conn, agent_id):
+            return jsonify(
+                {"error": "Agent Account ID must belong to an Agent account"}
+            ), 400
     try:
         private_id, public_id = _finalize_registration_with_donation(
-            conn, pending, amount
+            conn,
+            pending,
+            amount,
+            method=method,
+            agent_public_id=agent_id if method == "cash" else None,
         )
     except sqlite3.IntegrityError:
         conn.rollback()
@@ -10081,20 +10584,6 @@ def dashboard():
     )
     qoin_transactions_recent = [dict(r) for r in tx_cur]
 
-    cur_private = conn.execute(
-        """
-        SELECT id, content, current_level, status, total_score, created_at
-        FROM posts
-        WHERE user_private_id = ?
-          AND current_level = 'personal'
-          AND status IN ('live', 'frozen')
-        ORDER BY datetime(created_at) DESC
-        LIMIT 80
-        """,
-        (pid,),
-    )
-    private_posts = [dict(r) for r in cur_private]
-
     user_village_stats_url = "#"
     if default_vid:
         user_village_stats_url = build_geo_public_url("village", str(default_vid).strip())
@@ -10142,7 +10631,7 @@ def dashboard():
         wallet_balance=wallet_balance,
         qoins_earned_total=qoins_earned_total,
         qoin_transactions_recent=qoin_transactions_recent,
-        private_posts=private_posts,
+        account_badges=_user_account_badges(user_row),
         show_dashboard_post_form=bool(default_vid),
         dash_client_config=dash_client_config,
         quantum_punch_village_id=election_scheduler.TARGET_VILLAGE_ID,
@@ -10184,6 +10673,85 @@ def global_viewer():
         user=user_row,
         display_name=display_name,
     )
+
+
+@app.route("/calendar")
+@login_required
+def calendar_page():
+    user_row = g.current_user
+    display_name = f'{user_row["first_name"]} {user_row["last_name"]}'
+    return render_template(
+        "calendar.html",
+        user=user_row,
+        display_name=display_name,
+    )
+
+
+@app.route("/api/calendar/solar-months")
+@login_required
+def api_calendar_solar_months():
+    months = zodiac_calendar.get_solar_months_2026()
+    return jsonify(
+        {
+            "vikram_samvat": zodiac_calendar.VIKRAM_SAMVAT_2026,
+            "months": months,
+            "element_colours": zodiac_calendar.ELEMENT_COLOUR,
+        }
+    )
+
+
+@app.route("/api/calendar/events")
+@login_required
+def api_calendar_events():
+    conn = get_db()
+    year = request.args.get("year", type=int, default=2026)
+    month = (request.args.get("month") or "").strip()
+    solar = (request.args.get("solar") or "").strip()
+
+    if solar:
+        bounds = zodiac_calendar._solar_month_bounds(solar)
+        if not bounds:
+            return jsonify({"error": f"Unknown solar month: {solar}"}), 400
+        start, end = bounds
+        payload = zodiac_calendar.events_for_solar_month(conn, start, end)
+        return jsonify(
+            {
+                "year": year,
+                "month": month or solar,
+                "solar_month": solar,
+                "start_date": start,
+                "end_date": end,
+                **payload,
+            }
+        )
+
+    if not month:
+        return jsonify({"error": "month or solar query parameter required"}), 400
+
+    festivals = zodiac_calendar.get_festivals_for_month(conn, year, month)
+    lunar = zodiac_calendar.get_lunar_events_for_month(conn, year, month)
+    return jsonify(
+        {
+            "year": year,
+            "month": month,
+            "festivals": festivals,
+            "lunar_events": lunar,
+        }
+    )
+
+
+@app.route("/api/calendar/user-birthdays")
+@login_required
+def api_calendar_user_birthdays():
+    user_row = g.current_user
+    try:
+        is_admin = int(user_row["is_admin"] or 0)
+    except (KeyError, TypeError, ValueError):
+        is_admin = 0
+    if is_admin:
+        return jsonify({"birthday": None, "note": "Admin birthdays are hidden."})
+    birthday = zodiac_calendar.get_user_birthday_payload(user_row)
+    return jsonify({"birthday": birthday})
 
 
 if __name__ == "__main__":

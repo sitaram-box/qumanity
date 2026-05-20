@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}Zodiac Calendar — Quantum Box{% endblock %}
+
+{% block head_extra %}
+<link
+  rel="stylesheet"
+  href="{{ url_for('static', filename='calendar.css') }}"
+/>
+{% endblock %}
+
+{% block body_class %}qb-calendar-page{% endblock %}
+
+{% block body %}
+<div class="qb-cal-shell">
+  <header class="qb-cal-header">
+    <div class="qb-cal-header-top d-flex flex-wrap align-items-center justify-content-between gap-3">
+      <div>
+        <h1 class="qb-cal-title-devanagari">विक्रम संवत २०८३</h1>
+        <p class="qb-cal-subtitle mb-0">
+          Sauramana Solar Year · Sidereal Zodiac Months (Mesha → Meena)
+        </p>
+      </div>
+      <a href="{{ url_for('dashboard') }}" class="qb-btn qb-btn-outline qb-cal-close-btn">
+        Close
+      </a>
+    </div>
+    <p class="qb-cal-meta small text-muted mb-0">
+      Logged in as {{ display_name }} · Gregorian reference year 2026
+    </p>
+  </header>
+
+  <div id="qb-cal-loading" class="qb-cal-loading" role="status">Loading calendar…</div>
+  <div id="qb-cal-error" class="qb-cal-error" hidden role="alert"></div>
+
+  <div id="qb-cal-grid" class="qb-cal-grid" hidden aria-label="Twelve solar months"></div>
+
+  <section id="qb-cal-detail" class="qb-cal-detail" hidden aria-live="polite">
+    <div class="qb-cal-detail-head d-flex flex-wrap align-items-center justify-content-between gap-2">
+      <h2 id="qb-cal-detail-title" class="h5 mb-0"></h2>
+      <button type="button" class="qb-btn qb-btn-link btn-sm" id="qb-cal-detail-back">
+        ← Back to year view
+      </button>
+    </div>
+    <div id="qb-cal-day-grid" class="qb-cal-day-grid"></div>
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='calendar.js') }}" defer></script>
+{% endblock %}

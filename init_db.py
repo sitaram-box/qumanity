@@ -33,7 +33,7 @@ Tables applied by this script (in order):
      ``election_votes``, ``village_council`` (``election_scheduler.migrate_election_tables``)
 
 ``users`` must include ``age``, ``age_group``, and ``sun_sign`` (core ``USER_TABLE_SQL``) for
-election nomination (Yuvak + matching sign) and voting (age 13+ + matching sign + village).
+election nomination (Yuvak + matching sign) and voting (age 13+ + matching element + village).
 
 ``election_candidates.status`` is ``pending`` | ``approved`` | ``rejected`` (plus optional
 ``rejection_reason``, ``reviewed_at`` via ``election_scheduler.migrate_election_tables``).
@@ -53,6 +53,7 @@ import sqlite3
 
 import election_scheduler
 import qoin_core
+import zodiac_calendar
 from app import (
     BASE_DIR,
     FAMILY_RELATIONSHIPS_SQL,
@@ -153,6 +154,10 @@ def migrate_posts_schema(conn: sqlite3.Connection) -> None:
         ("origin_continent_id", "TEXT"),
         ("freeze_level", "TEXT"),
         ("qoins_settled", "INTEGER NOT NULL DEFAULT 0"),
+        ("original_post_id", "INTEGER"),
+        ("frozen_at_level", "TEXT"),
+        ("archived_at_level", "TEXT"),
+        ("level_end_time", "TIMESTAMP"),
     ]
     for col_name, decl in additions:
         if col_name in cols:
@@ -170,6 +175,8 @@ def migrate_posts_schema(conn: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_posts_level_start_time ON posts(level_start_time);
         CREATE INDEX IF NOT EXISTS idx_posts_level_status ON posts(current_level, status);
         CREATE INDEX IF NOT EXISTS idx_posts_freeze_level ON posts(freeze_level);
+        CREATE INDEX IF NOT EXISTS idx_posts_user_status_level ON posts(user_private_id, status, current_level);
+        CREATE INDEX IF NOT EXISTS idx_posts_original_post_id ON posts(original_post_id);
         """
     )
     conn.commit()
@@ -233,9 +240,12 @@ def main() -> None:
         election_scheduler.migrate_election_tables(conn)
         migrate_admin_user_profile(conn)
         qoin_core.migrate_qoin_transactions(conn)
+        qoin_core.migrate_cash_donations(conn)
+        zodiac_calendar.migrate_calendar_event_tables(conn)
         conn.commit()
         print(f"Core tables ready in {DB_PATH.resolve()}")
         print("Admin profile migration applied (H_U_ADMIN DOB / Leo / Fire).")
+        print("Calendar event tables (festivals, lunar_events) seeded from data/*.json.")
         print("Optional: python3 init_calendar_2026.py")
     finally:
         conn.close()

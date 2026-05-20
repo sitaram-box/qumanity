@@ -22,49 +22,7 @@
     class="qb-brand qb-brand-with-logo text-decoration-none"
     aria-label="Quantum Box home"
   >
-    <span class="qb-brand-mark" aria-hidden="true">
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        viewBox="0 0 82 40"
-        width="82"
-        height="40"
-        focusable="false"
-      >
-        <rect
-          x="2"
-          y="2"
-          width="78"
-          height="36"
-          rx="6"
-          ry="6"
-          fill="#FFD700"
-          stroke="#333333"
-          stroke-width="1"
-        />
-        <text
-          x="20"
-          y="20"
-          dominant-baseline="central"
-          font-family="'DM Sans', system-ui, sans-serif"
-          font-size="14"
-          font-weight="700"
-          fill="#000000"
-          text-anchor="middle"
-        >SITA</text>
-        <circle cx="55" cy="20" r="16" fill="#000000" />
-        <text
-          x="55"
-          y="20"
-          dominant-baseline="central"
-          font-size="16"
-          font-family="'Noto Sans Devanagari', system-ui, sans-serif"
-          font-weight="700"
-          fill="#ffffff"
-          text-anchor="middle"
-        >राम</text>
-      </svg>
-    </span>
-    <span class="qb-brand-wordmark">Quantum <span>Box</span></span>
+    {% include "_brand_logo.html" %}
   </a>
   <div class="qb-dash-header-actions d-flex flex-wrap align-items-center gap-2 justify-content-end">
     <div
@@ -94,6 +52,11 @@
           </button>
           <button type="button" class="qb-segmented-btn" data-cal-mode="indian">Indian</button>
         </div>
+        <a
+          href="{{ url_for('calendar_page') }}"
+          class="qb-timebox-cal-link"
+          title="Sauramana zodiac calendar (VS 2083)"
+        >📅 Calendar</a>
       </div>
       <div id="qb-timebox-extra" class="qb-timebox-extra" hidden>
         <div id="qb-timebox-line2" class="qb-timebox-extra-line"></div>
@@ -185,9 +148,21 @@
         <div class="qb-private-panel-head d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
           <h2 id="dash-private-heading" class="h5 mb-0">Private Account</h2>
           <div class="d-flex flex-wrap gap-2 align-items-start">
+          <button type="button" class="qb-btn qb-btn-outline btn-sm" id="qb-my-post-btn" title="My posts">
+            My Post
+          </button>
           <button type="button" class="qb-qoin-wallet-btn" id="qb-qoin-wallet-btn" title="Qoins Wallet">
             <span class="qb-qoin-wallet-symbol" aria-hidden="true">₹</span>
             <span class="qb-qoin-wallet-label">Qoin ₹ Wallet</span>
+          </button>
+          <button
+            type="button"
+            class="qb-birth-chart-btn"
+            id="qb-birth-chart-btn"
+            title="Lagna birth chart"
+            aria-label="Birth chart"
+          >
+            <span class="qb-birth-chart-icon" aria-hidden="true">☉</span>
           </button>
           <div class="qb-private-msg-wrap" id="qb-private-msg-wrap">
             <button
@@ -213,7 +188,16 @@
 
         <div class="qb-panel mb-3 qb-private-profile">
           <h3 class="h6 text-secondary text-uppercase small">Profile</h3>
-          <p class="mb-1"><strong>Name:</strong> {{ user.first_name }} {{ user.last_name }}</p>
+          <p class="mb-1">
+            <strong>Name:</strong> {{ user.first_name }} {{ user.last_name }}
+            {% if account_badges %}
+            <span class="qb-account-badges ms-1">
+              {% for badge in account_badges %}
+              <span class="badge bg-info text-dark qb-account-badge">{{ badge }}</span>
+              {% endfor %}
+            </span>
+            {% endif %}
+          </p>
           <p class="mb-1"><strong>Private ID:</strong> <span class="font-monospace">{{ user.private_id }}</span></p>
           <p class="mb-1"><strong>Public ID:</strong> <span class="font-monospace">{{ user.public_id }}</span></p>
           <p class="mb-1"><strong>Gender:</strong> {{ user.gender }}</p>
@@ -352,28 +336,6 @@
 
         <p class="small text-muted mb-3">Use the ✉ icon (top right) for Inbox, Sent, Drafts, and Compose.</p>
 
-        <div class="qb-panel mb-3">
-          <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-            <h3 class="h6 mb-0">Private posts</h3>
-            <span class="small text-muted">Live or frozen at personal level</span>
-          </div>
-          <ul class="list-unstyled small mb-0">
-            {% for p in private_posts %}
-            <li class="mb-3 pb-3 border-bottom border-secondary">
-              <div class="text-muted mb-1">
-                <span class="badge bg-secondary">{{ p.status }}</span>
-                <span class="badge bg-dark">{{ p.current_level }}</span>
-                · score {{ p.total_score }}
-                · {{ p.created_at }}
-              </div>
-              <div>{{ p.content }}</div>
-            </li>
-            {% else %}
-            <li class="text-muted">No private posts yet.</li>
-            {% endfor %}
-          </ul>
-        </div>
-
         {% if user.is_admin %}
         <section class="qb-panel mb-3 qb-private-admin-tools" id="qb-private-admin-tools">
           <h3 class="h6 text-secondary text-uppercase small mb-2">Administration</h3>
@@ -388,6 +350,36 @@
           >
             Family member removal request queue
           </button>
+        </section>
+
+        <section class="qb-panel mb-3" id="qb-admin-upgrade-users">
+          <h3 class="h6 text-secondary text-uppercase small mb-2">Upgrade User Accounts</h3>
+          <p class="small text-muted mb-2">
+            Search a Human User by public ID or name, then assign Volunteer, Agent, Manager, Leader, or Mentor.
+          </p>
+          <label class="form-label small" for="qb-admin-upgrade-search">User (public ID or name)</label>
+          <input
+            type="text"
+            class="form-control form-control-sm mb-2"
+            id="qb-admin-upgrade-search"
+            placeholder="Search user…"
+            autocomplete="off"
+          />
+          <ul class="list-unstyled small mb-2" id="qb-admin-upgrade-suggest" hidden></ul>
+          <p class="small mb-2" id="qb-admin-upgrade-selected" hidden></p>
+          <label class="form-label small" for="qb-admin-upgrade-type">New account type</label>
+          <select id="qb-admin-upgrade-type" class="form-select form-select-sm mb-2">
+            <option value="">Select type…</option>
+            <option value="Volunteer">Volunteer</option>
+            <option value="Agent">Agent</option>
+            <option value="Manager">Manager</option>
+            <option value="Leader">Leader</option>
+            <option value="Mentor">Mentor</option>
+          </select>
+          <button type="button" class="qb-btn qb-btn-primary btn-sm" id="qb-admin-upgrade-submit" disabled>
+            Upgrade
+          </button>
+          <p class="small text-info mt-2 mb-0" id="qb-admin-upgrade-flash" role="status" aria-live="polite"></p>
         </section>
 
         <section class="qb-panel mb-3" id="qb-admin-donation-reports">
@@ -414,7 +406,7 @@
 
         <section class="qb-panel mb-3" id="qb-private-manage-elections">
           <h3 class="h6 text-secondary text-uppercase small mb-2">Manage Elections</h3>
-          <div class="qb-private-election-village qb-panel p-2 mb-0" style="background: rgba(15, 20, 25, 0.35)">
+          <div class="qb-private-election-village qb-panel p-2 mb-0">
             <h4 class="h6 mb-2 font-monospace small">{{ quantum_punch_village_id }}</h4>
             <p class="small mb-1" id="qb-private-election-cycle-line" role="status">Loading election cycle…</p>
             <p class="small text-muted mb-2" id="qb-private-election-phase-line"></p>
@@ -430,29 +422,6 @@
         </section>
         {% endif %}
 
-        <div class="qb-panel qb-wallet-panel mb-3">
-          <h3 class="h6 mb-3">Wallet</h3>
-          <div class="row g-2 mb-2">
-            <div class="col-sm-4">
-              <span class="small text-muted d-block">Balance</span>
-              <span class="h5 mb-0 text-info">{{ wallet_balance }} Qoins</span>
-            </div>
-            <div class="col-sm-4">
-              <span class="small text-muted d-block">Qoins earned (total)</span>
-              <span class="h5 mb-0">{{ qoins_earned_total }}</span>
-            </div>
-            <div class="col-sm-4 d-flex align-items-end">
-              <button
-                type="button"
-                class="qb-btn qb-btn-outline btn-sm"
-                data-bs-toggle="modal"
-                data-bs-target="#walletTransactionsModal"
-              >
-                Transaction statement
-              </button>
-            </div>
-          </div>
-        </div>
       </section>
 
       <section
@@ -471,7 +440,7 @@
               <div>
                 <h3 class="h5 mb-1">Personal Collective Board (PCB)</h3>
                 <p class="small text-muted mb-0">
-                  Your posts and your connections&rsquo; posts stay here up to 7 days, then escalate to Village or move to history.
+                  Your posts and your connections&rsquo; posts stay here up to 7 days. Positive scores escalate to Village; zero or negative scores move to My Post &rarr; Previous Posts.
                 </p>
               </div>
               <div class="qb-personal-board-head-actions">
@@ -514,11 +483,6 @@
 
             <ul id="qb-personal-feed" class="list-unstyled small mb-0"></ul>
             <p id="qb-personal-feed-empty" class="small text-muted mb-0" hidden>No personal posts yet.</p>
-            <section class="qb-personal-section qb-personal-section--wide mt-3">
-              <h3 class="h6 mb-2">Post History</h3>
-              <ul id="qb-post-history-list" class="list-unstyled small mb-0"></ul>
-              <p id="qb-post-history-empty" class="small text-muted mb-0" hidden>No post history yet.</p>
-            </section>
           </div>
 
           <div id="qb-personal-stack-family" class="qb-personal-stack qb-personal-aux-stack" hidden>
@@ -883,10 +847,9 @@
                 <p class="small text-success mb-0" id="qb-election-nomination-done" hidden role="status">
                   Your nomination has been submitted and is pending admin approval for this zodiac cycle.
                 </p>
-                {% if election_vote_eligible %}
                 <div id="qb-election-voting-block" hidden>
                   <h5 class="h6 mt-2 mb-2">Cast your vote</h5>
-                  <p class="small text-muted mb-2">One vote per gender for this zodiac cycle (age 13+).</p>
+                  <p class="small text-muted mb-2">One vote per gender for this zodiac cycle (age 13+, same element as the active zodiac cycle).</p>
                   <div class="qb-election-vote-col">
                     <h6 class="small text-uppercase text-secondary mb-1">Male candidates</h6>
                     <ul class="list-unstyled qb-election-candidate-list" id="qb-election-male-list"></ul>
@@ -898,7 +861,6 @@
                   <button type="button" class="qb-btn qb-btn-primary btn-sm mt-2" id="qb-election-vote-submit" disabled>Submit votes</button>
                   <span class="small text-muted ms-2" id="qb-election-vote-msg" aria-live="polite"></span>
                 </div>
-                {% endif %}
                 <div id="qb-election-postvote-block" class="small" hidden>
                   <p class="text-info mb-0" id="qb-election-postvote-text"></p>
                 </div>
@@ -1154,8 +1116,12 @@
     </div>
     <p class="small text-muted mb-2" id="qb-admin-nominations-cycle-line"></p>
     <p class="small text-info mb-2" id="qb-admin-nominations-flash" role="status" aria-live="polite"></p>
-    <ul class="list-unstyled small mb-0" id="qb-admin-nominations-list"></ul>
-    <p class="small text-muted mb-0" id="qb-admin-nominations-empty" hidden>No nominations for this cycle.</p>
+    <h3 class="h6 text-secondary text-uppercase small mt-2 mb-2">Pending</h3>
+    <ul class="list-unstyled small mb-3" id="qb-admin-nominations-pending"></ul>
+    <p class="small text-muted mb-3" id="qb-admin-nominations-pending-empty" hidden>No pending nominations.</p>
+    <h3 class="h6 text-secondary text-uppercase small mb-2">Approved</h3>
+    <ul class="list-unstyled small mb-0" id="qb-admin-nominations-approved"></ul>
+    <p class="small text-muted mb-0" id="qb-admin-nominations-approved-empty" hidden>No approved nominations yet.</p>
   </div>
 </div>
 
@@ -1169,7 +1135,7 @@
     <label class="form-label small" for="qb-admin-reject-reason">Reason (required)</label>
     <textarea id="qb-admin-reject-reason" class="form-control form-control-sm mb-3" rows="4" required maxlength="2000"></textarea>
     <div class="qb-modal-actions">
-      <button type="button" class="qb-btn qb-btn-primary btn-sm" id="qb-admin-reject-confirm">Reject nomination</button>
+      <button type="button" class="qb-btn qb-btn-danger btn-sm" id="qb-admin-reject-confirm">Reject nomination</button>
       <button type="button" class="qb-btn qb-btn-outline btn-sm" data-qb-close-modal="qb-admin-reject-modal">Cancel</button>
     </div>
   </div>
@@ -1215,9 +1181,31 @@
       <p class="mb-0"><strong>Total value:</strong> ₹<span id="qb-wallet-balance-rupees">—</span></p>
       <ul class="list-unstyled small mt-2 mb-0" id="qb-wallet-coin-breakdown"></ul>
     </div>
+    <div class="d-flex flex-wrap gap-2 mb-3">
+      <button type="button" class="qb-btn qb-btn-outline btn-sm" id="qb-wallet-txn-btn">Transaction Statement</button>
+    </div>
     <hr />
     <h3 class="h6 mb-2">Donate ₹ and Earn Qoins</h3>
     <p class="small text-muted mb-2">Choose an amount (₹1–₹500). User Qoins are credited to you; part may go to your village wallet.</p>
+    <fieldset class="mb-2">
+      <legend class="form-label small mb-1">Donation method</legend>
+      <label class="me-3 small"
+        ><input type="radio" name="qb-donate-method" value="cash" class="qb-donate-method-radio" /> Cash (via Agent)</label
+      >
+      <label class="small"
+        ><input type="radio" name="qb-donate-method" value="upi" class="qb-donate-method-radio" checked /> Scan UPI QR Code</label
+      >
+    </fieldset>
+    <div id="qb-donate-cash-fields" class="mb-2" hidden>
+      <label class="form-label small" for="qb-donate-agent-id">Agent Account ID (public ID)</label>
+      <input type="text" class="form-control form-control-sm" id="qb-donate-agent-id" placeholder="Agent public ID" autocomplete="off" />
+    </div>
+    <div id="qb-donate-upi-fields" class="mb-2">
+      <div class="qb-upi-qr-placeholder" role="img" aria-label="QR code placeholder">
+        <span class="small text-muted">QR Code placeholder</span>
+      </div>
+      <button type="button" class="qb-btn qb-btn-outline btn-sm mt-2" id="qb-donate-upi-done">Payment Completed</button>
+    </div>
     <div class="d-flex flex-wrap gap-2 mb-2" id="qb-donate-amount-btns">
       <button type="button" class="qb-btn qb-btn-outline btn-sm qb-donate-amt" data-amount="1">₹1</button>
       <button type="button" class="qb-btn qb-btn-outline btn-sm qb-donate-amt" data-amount="2">₹2</button>
@@ -1232,6 +1220,92 @@
     <p class="small text-info mb-2" id="qb-donate-preview" role="status" aria-live="polite"></p>
     <button type="button" class="qb-btn qb-btn-primary btn-sm" id="qb-donate-submit" disabled>Donate selected amount</button>
     <p class="small text-muted mt-2 mb-0" id="qb-donate-flash" role="status"></p>
+  </div>
+</div>
+
+<div class="qb-modal-backdrop" id="qb-my-post-modal" hidden>
+  <div class="qb-modal-dialog qb-modal-dialog--wide qb-modal-dialog--scroll" role="dialog" aria-modal="true" aria-labelledby="qb-my-post-title">
+    <div class="qb-modal-head">
+      <h2 class="h5 mb-0" id="qb-my-post-title">My Posts</h2>
+      <button type="button" class="qb-modal-close" data-qb-close-modal="qb-my-post-modal" aria-label="Close">×</button>
+    </div>
+    <p class="small text-muted mb-2">
+      Your personal-level posts and posts that did not escalate after 7 days.
+    </p>
+    <div class="qb-board-tabs qb-my-post-tabs" role="tablist" aria-label="My posts">
+      <button
+        type="button"
+        class="qb-board-tab qb-js-my-post-tab is-active"
+        data-my-post-tab="active"
+        role="tab"
+        aria-selected="true"
+      >
+        Current Posts
+      </button>
+      <button
+        type="button"
+        class="qb-board-tab qb-js-my-post-tab"
+        data-my-post-tab="previous"
+        role="tab"
+        aria-selected="false"
+      >
+        Previous Posts
+      </button>
+    </div>
+    <ul id="qb-my-post-list" class="list-unstyled small mb-0 mt-3"></ul>
+    <p id="qb-my-post-empty" class="small text-muted mb-0" hidden>No posts in this tab yet.</p>
+  </div>
+</div>
+
+<div class="qb-modal-backdrop" id="qb-wallet-txn-modal" hidden>
+  <div class="qb-modal-dialog qb-modal-dialog--wide qb-modal-dialog--scroll" role="dialog" aria-modal="true" aria-labelledby="qb-wallet-txn-title">
+    <div class="qb-modal-head">
+      <h2 class="h5 mb-0" id="qb-wallet-txn-title">Transaction Statement</h2>
+      <button type="button" class="qb-modal-close" data-qb-close-modal="qb-wallet-txn-modal" aria-label="Close">×</button>
+    </div>
+    <p class="small text-info mb-2" id="qb-wallet-txn-flash" role="status"></p>
+    <ul class="list-unstyled small mb-0" id="qb-wallet-txn-list"></ul>
+    <p class="small text-muted mb-0" id="qb-wallet-txn-empty" hidden>No transactions yet.</p>
+  </div>
+</div>
+
+<div class="qb-modal-backdrop" id="qb-birth-chart-modal" hidden>
+  <div class="qb-modal-dialog qb-modal-dialog--wide qb-modal-dialog--scroll" role="dialog" aria-modal="true" aria-labelledby="qb-birth-chart-title">
+    <div class="qb-modal-head">
+      <h2 class="h5 mb-0" id="qb-birth-chart-title">Lagna Chart (Vedic)</h2>
+      <button type="button" class="qb-modal-close" data-qb-close-modal="qb-birth-chart-modal" aria-label="Close">×</button>
+    </div>
+    <p class="small text-info mb-2" id="qb-birth-chart-flash" role="status"></p>
+    <div id="qb-birth-chart-unavailable" class="small text-warning mb-2" hidden></div>
+    <div id="qb-birth-chart-body" hidden>
+      <p class="small mb-2" id="qb-birth-chart-meta"></p>
+      <div class="row g-3 qb-birth-chart-grids">
+        <div class="col-md-6">
+          <h3 class="h6 qb-chart-section-title" id="qb-birth-chart-rasi-title">RASI (D1)</h3>
+          <div class="qb-vedic-grid" id="qb-birth-chart-rasi-grid" aria-label="Rasi chart"></div>
+        </div>
+        <div class="col-md-6">
+          <h3 class="h6 qb-chart-section-title" id="qb-birth-chart-chandra-title">CHANDRA LAGNA</h3>
+          <div class="qb-vedic-grid" id="qb-birth-chart-chandra-grid" aria-label="Chandra Lagna chart"></div>
+        </div>
+      </div>
+      <h3 class="h6 qb-chart-section-title mt-3 mb-2">Planet placements</h3>
+      <div class="table-responsive qb-birth-chart-table-wrap">
+        <table class="table table-sm table-dark mb-0 qb-birth-chart-table" id="qb-birth-chart-planets-table">
+          <thead>
+            <tr class="text-secondary small">
+              <th scope="col">Planet</th>
+              <th scope="col">Sign</th>
+              <th scope="col">Degree</th>
+              <th scope="col">Nakshatra</th>
+              <th scope="col">Pada</th>
+              <th scope="col" class="text-center">R</th>
+            </tr>
+          </thead>
+          <tbody id="qb-birth-chart-planets-tbody"></tbody>
+        </table>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1961,42 +2035,6 @@
   </div>
 </div>
 
-<div
-  class="modal fade"
-  id="walletTransactionsModal"
-  tabindex="-1"
-  aria-labelledby="walletTransactionsModalLabel"
-  aria-hidden="true"
->
-  <div class="modal-dialog modal-dialog-scrollable">
-    <div class="modal-content text-bg-dark border-secondary">
-      <div class="modal-header border-secondary">
-        <h2 class="modal-title h5" id="walletTransactionsModalLabel">Recent Qoin transactions</h2>
-        <button
-          type="button"
-          class="btn-close btn-close-white"
-          data-bs-dismiss="modal"
-          aria-label="Close"
-        ></button>
-      </div>
-      <div class="modal-body">
-        {% if qoin_transactions_recent %}
-        <ul class="list-unstyled small mb-0">
-          {% for t in qoin_transactions_recent %}
-          <li class="mb-2 pb-2 border-bottom border-secondary">
-            <span class="text-info font-monospace">{{ t.amount }}</span>
-            · {{ t.reason }}<br />
-            <span class="text-muted">{{ t.created_at }}</span>
-          </li>
-          {% endfor %}
-        </ul>
-        {% else %}
-        <p class="text-muted mb-0 small">No transactions recorded yet.</p>
-        {% endif %}
-      </div>
-    </div>
-  </div>
-</div>
 {% endblock %}
 
 {% block scripts %}

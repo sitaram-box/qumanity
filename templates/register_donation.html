@@ -14,7 +14,7 @@
   {% endif %}
 </section>
 
-<div class="qb-panel p-3 mb-3" style="max-width: 36rem">
+<div class="qb-panel p-3 mb-3" style="max-width: 40rem">
   <h2 class="h6 mb-3">Select donation amount (₹)</h2>
   <div class="d-flex flex-wrap gap-2 mb-3" id="reg-donation-amounts">
     {% for amt in donation_amounts %}
@@ -22,6 +22,25 @@
       ₹{{ amt }}
     </button>
     {% endfor %}
+  </div>
+  <fieldset class="mb-2">
+    <legend class="form-label small mb-1">Donation method</legend>
+    <label class="me-3 small"
+      ><input type="radio" name="reg-donate-method" value="cash" class="reg-donate-method-radio" /> Cash (via Agent)</label
+    >
+    <label class="small"
+      ><input type="radio" name="reg-donate-method" value="upi" class="reg-donate-method-radio" checked /> Scan UPI QR Code</label
+    >
+  </fieldset>
+  <div id="reg-donate-cash-fields" class="mb-2" hidden>
+    <label class="form-label small" for="reg-donate-agent-id">Agent Account ID (public ID)</label>
+    <input type="text" class="form-control form-control-sm" id="reg-donate-agent-id" placeholder="Agent public ID" autocomplete="off" />
+  </div>
+  <div id="reg-donate-upi-fields" class="mb-2">
+    <div class="qb-upi-qr-placeholder" role="img" aria-label="QR code placeholder">
+      <span class="small text-muted">QR Code placeholder</span>
+    </div>
+    <button type="button" class="qb-btn qb-btn-outline btn-sm mt-2" id="reg-donate-upi-done">Payment Completed</button>
   </div>
   <p class="small text-info mb-2" id="reg-donation-preview" role="status" aria-live="polite"></p>
   <p class="small text-danger mb-2" id="reg-donation-error" hidden></p>
@@ -36,9 +55,34 @@
 <script>
   (function () {
     var selected = 0;
+    var method = "upi";
+    var upiDone = false;
     var preview = document.getElementById("reg-donation-preview");
     var errEl = document.getElementById("reg-donation-error");
     var submitBtn = document.getElementById("reg-donation-submit");
+    var cashFields = document.getElementById("reg-donate-cash-fields");
+    var upiFields = document.getElementById("reg-donate-upi-fields");
+
+    function syncMethod() {
+      var picked = document.querySelector('input[name="reg-donate-method"]:checked');
+      method = picked ? String(picked.value || "upi").toLowerCase() : "upi";
+      if (cashFields) cashFields.hidden = method !== "cash";
+      if (upiFields) upiFields.hidden = method !== "upi";
+      if (method === "upi") upiDone = false;
+    }
+
+    document.querySelectorAll(".reg-donate-method-radio").forEach(function (radio) {
+      radio.addEventListener("change", syncMethod);
+    });
+    var upiBtn = document.getElementById("reg-donate-upi-done");
+    if (upiBtn) {
+      upiBtn.addEventListener("click", function () {
+        upiDone = true;
+        if (preview) preview.textContent = "Payment marked complete.";
+      });
+    }
+    syncMethod();
+
     document.querySelectorAll(".reg-donation-amt").forEach(function (btn) {
       btn.addEventListener("click", function () {
         selected = parseInt(btn.getAttribute("data-amount"), 10) || 0;
@@ -54,12 +98,29 @@
     if (submitBtn) {
       submitBtn.addEventListener("click", function () {
         if (!selected) return;
+        var agentId = ((document.getElementById("reg-donate-agent-id") || {}).value || "").trim();
+        if (method === "cash" && !agentId) {
+          if (errEl) {
+            errEl.textContent = "Agent Account ID is required for cash donations.";
+            errEl.hidden = false;
+          }
+          return;
+        }
+        if (method === "upi" && !upiDone) {
+          if (errEl) {
+            errEl.textContent = "Click Payment Completed after scanning the QR code.";
+            errEl.hidden = false;
+          }
+          return;
+        }
         submitBtn.disabled = true;
         if (preview) preview.textContent = "Processing…";
+        var body = { amount: selected, method: method };
+        if (method === "cash") body.agent_id = agentId;
         fetch("/api/register/donate", {
           method: "POST",
           headers: { "Content-Type": "application/json", Accept: "application/json" },
-          body: JSON.stringify({ amount: selected }),
+          body: JSON.stringify(body),
         })
           .then(function (r) {
             return r.json().then(function (b) {

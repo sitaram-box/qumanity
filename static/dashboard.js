@@ -13,6 +13,39 @@
     return escHtml(s).replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
 
+  /** Parse fetch responses safely — never assume JSON when the server returns HTML. */
+  function fetchJson(url, options) {
+    options = options || {};
+    options.credentials = options.credentials || "same-origin";
+    options.headers = Object.assign({ Accept: "application/json" }, options.headers || {});
+    return fetch(url, options).then(function (r) {
+      return r.text().then(function (text) {
+        var ct = (r.headers.get("content-type") || "").toLowerCase();
+        var body = null;
+        var trimmed = (text || "").trim();
+        if (
+          trimmed &&
+          (ct.indexOf("application/json") !== -1 ||
+            trimmed.charAt(0) === "{" ||
+            trimmed.charAt(0) === "[")
+        ) {
+          try {
+            body = JSON.parse(trimmed);
+          } catch (_parseErr) {
+            throw new Error("Invalid JSON response (HTTP " + r.status + ")");
+          }
+        } else if (trimmed && trimmed.charAt(0) === "<") {
+          throw new Error("Server returned HTML instead of JSON (HTTP " + r.status + ")");
+        } else if (trimmed) {
+          throw new Error(trimmed.slice(0, 160) || "Unexpected response");
+        } else {
+          body = {};
+        }
+        return { ok: r.ok, status: r.status, body: body, b: body };
+      });
+    });
+  }
+
   var dashCfg = {
     userHierarchy: [],
     villageStatsUrl: "#",
@@ -320,6 +353,7 @@
   if (activeNav) {
     var t0 = activeNav.getAttribute("data-dash-tab");
     if (t0 === "public" || t0 === "global") setExplorerMode(t0);
+    if (t0 === "personal") refreshPersonalData();
   }
 
   /* --- Stats table helpers --- */
@@ -372,21 +406,14 @@
 
   function loadPublicStats(locationId) {
     if (!locationId) return;
-    fetch("/api/dashboard/public_stats?location_id=" + encodeURIComponent(locationId), {
-      credentials: "same-origin",
-      headers: { Accept: "application/json" },
-    })
-      .then(function (r) {
-        return r.json().then(function (b) {
-          return { ok: r.ok, b: b };
-        });
-      })
+    fetchJson("/api/dashboard/public_stats?location_id=" + encodeURIComponent(locationId))
       .then(function (x) {
-        if (!x.ok) throw new Error(x.b.error || "stats failed");
-        applyStatsPayload("qb-public", x.b);
+        if (!x.ok) throw new Error(x.body.error || "stats failed");
+        applyStatsPayload("qb-public", x.body);
       })
-      .catch(function () {
+      .catch(function (err) {
         text(document.getElementById("qb-public-total"), "—");
+        console.error("Public stats failed:", err);
       });
   }
 
@@ -489,6 +516,48 @@
     );
   }
 
+  function frozenMetaHtml(p) {
+    var progress = p.progress || {};
+    var label = p.escalation_label || "Frozen";
+    return (
+      '<div class="qb-board-frozen-meta">' +
+      '<span class="badge bg-info text-dark">' +
+      escHtml(label) +
+      "</span>" +
+      '<div class="qb-board-frozen-dates text-muted small mt-1">' +
+      "<span>Live: " +
+      escHtml(formatBoardDate(progress.start_date || p.level_start_time)) +
+      " – " +
+      escHtml(formatBoardDate(progress.end_date || p.level_end_time)) +
+      "</span>" +
+      "</div>" +
+      "</div>"
+    );
+  }
+
+  function renderPreviousPost(p) {
+    var li = document.createElement("li");
+    li.className = "qb-board-post qb-my-post-previous";
+    li.innerHTML =
+      '<article class="qb-board-post-card">' +
+      '<header class="qb-board-post-head">' +
+      '<span class="qb-board-post-time">' +
+      escHtml(formatBoardDate(p.level_end_time || p.created_at)) +
+      "</span>" +
+      '<span class="badge bg-secondary ms-2">' +
+      escHtml(p.archive_label || "Previous post") +
+      "</span>" +
+      "</header>" +
+      '<p class="qb-board-post-content">' +
+      escHtml(p.content || "") +
+      "</p>" +
+      '<div class="qb-board-vote-row">' +
+      voteCountsHtml(p) +
+      "</div>" +
+      "</article>";
+    return li;
+  }
+
   function renderPost(p, boardState) {
     var li = document.createElement("li");
     li.className = "qb-board-post";
@@ -533,21 +602,27 @@
       voteControls = '<div class="qb-board-vote-row">' + voteCountsHtml(p) + "</div>";
     }
     var deleteBtn = "";
-    if (p.can_author_delete) {
-      deleteBtn =
-        '<button type="button" class="qb-post-delete-btn qb-js-post-delete" ' +
-        'data-post-id="' +
-        pid +
-        '" data-mode="author" title="Delete your post (within 24 hours)">' +
-        "Delete</button>";
-    } else if (p.can_admin_delete) {
-      deleteBtn =
-        '<button type="button" class="qb-post-delete-btn qb-post-delete-btn--admin qb-js-post-delete" ' +
-        'data-post-id="' +
-        pid +
-        '" data-mode="admin" title="Delete this post (admin)">' +
-        "Delete (Admin)</button>";
+    if (boardState === "live") {
+      if (p.can_author_delete) {
+        deleteBtn =
+          '<button type="button" class="qb-post-delete-btn qb-js-post-delete" ' +
+          'data-post-id="' +
+          pid +
+          '" data-mode="author" title="Delete your post (within 24 hours)">' +
+          "Delete</button>";
+      } else if (p.can_admin_delete) {
+        deleteBtn =
+          '<button type="button" class="qb-post-delete-btn qb-post-delete-btn--admin qb-js-post-delete" ' +
+          'data-post-id="' +
+          pid +
+          '" data-mode="admin" title="Delete this post (admin)">' +
+          "Delete (Admin)</button>";
+      }
     }
+    var bodyExtra =
+      boardState === "frozen"
+        ? frozenMetaHtml(p)
+        : progressHtml(p, boardState);
     li.innerHTML =
       '<article class="qb-board-post-card">' +
       '<header class="qb-board-post-head">' +
@@ -574,7 +649,7 @@
       '<p class="qb-board-post-content">' +
       escHtml(p.content) +
       "</p>" +
-      progressHtml(p, boardState) +
+      bodyExtra +
       voteControls +
       "</article>";
     return li;
@@ -612,18 +687,10 @@
     var ul = document.getElementById("qb-personal-feed");
     var empty = document.getElementById("qb-personal-feed-empty");
     if (!ul) return;
-    fetch("/api/personal_board?state=" + encodeURIComponent(activePersonalBoardState), {
-      credentials: "same-origin",
-      headers: { Accept: "application/json" },
-    })
-      .then(function (r) {
-        return r.json().then(function (b) {
-          return { ok: r.ok, b: b };
-        });
-      })
+    fetchJson("/api/personal_board?state=" + encodeURIComponent(activePersonalBoardState))
       .then(function (x) {
-        if (!x.ok) throw new Error(x.b.error || "personal board failed");
-        var posts = x.b.posts || [];
+        if (!x.ok) throw new Error(x.body.error || "personal board failed");
+        var posts = x.body.posts || [];
         ul.innerHTML = "";
         if (!posts.length) {
           if (empty) {
@@ -637,12 +704,13 @@
           ul.appendChild(renderPost(p, activePersonalBoardState));
         });
       })
-      .catch(function () {
+      .catch(function (err) {
         ul.innerHTML = "";
         if (empty) {
           empty.hidden = false;
-          text(empty, "Could not load Personal Collective Board posts.");
+          text(empty, err.message || "Could not load Personal Collective Board posts.");
         }
+        console.error("PCB load failed:", err);
       });
   }
 
@@ -656,7 +724,6 @@
     if (soc) soc.hidden = view !== "social";
     if (view === "pcb") {
       loadPersonalBoard();
-      loadPostHistory();
     } else if (view === "family") {
       loadConnections("family");
     } else if (view === "social") {
@@ -1011,18 +1078,10 @@
   }
 
   function loadFamilyProfile() {
-    return fetch("/api/family/profile", {
-      credentials: "same-origin",
-      headers: { Accept: "application/json" },
-    })
-      .then(function (r) {
-        return r.json().then(function (b) {
-          return { ok: r.ok, b: b };
-        });
-      })
+    return fetchJson("/api/family/profile")
       .then(function (x) {
-        if (!x.ok) throw new Error((x.b && x.b.error) || "family profile failed");
-        familyProfileState = x.b || familyProfileState;
+        if (!x.ok) throw new Error((x.body && x.body.error) || "family profile failed");
+        familyProfileState = x.body || familyProfileState;
         var needs = !!familyProfileState.needs_initial_setup;
         if (needs) {
           showFamilyInitialSetup(true);
@@ -1318,6 +1377,8 @@
   var cachedEducation = null;
   var cachedWork = null;
   var selectedDonateAmount = 0;
+  var selectedDonateMethod = "upi";
+  var upiPaymentAcknowledged = false;
 
   var DONATION_PREVIEW = {
     1: "You receive: 1 Qoin (₹1). Village: none.",
@@ -1713,6 +1774,86 @@
     });
   }
 
+  function getSelectedDonateMethod() {
+    var picked = document.querySelector('input[name="qb-donate-method"]:checked');
+    return picked ? String(picked.value || "upi").toLowerCase() : "upi";
+  }
+
+  function syncDonateMethodUi() {
+    selectedDonateMethod = getSelectedDonateMethod();
+    var cash = document.getElementById("qb-donate-cash-fields");
+    var upi = document.getElementById("qb-donate-upi-fields");
+    if (cash) cash.hidden = selectedDonateMethod !== "cash";
+    if (upi) upi.hidden = selectedDonateMethod !== "upi";
+    if (selectedDonateMethod === "upi") upiPaymentAcknowledged = false;
+  }
+
+  document.querySelectorAll(".qb-donate-method-radio").forEach(function (radio) {
+    radio.addEventListener("change", syncDonateMethodUi);
+  });
+  var upiDoneBtn = document.getElementById("qb-donate-upi-done");
+  if (upiDoneBtn) {
+    upiDoneBtn.addEventListener("click", function () {
+      upiPaymentAcknowledged = true;
+      text(document.getElementById("qb-donate-flash"), "Payment marked complete. You may donate now.");
+    });
+  }
+
+  function loadWalletTransactions() {
+    var flash = document.getElementById("qb-wallet-txn-flash");
+    var ul = document.getElementById("qb-wallet-txn-list");
+    var empty = document.getElementById("qb-wallet-txn-empty");
+    if (flash) text(flash, "Loading…");
+    if (ul) ul.innerHTML = "";
+    return fetch("/api/qoin/transactions", {
+      credentials: "same-origin",
+      headers: { Accept: "application/json" },
+    })
+      .then(function (r) {
+        return r.json().then(function (b) {
+          return { ok: r.ok, b: b };
+        });
+      })
+      .then(function (x) {
+        if (!x.ok) throw new Error((x.b && x.b.error) || "Load failed");
+        if (flash) text(flash, "");
+        var rows = (x.b && x.b.transactions) || [];
+        if (!ul) return;
+        if (!rows.length) {
+          if (empty) empty.hidden = false;
+          return;
+        }
+        if (empty) empty.hidden = true;
+        rows.forEach(function (t) {
+          var li = document.createElement("li");
+          li.className = "mb-2 pb-2 border-bottom border-secondary";
+          var rv = t.rupee_value ? " · ₹" + t.rupee_value : "";
+          li.innerHTML =
+            "<span class='text-info font-monospace'>" +
+            escHtml(String(t.amount)) +
+            "</span>" +
+            rv +
+            " · " +
+            escHtml(t.reason || t.type || "") +
+            "<br/><span class='text-muted'>" +
+            escHtml(t.created_at || "") +
+            "</span>";
+          ul.appendChild(li);
+        });
+      })
+      .catch(function (err) {
+        if (flash) text(flash, err.message || "Could not load transactions");
+      });
+  }
+
+  var walletTxnBtn = document.getElementById("qb-wallet-txn-btn");
+  if (walletTxnBtn) {
+    walletTxnBtn.addEventListener("click", function () {
+      openModal("qb-wallet-txn-modal");
+      loadWalletTransactions();
+    });
+  }
+
   function loadWalletModal() {
     fetch("/api/wallet/balance", {
       credentials: "same-origin",
@@ -1742,6 +1883,74 @@
       });
   }
 
+  var activeMyPostTab = "active";
+
+  function loadMyPostModal() {
+    var ul = document.getElementById("qb-my-post-list");
+    var empty = document.getElementById("qb-my-post-empty");
+    if (!ul) return;
+    var url =
+      activeMyPostTab === "previous"
+        ? "/api/my_posts/previous"
+        : "/api/my_posts/active";
+    fetchJson(url)
+      .then(function (x) {
+        if (!x.ok) throw new Error(x.body.error || "Could not load posts");
+        var posts = x.body.posts || [];
+        ul.innerHTML = "";
+        if (!posts.length) {
+          if (empty) {
+            empty.hidden = false;
+            text(
+              empty,
+              activeMyPostTab === "previous"
+                ? "No previous posts yet."
+                : "No current personal posts yet."
+            );
+          }
+          return;
+        }
+        if (empty) empty.hidden = true;
+        posts.forEach(function (p) {
+          if (activeMyPostTab === "previous") {
+            ul.appendChild(renderPreviousPost(p));
+          } else {
+            ul.appendChild(renderPost(p, "live"));
+          }
+        });
+      })
+      .catch(function () {
+        ul.innerHTML = "";
+        if (empty) {
+          empty.hidden = false;
+          text(empty, "Could not load posts.");
+        }
+      });
+  }
+
+  function setMyPostTab(tab) {
+    activeMyPostTab = tab === "previous" ? "previous" : "active";
+    document.querySelectorAll(".qb-js-my-post-tab").forEach(function (btn) {
+      var on = btn.getAttribute("data-my-post-tab") === activeMyPostTab;
+      btn.classList.toggle("is-active", on);
+      btn.setAttribute("aria-selected", on ? "true" : "false");
+    });
+    loadMyPostModal();
+  }
+
+  var myPostBtn = document.getElementById("qb-my-post-btn");
+  if (myPostBtn) {
+    myPostBtn.addEventListener("click", function () {
+      setMyPostTab("active");
+      openModal("qb-my-post-modal");
+    });
+  }
+  document.querySelectorAll(".qb-js-my-post-tab").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      setMyPostTab(btn.getAttribute("data-my-post-tab"));
+    });
+  });
+
   var qoinWalletBtn = document.getElementById("qb-qoin-wallet-btn");
   if (qoinWalletBtn) {
     qoinWalletBtn.addEventListener("click", function () {
@@ -1755,6 +1964,7 @@
         b.classList.add("qb-btn-outline");
       });
       openModal("qb-qoin-wallet-modal");
+      syncDonateMethodUi();
       loadWalletModal();
     });
   }
@@ -1777,12 +1987,24 @@
   if (donateSubmit) {
     donateSubmit.addEventListener("click", function () {
       if (!selectedDonateAmount) return;
+      var method = getSelectedDonateMethod();
+      var agentId = ((document.getElementById("qb-donate-agent-id") || {}).value || "").trim();
+      if (method === "cash" && !agentId) {
+        text(document.getElementById("qb-donate-flash"), "Agent Account ID is required for cash donations.");
+        return;
+      }
+      if (method === "upi" && !upiPaymentAcknowledged) {
+        text(document.getElementById("qb-donate-flash"), "Confirm payment with Payment Completed first.");
+        return;
+      }
       text(document.getElementById("qb-donate-flash"), "Processing…");
+      var body = { amount: selectedDonateAmount, method: method };
+      if (method === "cash") body.agent_id = agentId;
       fetch("/api/qoin/donate", {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ amount: selectedDonateAmount }),
+        body: JSON.stringify(body),
       })
         .then(function (r) {
           return r.json().then(function (b) {
@@ -2639,55 +2861,9 @@
       });
   }
 
-  function loadPostHistory() {
-    var ul = document.getElementById("qb-post-history-list");
-    var empty = document.getElementById("qb-post-history-empty");
-    if (!ul) return;
-    fetch("/api/post_history", {
-      credentials: "same-origin",
-      headers: { Accept: "application/json" },
-    })
-      .then(function (r) {
-        return r.json().then(function (b) {
-          return { ok: r.ok, b: b };
-        });
-      })
-      .then(function (x) {
-        if (!x.ok) throw new Error(x.b.error || "history failed");
-        var rows = x.b.posts || [];
-        ul.innerHTML = "";
-        if (empty) empty.hidden = rows.length > 0;
-        rows.forEach(function (p) {
-          var li = document.createElement("li");
-          li.className = "qb-post-history-row";
-          li.innerHTML =
-            '<div class="text-muted">' +
-            escHtml(formatBoardDate(p.created_at)) +
-            " · " +
-            escHtml(p.status || "") +
-            " · " +
-            escHtml(p.freeze_level || p.current_level || "") +
-            " · score " +
-            escHtml(p.total_score == null ? 0 : p.total_score) +
-            "</div><div>" +
-            escHtml(p.content || "") +
-            "</div>";
-          ul.appendChild(li);
-        });
-      })
-      .catch(function () {
-        ul.innerHTML = "";
-        if (empty) {
-          empty.hidden = false;
-          text(empty, "Could not load post history.");
-        }
-      });
-  }
-
   function refreshPersonalData() {
     loadPersonalBoard();
     loadIncomingRequests();
-    loadPostHistory();
     var fam = document.getElementById("qb-personal-stack-family");
     var soc = document.getElementById("qb-personal-stack-social");
     if (fam && !fam.hidden) loadConnections("family");
@@ -2822,26 +2998,17 @@
     activeBoardScope = scope;
     setBoardHeading(scope);
     updatePostFormVisibility();
-    fetch(
+    fetchJson(
       "/api/collective_board?level=" +
         encodeURIComponent(scope) +
         "&location_id=" +
         encodeURIComponent(locationId) +
         "&state=" +
-        encodeURIComponent(activeBoardState),
-      {
-        credentials: "same-origin",
-        headers: { Accept: "application/json" },
-      }
+        encodeURIComponent(activeBoardState)
     )
-      .then(function (r) {
-        return r.json().then(function (b) {
-          return { ok: r.ok, b: b };
-        });
-      })
       .then(function (x) {
-        if (!x.ok) throw new Error(x.b.error || "feed failed");
-        var posts = x.b.posts || [];
+        if (!x.ok) throw new Error(x.body.error || "feed failed");
+        var posts = x.body.posts || [];
         ul.innerHTML = "";
         if (!posts.length) {
           if (empty) empty.hidden = false;
@@ -2852,12 +3019,13 @@
           ul.appendChild(renderPost(p, activeBoardState));
         });
       })
-      .catch(function () {
+      .catch(function (err) {
         if (ul) ul.innerHTML = "";
         if (empty) {
           empty.hidden = false;
-          text(empty, "Could not load Collective Board posts for this level.");
+          text(empty, err.message || "Could not load Collective Board posts for this level.");
         }
+        console.error("CVB load failed:", err);
       });
   }
 
@@ -3002,22 +3170,14 @@
     var cycleLine = document.getElementById("qb-private-election-cycle-line");
     var phaseLine = document.getElementById("qb-private-election-phase-line");
     var nomBtn = document.getElementById("qb-admin-manage-nominations-btn");
-    fetch("/api/election/status", {
-      credentials: "same-origin",
-      headers: { Accept: "application/json" },
-    })
-      .then(function (r) {
-        return r.json().then(function (b) {
-          return { ok: r.ok, b: b };
-        });
-      })
+    fetchJson("/api/election/status")
       .then(function (x) {
-        if (!x.ok) throw new Error((x.b && x.b.error) || "Load failed");
-        var disp = x.b.election_display || {};
-        var ap = x.b.active_period;
+        if (!x.ok) throw new Error((x.body && x.body.error) || "Load failed");
+        var disp = x.body.election_display || {};
+        var ap = x.body.active_period;
         var zodiac =
-          (disp.zodiac_sign || (ap && ap.zodiac_sign) || (x.b.cycle && x.b.cycle.zodiac_sign) || "—");
-        var ph = disp.phase || (x.b.cycle && x.b.cycle.status) || x.b.phase || "—";
+          (disp.zodiac_sign || (ap && ap.zodiac_sign) || (x.body.cycle && x.body.cycle.zodiac_sign) || "—");
+        var ph = disp.phase || (x.body.cycle && x.body.cycle.status) || x.body.phase || "—";
         if (cycleLine) {
           text(cycleLine, "Current zodiac cycle: " + zodiac);
         }
@@ -3028,12 +3188,13 @@
             (disp.current_phase_window ? " · " + disp.current_phase_window : "");
         }
         if (nomBtn) {
-          nomBtn.hidden = !x.b.user_in_target_village;
+          nomBtn.hidden = !x.body.user_in_target_village;
         }
       })
       .catch(function (err) {
         if (cycleLine) text(cycleLine, err.message || "Could not load election status");
         if (phaseLine) text(phaseLine, "");
+        console.error("Election admin status failed:", err);
       });
   }
 
@@ -3177,12 +3338,14 @@
           );
         } else if (ph === "voting" && payload.user_age != null && payload.user_age < 13) {
           text(bad, "You must be at least 13 years old to vote in village elections.");
+        } else if (payload.voting_ineligible_message) {
+          text(bad, payload.voting_ineligible_message);
         } else {
           text(
             bad,
-            "This month’s election is for residents whose sun sign matches the active zodiac period. Your sign: " +
-              (payload.user_sun_sign || "—") +
-              "."
+            "Voting is open only to " +
+              (payload.cycle_element || "matching") +
+              " sign members for this election."
           );
         }
       }
@@ -3306,35 +3469,20 @@
     }
     electionPanel.hidden = false;
     if (electionCouncilCard) electionCouncilCard.hidden = false;
-    fetch("/api/election/status", {
-      credentials: "same-origin",
-      headers: { Accept: "application/json" },
-    })
-      .then(function (r) {
-        return r.json().then(function (b) {
-          return { ok: r.ok, b: b };
-        });
-      })
+    fetchJson("/api/election/status")
       .then(function (x) {
-        if (!x.ok) throw new Error((x.b && x.b.error) || "Election status failed");
-        renderElectionStatus(x.b);
+        if (!x.ok) throw new Error((x.body && x.body.error) || "Election status failed");
+        renderElectionStatus(x.body);
         if (dashCfg.isAdmin) loadPrivateElectionAdminPanel();
       })
       .catch(function (err) {
         text(document.getElementById("qb-election-status-line"), err.message || "Could not load election status");
+        console.error("Election status failed:", err);
       });
-    fetch("/api/election/council", {
-      credentials: "same-origin",
-      headers: { Accept: "application/json" },
-    })
-      .then(function (r) {
-        return r.json().then(function (b) {
-          return { ok: r.ok, b: b };
-        });
-      })
+    fetchJson("/api/election/council")
       .then(function (x) {
         if (!x.ok) return;
-        renderElectionCouncil(x.b);
+        renderElectionCouncil(x.body);
       })
       .catch(function () {});
   }
@@ -5680,23 +5828,17 @@
       }
       return;
     }
-    fetch(
+    fetchJson(
       "/api/collective_board?level=" +
         encodeURIComponent(level) +
         "&location_id=" +
         encodeURIComponent(lid) +
         "&state=" +
-        encodeURIComponent(activeGlobalBoardState),
-      { credentials: "same-origin", headers: { Accept: "application/json" } }
+        encodeURIComponent(activeGlobalBoardState)
     )
-      .then(function (r) {
-        return r.json().then(function (b) {
-          return { ok: r.ok, b: b };
-        });
-      })
       .then(function (x) {
-        if (!x.ok) throw new Error((x.b && x.b.error) || "feed failed");
-        var posts = x.b.posts || [];
+        if (!x.ok) throw new Error((x.body && x.body.error) || "feed failed");
+        var posts = x.body.posts || [];
         ul.innerHTML = "";
         if (!posts.length) {
           if (empty) empty.hidden = false;
@@ -6513,33 +6655,6 @@
         openModal("qb-admin-edit-manifest-modal");
       });
     });
-    ul.querySelectorAll(".qb-js-nom-remove").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        var id = btn.getAttribute("data-id");
-        var nm = btn.getAttribute("data-name") || "this candidate";
-        if (!window.confirm("Remove nomination for " + nm + "? The candidate may be notified.")) return;
-        fetch("/api/admin/nomination/remove/" + encodeURIComponent(id), {
-          method: "POST",
-          credentials: "same-origin",
-          headers: { "Content-Type": "application/json", Accept: "application/json" },
-          body: JSON.stringify({ notify: true }),
-        })
-          .then(function (r) {
-            return r.json().then(function (b) {
-              return { ok: r.ok, b: b };
-            });
-          })
-          .then(function (x) {
-            if (!x.ok) throw new Error((x.b && x.b.error) || "Remove failed");
-            adminNomFlash("Nomination removed.");
-            loadAdminNominations();
-            loadQuantumElectionUi(qpVillageId, "village");
-          })
-          .catch(function (err) {
-            adminNomFlash(err.message || "Remove failed");
-          });
-      });
-    });
     ul.querySelectorAll(".qb-js-nom-private-details").forEach(function (btn) {
       btn.addEventListener("click", function () {
         var pid = btn.getAttribute("data-private-id");
@@ -6547,17 +6662,7 @@
       });
     });
   }
-  function renderAdminNominationsList(items) {
-    var ul = document.getElementById("qb-admin-nominations-list");
-    var empty = document.getElementById("qb-admin-nominations-empty");
-    if (!ul) return;
-    ul.innerHTML = "";
-    if (!items || !items.length) {
-      if (empty) empty.hidden = false;
-      return;
-    }
-    if (empty) empty.hidden = true;
-    items.forEach(function (n) {
+  function renderAdminNominationItem(n) {
       var li = document.createElement("li");
       li.className = "qb-admin-nom-item mb-3 pb-3 border-bottom border-secondary";
       var rawName = ((n.first_name || "") + " " + (n.last_name || "")).trim();
@@ -6616,16 +6721,31 @@
         "' data-changes='" +
         escAttr(n.changes || "") +
         "'>Edit Manifest</button>" +
-        "<button type='button' class='qb-btn btn-outline-danger btn-sm qb-js-nom-remove' data-id='" +
-        escAttr(String(n.id)) +
-        "' data-name='" +
-        escAttr(rawName) +
-        "'>Remove</button>" +
         "</div>";
-      ul.appendChild(li);
-    });
-    bindAdminNominationActions(ul);
+    return li;
   }
+
+  function renderAdminNominationsList(pending, approved) {
+    var ulPending = document.getElementById("qb-admin-nominations-pending");
+    var ulApproved = document.getElementById("qb-admin-nominations-approved");
+    var emptyP = document.getElementById("qb-admin-nominations-pending-empty");
+    var emptyA = document.getElementById("qb-admin-nominations-approved-empty");
+    if (ulPending) ulPending.innerHTML = "";
+    if (ulApproved) ulApproved.innerHTML = "";
+    pending = pending || [];
+    approved = approved || [];
+    if (emptyP) emptyP.hidden = pending.length > 0;
+    if (emptyA) emptyA.hidden = approved.length > 0;
+    pending.forEach(function (n) {
+      if (ulPending) ulPending.appendChild(renderAdminNominationItem(n));
+    });
+    approved.forEach(function (n) {
+      if (ulApproved) ulApproved.appendChild(renderAdminNominationItem(n));
+    });
+    bindAdminNominationActions(ulPending);
+    bindAdminNominationActions(ulApproved);
+  }
+
   function loadAdminNominations() {
     fetch("/api/admin/nominations?status=all", {
       credentials: "same-origin",
@@ -6648,7 +6768,7 @@
               (x.b.cycle.status || "")
           );
         }
-        renderAdminNominationsList(x.b.nominations || []);
+        renderAdminNominationsList(x.b.pending || [], x.b.approved || []);
       })
       .catch(function (err) {
         adminNomFlash(err.message || "Could not load nominations");
@@ -6820,6 +6940,315 @@
   if (document.querySelector(".qb-js-global-tab")) {
     updateGlobalTabsFromSelection();
     loadGlobalPanelStats();
+  }
+
+  function parseJsonResponse(r) {
+    var ct = (r.headers.get("Content-Type") || "").toLowerCase();
+    return r.text().then(function (text) {
+      if (!text || !text.trim()) {
+        return { ok: r.ok, b: { error: "Empty response from server" } };
+      }
+      if (ct.indexOf("application/json") === -1 && text.trim().charAt(0) === "<") {
+        return {
+          ok: false,
+          b: {
+            error:
+              "Server returned HTML instead of JSON. You may need to log in again, or the birth chart route failed on the server.",
+          },
+        };
+      }
+      try {
+        return { ok: r.ok, b: JSON.parse(text) };
+      } catch (parseErr) {
+        return {
+          ok: false,
+          b: { error: "Invalid JSON from server: " + (parseErr.message || "parse error") },
+        };
+      }
+    });
+  }
+
+  function renderVedicGrid(el, gridCells) {
+    if (!el || !gridCells || !gridCells.length) return;
+    el.innerHTML = "";
+    gridCells.forEach(function (cell) {
+      var box = document.createElement("div");
+      box.className = "qb-vedic-cell";
+      var houseNum = cell.house != null ? String(cell.house) : "";
+      var planets = (cell.planets || []).join(" ");
+      box.innerHTML =
+        "<span class='qb-vedic-cell-house'>" +
+        escHtml(houseNum) +
+        "</span>" +
+        "<span class='qb-vedic-cell-sign'>" +
+        escHtml(cell.sign || "") +
+        "</span>" +
+        "<span class='qb-vedic-cell-planets'>" +
+        escHtml(planets) +
+        "</span>";
+      el.appendChild(box);
+    });
+  }
+
+  function renderBirthChartTable(rows) {
+    var tbody = document.getElementById("qb-birth-chart-planets-tbody");
+    if (!tbody) return;
+    tbody.innerHTML = "";
+    (rows || []).forEach(function (p) {
+      var tr = document.createElement("tr");
+      var pada = p.pada != null && p.pada !== "" ? String(p.pada) : "—";
+      tr.innerHTML =
+        "<td>" +
+        escHtml(p.name || "") +
+        "</td><td>" +
+        escHtml(p.sign || "") +
+        "</td><td class='font-monospace small'>" +
+        escHtml(p.degree || "—") +
+        "</td><td>" +
+        escHtml(p.nakshatra || "—") +
+        "</td><td class='text-center'>" +
+        escHtml(pada) +
+        "</td><td class='text-center'>" +
+        (p.retrograde ? "<span class='text-warning'>R</span>" : "—") +
+        "</td>";
+      tbody.appendChild(tr);
+    });
+  }
+
+  /* legacy removed */
+  function _renderChartGridLegacy_UNUSED(el, chart) {
+    if (!el || !chart) return;
+    var cells = chart.houses;
+    if (!cells && chart.houses && typeof chart.houses === "object" && !Array.isArray(chart.houses)) {
+      cells = Object.keys(chart.houses)
+        .sort(function (a, b) {
+          return parseInt(a, 10) - parseInt(b, 10);
+        })
+        .map(function (k) {
+          return { house: parseInt(k, 10), sign: chart.houses[k], planets: [] };
+        });
+    }
+    if (!cells || !cells.length) return;
+    el.innerHTML = "";
+    cells.forEach(function (cell) {
+      var box = document.createElement("div");
+      box.className = "qb-chart-cell";
+      var planets = (cell.planets || []).join(" ");
+      box.innerHTML =
+        "<div class='qb-chart-cell-sign'>" +
+        escHtml(cell.sign || "") +
+        "</div>" +
+        "<div class='qb-chart-cell-planets small'>" +
+        escHtml(planets) +
+        "</div>";
+      el.appendChild(box);
+    });
+  }
+
+  function renderBirthChartPayload(data) {
+    var flash = document.getElementById("qb-birth-chart-flash");
+    var unavail = document.getElementById("qb-birth-chart-unavailable");
+    var body = document.getElementById("qb-birth-chart-body");
+    if (flash) text(flash, "");
+    if (unavail) {
+      if (data.library_missing || data.mock) {
+        unavail.hidden = false;
+        text(
+          unavail,
+          data.message ||
+            "Showing simplified chart. Install jyotishyam for full Vedic calculations."
+        );
+      } else if (data.error) {
+        unavail.hidden = false;
+        text(unavail, data.error + (data.details ? " — " + data.details : ""));
+      } else {
+        unavail.hidden = true;
+        text(unavail, "");
+      }
+    }
+    if (body) body.hidden = false;
+    var meta = document.getElementById("qb-birth-chart-meta");
+    if (meta) {
+      var asc = data.ascendant || {};
+      text(
+        meta,
+        "Lagna: " +
+          (asc.sign || "—") +
+          " " +
+          (asc.degree || "") +
+          " · " +
+          (asc.nakshatra || "") +
+          (asc.pada ? " Pada " + asc.pada : "")
+      );
+    }
+    renderVedicGrid(document.getElementById("qb-birth-chart-rasi-grid"), data.rasi_grid);
+    renderVedicGrid(document.getElementById("qb-birth-chart-chandra-grid"), data.chandra_grid);
+    renderBirthChartTable(data.table_rows || []);
+  }
+
+  function loadBirthChartModal() {
+    var flash = document.getElementById("qb-birth-chart-flash");
+    var unavail = document.getElementById("qb-birth-chart-unavailable");
+    var body = document.getElementById("qb-birth-chart-body");
+    if (flash) text(flash, "Loading chart…");
+    if (unavail) {
+      unavail.hidden = true;
+      text(unavail, "");
+    }
+    if (body) body.hidden = true;
+    return fetch("/api/user/birth_chart", {
+      credentials: "same-origin",
+      headers: { Accept: "application/json" },
+    })
+      .then(parseJsonResponse)
+      .then(function (x) {
+        var data = x.b || {};
+        if (!x.ok && data.error) {
+          throw new Error(data.error);
+        }
+        if (data.error && !data.available && !data.mock) {
+          throw new Error(data.error);
+        }
+        if (data.available === false && !data.mock) {
+          if (unavail) {
+            unavail.hidden = false;
+            text(unavail, data.message || data.error || "Chart unavailable.");
+          }
+          return;
+        }
+        renderBirthChartPayload(data);
+      })
+      .catch(function (err) {
+        if (flash) text(flash, "");
+        if (body) body.hidden = true;
+        if (unavail) {
+          unavail.hidden = false;
+          text(unavail, err.message || "Could not load chart.");
+        }
+      });
+  }
+
+  var birthChartBtn = document.getElementById("qb-birth-chart-btn");
+  if (birthChartBtn) {
+    birthChartBtn.addEventListener("click", function () {
+      openModal("qb-birth-chart-modal");
+      loadBirthChartModal();
+    });
+  }
+
+  var adminUpgradeSelected = null;
+  var adminUpgradeSearchTimer = null;
+  var adminUpgradeSearch = document.getElementById("qb-admin-upgrade-search");
+  var adminUpgradeSuggest = document.getElementById("qb-admin-upgrade-suggest");
+  var adminUpgradeSelectedEl = document.getElementById("qb-admin-upgrade-selected");
+  var adminUpgradeSubmit = document.getElementById("qb-admin-upgrade-submit");
+
+  function syncAdminUpgradeSubmit() {
+    if (adminUpgradeSubmit) {
+      adminUpgradeSubmit.disabled = !(
+        adminUpgradeSelected &&
+        (document.getElementById("qb-admin-upgrade-type") || {}).value
+      );
+    }
+  }
+
+  if (adminUpgradeSearch) {
+    adminUpgradeSearch.addEventListener("input", function () {
+      adminUpgradeSelected = null;
+      syncAdminUpgradeSubmit();
+      if (adminUpgradeSelectedEl) adminUpgradeSelectedEl.hidden = true;
+      var q = (adminUpgradeSearch.value || "").trim();
+      clearTimeout(adminUpgradeSearchTimer);
+      if (!q || q.length < 2) {
+        if (adminUpgradeSuggest) {
+          adminUpgradeSuggest.hidden = true;
+          adminUpgradeSuggest.innerHTML = "";
+        }
+        return;
+      }
+      adminUpgradeSearchTimer = setTimeout(function () {
+        fetch("/api/admin/users/search?q=" + encodeURIComponent(q), {
+          credentials: "same-origin",
+          headers: { Accept: "application/json" },
+        })
+          .then(function (r) {
+            return r.json().then(function (b) {
+              return { ok: r.ok, b: b };
+            });
+          })
+          .then(function (x) {
+            if (!adminUpgradeSuggest) return;
+            adminUpgradeSuggest.innerHTML = "";
+            (x.b.users || []).forEach(function (u) {
+              var li = document.createElement("li");
+              var btn = document.createElement("button");
+              btn.type = "button";
+              btn.className = "qb-btn qb-btn-outline btn-sm w-100 text-start mb-1";
+              btn.textContent =
+                (u.full_name || "") + " · " + (u.public_id || "") + " (" + (u.account_type || "") + ")";
+              btn.addEventListener("click", function () {
+                adminUpgradeSelected = u;
+                adminUpgradeSearch.value = u.public_id || "";
+                adminUpgradeSuggest.hidden = true;
+                if (adminUpgradeSelectedEl) {
+                  adminUpgradeSelectedEl.hidden = false;
+                  text(
+                    adminUpgradeSelectedEl,
+                    "Selected: " + (u.full_name || "") + " · " + (u.public_id || "")
+                  );
+                }
+                syncAdminUpgradeSubmit();
+              });
+              li.appendChild(btn);
+              adminUpgradeSuggest.appendChild(li);
+            });
+            adminUpgradeSuggest.hidden = !(x.b.users && x.b.users.length);
+          });
+      }, 250);
+    });
+  }
+
+  var adminUpgradeType = document.getElementById("qb-admin-upgrade-type");
+  if (adminUpgradeType) {
+    adminUpgradeType.addEventListener("change", syncAdminUpgradeSubmit);
+  }
+
+  if (adminUpgradeSubmit) {
+    adminUpgradeSubmit.addEventListener("click", function () {
+      if (!adminUpgradeSelected) return;
+      var newType = ((document.getElementById("qb-admin-upgrade-type") || {}).value || "").trim();
+      if (!newType) return;
+      var flash = document.getElementById("qb-admin-upgrade-flash");
+      if (flash) text(flash, "Upgrading…");
+      fetch("/api/admin/upgrade_user", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          public_id: adminUpgradeSelected.public_id,
+          new_account_type: newType,
+        }),
+      })
+        .then(function (r) {
+          return r.json().then(function (b) {
+            return { ok: r.ok, b: b };
+          });
+        })
+        .then(function (x) {
+          if (!x.ok) throw new Error((x.b && x.b.error) || "Upgrade failed");
+          if (flash) {
+            text(
+              flash,
+              "Upgraded " + (x.b.full_name || adminUpgradeSelected.public_id) + " to " + newType + "."
+            );
+          }
+          adminUpgradeSelected = null;
+          syncAdminUpgradeSubmit();
+        })
+        .catch(function (err) {
+          if (flash) text(flash, err.message || "Upgrade failed");
+        });
+    });
   }
 
   window.qbOpenModal = openModal;

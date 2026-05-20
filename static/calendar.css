@@ -1,0 +1,185 @@
+/* Zodiac (Sauramana) calendar — dark theme, high contrast */
+
+.qb-calendar-page .qb-main {
+  max-width: 1200px;
+  margin-inline: auto;
+  padding-bottom: 2rem;
+  color: var(--qb-text);
+}
+
+.qb-cal-shell {
+  padding: 1.25rem 0.5rem 2rem;
+}
+
+.qb-cal-header {
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--qb-border);
+  background: var(--qb-surface);
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22);
+  color: var(--qb-text);
+}
+
+.qb-cal-title-devanagari {
+  font-family: "Noto Sans Devanagari", "DM Sans", system-ui, sans-serif;
+  font-weight: 700;
+  font-size: clamp(1.75rem, 4vw, 2.5rem);
+  letter-spacing: 0.02em;
+  color: var(--qb-topbar-accent);
+  margin: 0 0 0.25rem;
+}
+
+.qb-cal-subtitle,
+.qb-cal-meta {
+  font-size: 0.95rem;
+  color: var(--qb-muted);
+}
+
+.qb-cal-close-btn {
+  white-space: nowrap;
+}
+
+.qb-cal-loading {
+  text-align: center;
+  padding: 2rem;
+  color: var(--qb-muted);
+}
+
+.qb-cal-error {
+  text-align: center;
+  padding: 2rem;
+  color: #fca5a5;
+  background: var(--qb-danger-dim);
+  border-radius: 8px;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.qb-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+
+@media (max-width: 992px) {
+  .qb-cal-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .qb-cal-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+}
+
+@media (max-width: 420px) {
+  .qb-cal-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.qb-cal-month-card {
+  position: relative;
+  border-radius: 12px;
+  border: 3px solid var(--qb-cal-accent, #ccc);
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--qb-cal-accent) 22%, var(--qb-surface)) 0%,
+    var(--qb-surface) 55%
+  );
+  padding: 0.85rem 0.9rem 0.75rem;
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  color: var(--qb-text);
+}
+
+.qb-cal-month-card:hover,
+.qb-cal-month-card:focus-visible {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.35);
+  outline: none;
+}
+
+.qb-cal-month-name {
+  font-weight: 700;
+  font-size: 1.05rem;
+  line-height: 1.2;
+  color: var(--qb-text);
+}
+
+.qb-cal-month-sanskrit {
+  font-family: "Noto Sans Devanagari", system-ui, sans-serif;
+  font-size: 0.8rem;
+  color: var(--qb-muted);
+}
+
+.qb-cal-date-range {
+  font-size: 0.72rem;
+  color: var(--qb-muted);
+  margin-bottom: 0.5rem;
+}
+
+.qb-cal-events-title {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--qb-subtle);
+  margin-bottom: 0.35rem;
+}
+
+.qb-cal-events ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: var(--qb-text);
+}
+
+.qb-cal-events li .qb-cal-ev-date {
+  color: var(--qb-muted);
+}
+
+.qb-cal-events-more {
+  color: var(--qb-muted);
+}
+
+.qb-cal-day {
+  border: 1px solid var(--qb-border);
+  background: var(--qb-surface-elevated);
+  color: var(--qb-text);
+}
+
+.qb-cal-day.is-outside {
+  opacity: 0.35;
+  background: var(--qb-surface);
+}
+
+.qb-cal-day.is-today {
+  border-color: var(--qb-primary);
+  background: var(--qb-primary-dim);
+}
+
+.qb-cal-day-num {
+  color: var(--qb-text);
+}
+
+.qb-cal-dow {
+  color: var(--qb-muted);
+}
+
+.qb-cal-day-marker {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--qb-text);
+}
+
+.qb-cal-detail-head .h5 {
+  color: var(--qb-text);
+}

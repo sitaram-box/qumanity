@@ -101,6 +101,10 @@ def ensure_posts_escalation_columns(conn: sqlite3.Connection) -> None:
         ("origin_continent_id", "TEXT"),
         ("freeze_level", "TEXT"),
         ("qoins_settled", "INTEGER NOT NULL DEFAULT 0"),
+        ("original_post_id", "INTEGER"),
+        ("frozen_at_level", "TEXT"),
+        ("archived_at_level", "TEXT"),
+        ("level_end_time", "TIMESTAMP"),
     ]
     for name, decl in adds:
         if name not in cols:
@@ -113,6 +117,8 @@ def ensure_posts_escalation_columns(conn: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_posts_level_start_time ON posts(level_start_time);
         CREATE INDEX IF NOT EXISTS idx_posts_level_status ON posts(current_level, status);
         CREATE INDEX IF NOT EXISTS idx_posts_freeze_level ON posts(freeze_level);
+        CREATE INDEX IF NOT EXISTS idx_posts_user_status_level ON posts(user_private_id, status, current_level);
+        CREATE INDEX IF NOT EXISTS idx_posts_original_post_id ON posts(original_post_id);
         """
     )
     if "location_id" in _cols(conn, "posts"):
@@ -252,8 +258,196 @@ def _parse_sqlite_datetime(value: object) -> datetime | None:
     return dt.astimezone(timezone.utc)
 
 
+def _frozen_level_name(level: str) -> str:
+    return f"{level}_frozen"
+
+
+def _archive_live_post(
+    conn: sqlite3.Connection,
+    post: sqlite3.Row,
+    level: str,
+    now: datetime,
+) -> bool:
+    """Move a live post to the author's Previous Posts (private history)."""
+    ts = now.isoformat(timespec="seconds")
+    res = conn.execute(
+        """
+        UPDATE posts
+           SET status = 'archived',
+               current_level = 'private_history',
+               archived_at_level = ?,
+               level_end_time = ?,
+               qoins_settled = 1
+         WHERE id = ? AND status = 'live'
+        """,
+        (level, ts, int(post["id"])),
+    )
+    return res.rowcount == 1
+
+
+def _insert_archived_copy(
+    conn: sqlite3.Connection,
+    post: sqlite3.Row,
+    level: str,
+    now: datetime,
+    *,
+    original_post_id: int | None = None,
+) -> None:
+    """Duplicate a post row into the author's Previous Posts archive."""
+    prev = (post["previous_levels"] or "").strip()
+    archived_prev = prev + ("," if prev else "") + level + ":archived"
+    ts = now.isoformat(timespec="seconds")
+    conn.execute(
+        """
+        INSERT INTO posts (
+            user_private_id, location_id, content, created_at,
+            current_level, level_start_time, level_end_time, status, total_score,
+            previous_levels, origin_village_id, origin_tehsil_id,
+            origin_district_id, origin_state_id, origin_country_id,
+            origin_continent_id, archived_at_level, original_post_id, qoins_settled
+        ) VALUES (?, ?, ?, ?, 'private_history', ?, ?, 'archived', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+        """,
+        (
+            str(post["user_private_id"]),
+            post["location_id"],
+            post["content"],
+            post["created_at"],
+            post["level_start_time"],
+            ts,
+            int(post["total_score"] or 0),
+            archived_prev,
+            post["origin_village_id"],
+            post["origin_tehsil_id"],
+            post["origin_district_id"],
+            post["origin_state_id"],
+            post["origin_country_id"],
+            post["origin_continent_id"],
+            level,
+            original_post_id,
+        ),
+    )
+
+
+def _freeze_and_ascend(
+    conn: sqlite3.Connection,
+    post: sqlite3.Row,
+    level: str,
+    now: datetime,
+) -> bool:
+    """Freeze the current-level row and insert a fresh live copy at the next level."""
+    pid = int(post["id"])
+    score = int(post["total_score"] or 0)
+    author = str(post["user_private_id"])
+    prev = (post["previous_levels"] or "").strip()
+    idx = _level_idx(level)
+    if idx >= len(POST_LEVEL_ORDER) - 1:
+        return False
+    new_level = POST_LEVEL_ORDER[idx + 1]
+    new_prev = prev + ("," if prev else "") + level
+    ts = now.isoformat(timespec="seconds")
+    frozen_level = _frozen_level_name(level)
+
+    res = conn.execute(
+        """
+        UPDATE posts
+           SET status = 'frozen',
+               current_level = ?,
+               freeze_level = ?,
+               frozen_at_level = ?,
+               level_end_time = ?,
+               previous_levels = ?,
+               qoins_settled = 1
+         WHERE id = ? AND status = 'live'
+        """,
+        (frozen_level, level, level, ts, new_prev, pid),
+    )
+    if res.rowcount != 1:
+        return False
+
+    conn.execute(
+        """
+        INSERT INTO posts (
+            user_private_id, location_id, content, created_at,
+            current_level, level_start_time, status, total_score,
+            previous_levels, origin_village_id, origin_tehsil_id,
+            origin_district_id, origin_state_id, origin_country_id,
+            origin_continent_id, original_post_id, qoins_settled
+        ) VALUES (?, ?, ?, ?, ?, ?, 'live', 0, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+        """,
+        (
+            author,
+            post["location_id"],
+            post["content"],
+            post["created_at"],
+            new_level,
+            ts,
+            new_prev,
+            post["origin_village_id"],
+            post["origin_tehsil_id"],
+            post["origin_district_id"],
+            post["origin_state_id"],
+            post["origin_country_id"],
+            post["origin_continent_id"],
+            pid,
+        ),
+    )
+    amt = qoins_for_final_score(score)
+    credit_wallet(
+        conn,
+        "user",
+        author,
+        amt,
+        author,
+        f"post#{pid} escalated from {level} to {new_level}",
+    )
+    return True
+
+
+def _complete_earth_journey(
+    conn: sqlite3.Connection,
+    post: sqlite3.Row,
+    now: datetime,
+) -> bool:
+    """Finish an earth-level post: freeze on CEB and archive a copy for the author."""
+    pid = int(post["id"])
+    score = int(post["total_score"] or 0)
+    author = str(post["user_private_id"])
+    prev = (post["previous_levels"] or "").strip()
+    new_prev = prev + ("," if prev else "") + "earth"
+    ts = now.isoformat(timespec="seconds")
+
+    res = conn.execute(
+        """
+        UPDATE posts
+           SET status = 'frozen',
+               current_level = 'earth_frozen',
+               freeze_level = 'earth',
+               frozen_at_level = 'earth',
+               level_end_time = ?,
+               previous_levels = ?,
+               qoins_settled = 1
+         WHERE id = ? AND status = 'live'
+        """,
+        (ts, new_prev, pid),
+    )
+    if res.rowcount != 1:
+        return False
+
+    _insert_archived_copy(conn, post, "earth", now, original_post_id=pid)
+    amt = qoins_for_final_score(score)
+    credit_wallet(
+        conn,
+        "user",
+        author,
+        amt,
+        author,
+        f"post#{pid} journey complete",
+    )
+    return True
+
+
 def escalate_posts(conn: sqlite3.Connection, now: datetime | None = None) -> None:
-    """Advance or freeze posts whose current level window has ended."""
+    """Advance, freeze, or archive posts whose current level window has ended."""
     if now is None:
         now = datetime.now(timezone.utc)
     cutoff_tpl = (now - timedelta(days=LEVEL_DAYS)).isoformat(timespec="seconds")
@@ -264,117 +458,38 @@ def escalate_posts(conn: sqlite3.Connection, now: datetime | None = None) -> Non
         WHERE status = 'live'
           AND level_start_time IS NOT NULL
           AND datetime(level_start_time) <= datetime(?)
+          AND current_level IN (
+            'personal', 'village', 'tehsil', 'district',
+            'state', 'country', 'continent', 'earth'
+          )
         """,
         (cutoff_tpl,),
     )
     rows = cur.fetchall()
     for post in rows:
-        pid = int(post["id"])
-        score = int(post["total_score"] or 0)
-        level = str(post["current_level"] or "personal")
-        author = str(post["user_private_id"])
-        started_at = _parse_sqlite_datetime(post["level_start_time"])
-        level_days = LEVEL_DAYS_BY_LEVEL.get(level, LEVEL_DAYS)
-        if started_at is None or now < started_at + timedelta(days=level_days):
-            continue
-
-        prev = (post["previous_levels"] or "").strip()
-        idx = _level_idx(level)
-        if idx >= len(POST_LEVEL_ORDER) - 1:
-            res = conn.execute(
-                """
-                UPDATE posts SET status = 'completed', qoins_settled = 1,
-                    previous_levels = ?
-                WHERE id = ? AND status = 'live' AND qoins_settled = 0
-                """,
-                (
-                    prev + ("," if prev else "") + "earth:completed",
-                    pid,
-                ),
-            )
-            if res.rowcount != 1:
+        try:
+            score = int(post["total_score"] or 0)
+            level = str(post["current_level"] or "personal").strip().lower()
+            started_at = _parse_sqlite_datetime(post["level_start_time"])
+            level_days = LEVEL_DAYS_BY_LEVEL.get(level, LEVEL_DAYS)
+            if started_at is None or now < started_at + timedelta(days=level_days):
                 continue
-            amt = qoins_for_final_score(score)
-            credit_wallet(
-                conn,
-                "user",
-                author,
-                amt,
-                author,
-                f"post#{pid} journey complete",
-            )
-            continue
 
-        # Descend rule: applies once a post has been promoted above the personal
-        # board. The first level ('personal') always graduates to the village
-        # board after 7 days regardless of score, so PCB posts always get their
-        # chance on the CVB before being judged by the village.
-        if level != "personal" and score <= 0:
-            frozen_prev = prev + ("," if prev else "") + level + ":descended"
-            res = conn.execute(
-                """
-                UPDATE posts
-                   SET status = 'frozen',
-                       current_level = ?,
-                       freeze_level = ?,
-                       previous_levels = ?,
-                       qoins_settled = 1
-                 WHERE id = ? AND status = 'live'
-                """,
-                (f"{level}_frozen", level, frozen_prev, pid),
-            )
-            if res.rowcount != 1:
+            idx = _level_idx(level)
+            if idx >= len(POST_LEVEL_ORDER) - 1:
+                if score <= 0:
+                    _archive_live_post(conn, post, "earth", now)
+                else:
+                    _complete_earth_journey(conn, post, now)
                 continue
-            conn.execute(
-                """
-                INSERT INTO posts (
-                    user_private_id, location_id, content, created_at,
-                    current_level, level_start_time, status, total_score,
-                    previous_levels, origin_village_id, origin_tehsil_id,
-                    origin_district_id, origin_state_id, origin_country_id,
-                    origin_continent_id, freeze_level, qoins_settled
-                ) VALUES (?, ?, ?, ?, 'personal_history', ?, 'frozen', ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
-                """,
-                (
-                    author,
-                    post["location_id"],
-                    post["content"],
-                    post["created_at"],
-                    now.isoformat(timespec="seconds"),
-                    score,
-                    frozen_prev,
-                    post["origin_village_id"],
-                    post["origin_tehsil_id"],
-                    post["origin_district_id"],
-                    post["origin_state_id"],
-                    post["origin_country_id"],
-                    post["origin_continent_id"],
-                    level,
-                ),
-            )
-            continue
 
-        new_level = POST_LEVEL_ORDER[idx + 1]
-        new_prev = prev + ("," if prev else "") + level
-        res = conn.execute(
-            """
-            UPDATE posts SET current_level = ?, level_start_time = ?,
-                previous_levels = ?
-            WHERE id = ? AND status = 'live'
-            """,
-            (new_level, now.isoformat(timespec="seconds"), new_prev, pid),
-        )
-        if res.rowcount != 1:
+            if score <= 0:
+                _archive_live_post(conn, post, level, now)
+                continue
+
+            _freeze_and_ascend(conn, post, level, now)
+        except sqlite3.Error:
             continue
-        amt = qoins_for_final_score(score)
-        credit_wallet(
-            conn,
-            "user",
-            author,
-            amt,
-            author,
-            f"post#{pid} escalated from {level} to {new_level}",
-        )
     conn.commit()
 
 
@@ -526,7 +641,7 @@ def posts_for_geo_feed(
     }.get(scope)
     if scope == "earth":
         extra = (
-            " AND LOWER(TRIM(COALESCE(p.current_level,''))) NOT IN ('personal','personal_history')"
+            " AND LOWER(TRIM(COALESCE(p.current_level,''))) NOT IN ('personal','personal_history','private_history')"
             " AND LOWER(TRIM(COALESCE(p.current_level,''))) NOT LIKE 'personal\\_%' ESCAPE '\\'"
         )
         if "deleted_at" in _cols(conn, "posts"):
@@ -548,7 +663,7 @@ def posts_for_geo_feed(
     if not col:
         return []
     extra = (
-        " AND LOWER(TRIM(COALESCE(p.current_level,''))) NOT IN ('personal','personal_history')"
+        " AND LOWER(TRIM(COALESCE(p.current_level,''))) NOT IN ('personal','personal_history','private_history')"
         " AND LOWER(TRIM(COALESCE(p.current_level,''))) NOT LIKE 'personal\\_%' ESCAPE '\\'"
     )
     if "deleted_at" in _cols(conn, "posts"):

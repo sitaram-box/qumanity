@@ -47,6 +47,24 @@ def split_donation(amount: int) -> tuple[list[dict[str, int]], dict[str, int] | 
     return [{"rupee_value": v} for v in user_vals], {"rupee_value": village_val}
 
 
+CASH_DONATIONS_SQL = """
+CREATE TABLE IF NOT EXISTS cash_donations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    donor_private_id TEXT NOT NULL,
+    agent_public_id TEXT NOT NULL,
+    amount_rupees INTEGER NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_cash_donations_donor ON cash_donations(donor_private_id);
+CREATE INDEX IF NOT EXISTS idx_cash_donations_agent ON cash_donations(agent_public_id);
+"""
+
+
+def migrate_cash_donations(conn: sqlite3.Connection) -> None:
+    conn.executescript(CASH_DONATIONS_SQL)
+    conn.commit()
+
+
 def migrate_qoin_transactions(conn: sqlite3.Connection) -> None:
     cols = {str(r[1]) for r in conn.execute("PRAGMA table_info(qoin_transactions)")}
     additions: list[tuple[str, str]] = [
@@ -160,13 +178,42 @@ def record_transaction(
     )
 
 
+def record_cash_donation(
+    conn: sqlite3.Connection,
+    *,
+    donor_private_id: str,
+    agent_public_id: str,
+    amount_rupees: int,
+) -> None:
+    migrate_cash_donations(conn)
+    conn.execute(
+        """
+        INSERT INTO cash_donations (donor_private_id, agent_public_id, amount_rupees, created_at)
+        VALUES (?, ?, ?, ?)
+        """,
+        (donor_private_id, agent_public_id, amount_rupees, _now()),
+    )
+
+
 def process_donation(
     conn: sqlite3.Connection,
     *,
     donor_private_id: str,
     amount_rupees: int,
     village_id: str | None,
+    method: str = "upi",
+    agent_public_id: str | None = None,
 ) -> dict[str, Any]:
+    method_norm = (method or "upi").strip().lower()
+    if method_norm == "cash":
+        if not agent_public_id:
+            raise ValueError("Agent Account ID is required for cash donations")
+        record_cash_donation(
+            conn,
+            donor_private_id=donor_private_id,
+            agent_public_id=agent_public_id,
+            amount_rupees=amount_rupees,
+        )
     user_coins, village_coin = split_donation(amount_rupees)
     for coin in user_coins:
         record_transaction(
@@ -190,6 +237,8 @@ def process_donation(
         )
     return {
         "amount_rupees": amount_rupees,
+        "method": method_norm,
+        "agent_public_id": agent_public_id,
         "user_coins": user_coins,
         "village_coin": village_coin,
         "user_balance": wallet_balance(conn, "user", donor_private_id),
@@ -199,6 +248,38 @@ def process_donation(
         if village_id
         else 0,
     }
+
+
+def user_transactions(
+    conn: sqlite3.Connection, user_private_id: str, *, limit: int = 50
+) -> list[dict[str, Any]]:
+    migrate_qoin_transactions(conn)
+    cur = conn.execute(
+        """
+        SELECT id, amount, reason, rupee_value, type, description, created_at,
+               recipient_type, recipient_id
+        FROM qoin_transactions
+        WHERE user_private_id = ?
+        ORDER BY datetime(created_at) DESC
+        LIMIT ?
+        """,
+        (user_private_id, limit),
+    )
+    out: list[dict[str, Any]] = []
+    for r in cur:
+        out.append(
+            {
+                "id": int(r["id"]),
+                "amount": int(r["amount"] or 0),
+                "reason": str(r["reason"] or r["description"] or ""),
+                "rupee_value": int(r["rupee_value"] or 0) if r["rupee_value"] else None,
+                "type": str(r["type"] or ""),
+                "created_at": str(r["created_at"] or ""),
+                "recipient_type": str(r["recipient_type"] or ""),
+                "recipient_id": str(r["recipient_id"] or ""),
+            }
+        )
+    return out
 
 
 def credit_signup_bonus(conn: sqlite3.Connection, user_private_id: str) -> None:
