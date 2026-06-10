@@ -1,17 +1,111 @@
 {% extends "base.html" %}
 
-{% block title %}About — Quantum Box{% endblock %}
+{% block title %}About Qumanity – For Humanity, Harmony & Peace{% endblock %}
 
 {% block body %}
-<section class="qb-hero">
-  <h1>About Quantum Box</h1>
-  <p class="qb-lead mb-3">
-    Quantum Box is a public digital governance prototype. For the full story on the home page, see
-    <a href="{{ url_for('index') }}#about">About Quantum Box</a> on the landing page, or the
-    <a href="{{ url_for('about_details') }}">extended notes</a> page.
-  </p>
-  <p class="mb-0 text-muted small">
-    This page is a lightweight overview; detailed copy may be expanded later.
-  </p>
-</section>
+<div class="about-container">
+    <div class="about-header">
+        <h1>Qumanity</h1>
+        <p class="subtitle">Quantum + Humanity – For Harmony, Peace &amp; Self‑Rule</p>
+        <p class="foundation">An initiative by <strong>SITA Foundation</strong></p>
+    </div>
+
+    <div class="about-section">
+        <h2>What is Qumanity?</h2>
+        <p><strong>Qumanity</strong> is a governance and economic platform for the people, by the people. It combines quantum technology with human values – transparency, accountability, and collective welfare.</p>
+        <p>It is an <strong>Indian product for the world</strong> – built in India, for India, but designed to serve all of humanity.</p>
+    </div>
+
+    <div class="about-section">
+        <h2>Our Mission</h2>
+        <p><strong>Harmony, Peace, and Self‑Rule</strong> for every village, every citizen, and for humanity.</p>
+        <p>Qumanity replaces corruption with transparency, dependency with self‑reliance, and silence with voice.</p>
+    </div>
+
+    <div class="about-section">
+        <h2>The Five Pillars</h2>
+        <ul>
+            <li><strong>Nested Governance</strong> – From Village to Earth, every community has a Quantum Punch Council.</li>
+            <li><strong>Karma Ledger</strong> – Every good deed earns Qoins. Every action is recorded.</li>
+            <li><strong>Qoin Economy</strong> – A digital currency that stays in the village and rewards ethical behaviour.</li>
+            <li><strong>Zodiac Elections</strong> – Monthly council elections aligned with the sun's journey.</li>
+            <li><strong>Collective Intelligence</strong> – AI that serves, not controls.</li>
+        </ul>
+    </div>
+
+    <div class="philosophy-section">
+        <h2>The Five Elements of Qumanity</h2>
+        <p>
+            Qumanity is built on the ancient Vedic understanding of the five elements
+            (Pañca Mahābhūta) that constitute all existence — Space, Fire, Earth, Air
+            and Water.
+        </p>
+
+        <div class="elements-grid">
+            <div class="element-card space">
+                <h3>Space (Ākāśa)</h3>
+                <p>
+                    The container of all existence. Stores the soul and consciousness of all
+                    beings — living and departed — every past action, frozen posts, planets,
+                    nakshatras, and time itself (past, present and future).
+                </p>
+            </div>
+            <div class="element-card fire">
+                <h3>Fire (Agni)</h3>
+                <p>
+                    Represents energy, transformation, and leadership. All actions of Fire
+                    zodiac beings (Aries, Leo, Sagittarius) are recorded here.
+                </p>
+            </div>
+            <div class="element-card earth">
+                <h3>Earth (Pṛthvī)</h3>
+                <p>
+                    Represents physical form, locations, and matter. All locations — from
+                    villages to continents — and Earth zodiac beings (Taurus, Virgo,
+                    Capricorn) exist here.
+                </p>
+            </div>
+            <div class="element-card air">
+                <h3>Air (Vāyu)</h3>
+                <p>
+                    Represents communication, thoughts, and movement. All posts, messages,
+                    and ideas of Air zodiac beings (Gemini, Libra, Aquarius) flow here.
+                </p>
+            </div>
+            <div class="element-card water">
+                <h3>Water (Apas)</h3>
+                <p>
+                    Represents emotions, relationships, and community. Family trees and
+                    social connections of Water zodiac beings (Cancer, Scorpio, Pisces)
+                    live here.
+                </p>
+            </div>
+        </div>
+
+        <div class="philosophy-hierarchy">
+            <p>
+                <strong>Space (Ākāśa)</strong> contains everything — including
+                <strong>Earth (Pṛthvī)</strong>, the physical realm of villages, tehsils,
+                districts, states, zones, countries and continents. Within Earth lives the
+                <strong>human body</strong>, itself composed of the four elements: Fire,
+                Earth, Air and Water. Every human action — every emotion, feeling, thought
+                and karma from birth to death — is stored in these elements.
+            </p>
+            <p><strong>Your body is made of these five elements. Your soul resides in Space. Your actions are recorded in the elements.</strong></p>
+            <p><em>This is not just software. This is a mirror of the cosmos.</em></p>
+        </div>
+    </div>
+
+    <div class="about-section">
+        <h2>From India, for the World</h2>
+        <p>Qumanity begins in the villages of India – the cradle of Dharma, Karma, and Democracy. But its architecture is planetary. What starts as a village collective board becomes a global conversation.</p>
+        <p><strong>Qumanity is not a product. It is a promise – that technology can serve humanity, not exploit it.</strong></p>
+    </div>
+
+    <div class="about-section">
+        <h2>Join the Movement</h2>
+        <p>Qumanity is open source. Whether you are a coder, a council member, a farmer, or a dreamer – there is a place for you here.</p>
+        <p><a href="{{ url_for('register') }}" class="qb-btn qb-btn-primary">Register your account</a> | <a href="https://github.com/sitaram-box/QUMANITY" target="_blank" rel="noopener">GitHub</a></p>
+    </div>
+</div>
 {% endblock %}

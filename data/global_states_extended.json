@@ -1,0 +1,741 @@
+{
+  "version": 1,
+  "states": {
+    "JPN": [
+      {
+        "code": "HKD",
+        "name": "Hokkaido"
+      },
+      {
+        "code": "AOM",
+        "name": "Aomori"
+      },
+      {
+        "code": "IWT",
+        "name": "Iwate"
+      },
+      {
+        "code": "MYG",
+        "name": "Miyagi"
+      },
+      {
+        "code": "AKT",
+        "name": "Akita"
+      },
+      {
+        "code": "YMT",
+        "name": "Yamagata"
+      },
+      {
+        "code": "FKS",
+        "name": "Fukushima"
+      },
+      {
+        "code": "IBR",
+        "name": "Ibaraki"
+      },
+      {
+        "code": "TCG",
+        "name": "Tochigi"
+      },
+      {
+        "code": "GMM",
+        "name": "Gunma"
+      },
+      {
+        "code": "SIT",
+        "name": "Saitama"
+      },
+      {
+        "code": "CHB",
+        "name": "Chiba"
+      },
+      {
+        "code": "TKY",
+        "name": "Tokyo",
+        "lat": 35.6762,
+        "lng": 139.6503
+      },
+      {
+        "code": "KNG",
+        "name": "Kanagawa"
+      },
+      {
+        "code": "NIG",
+        "name": "Niigata"
+      },
+      {
+        "code": "TYM",
+        "name": "Toyama"
+      },
+      {
+        "code": "ISH",
+        "name": "Ishikawa"
+      },
+      {
+        "code": "FKI",
+        "name": "Fukui"
+      },
+      {
+        "code": "YMN",
+        "name": "Yamanashi"
+      },
+      {
+        "code": "NGN",
+        "name": "Nagano"
+      },
+      {
+        "code": "GIF",
+        "name": "Gifu"
+      },
+      {
+        "code": "SZD",
+        "name": "Shizuoka"
+      },
+      {
+        "code": "AIC",
+        "name": "Aichi"
+      },
+      {
+        "code": "MIE",
+        "name": "Mie"
+      },
+      {
+        "code": "SIG",
+        "name": "Shiga"
+      },
+      {
+        "code": "KYO",
+        "name": "Kyoto"
+      },
+      {
+        "code": "OSK",
+        "name": "Osaka"
+      },
+      {
+        "code": "HYG",
+        "name": "Hyogo"
+      },
+      {
+        "code": "NRA",
+        "name": "Nara"
+      },
+      {
+        "code": "WKY",
+        "name": "Wakayama"
+      },
+      {
+        "code": "TTR",
+        "name": "Tottori"
+      },
+      {
+        "code": "SMN",
+        "name": "Shimane"
+      },
+      {
+        "code": "OKY",
+        "name": "Okayama"
+      },
+      {
+        "code": "HSH",
+        "name": "Hiroshima"
+      },
+      {
+        "code": "YMG",
+        "name": "Yamaguchi"
+      },
+      {
+        "code": "TKS",
+        "name": "Tokushima"
+      },
+      {
+        "code": "KGW",
+        "name": "Kagawa"
+      },
+      {
+        "code": "EHM",
+        "name": "Ehime"
+      },
+      {
+        "code": "KCH",
+        "name": "Kochi"
+      },
+      {
+        "code": "FKO",
+        "name": "Fukuoka"
+      },
+      {
+        "code": "SGA",
+        "name": "Saga"
+      },
+      {
+        "code": "NGS",
+        "name": "Nagasaki"
+      },
+      {
+        "code": "KMT",
+        "name": "Kumamoto"
+      },
+      {
+        "code": "OIT",
+        "name": "Oita"
+      },
+      {
+        "code": "MYZ",
+        "name": "Miyazaki"
+      },
+      {
+        "code": "KGS",
+        "name": "Kagoshima"
+      },
+      {
+        "code": "OKN",
+        "name": "Ookinawa"
+      }
+    ],
+    "KOR": [
+      {
+        "code": "SEO",
+        "name": "Seoul"
+      },
+      {
+        "code": "PUS",
+        "name": "Busan"
+      },
+      {
+        "code": "DGU",
+        "name": "Daegu"
+      },
+      {
+        "code": "ICN",
+        "name": "Incheon"
+      },
+      {
+        "code": "GWJ",
+        "name": "Gwangju"
+      },
+      {
+        "code": "DJN",
+        "name": "Daejeon"
+      },
+      {
+        "code": "USN",
+        "name": "Ulsan"
+      },
+      {
+        "code": "SJG",
+        "name": "Sejong"
+      },
+      {
+        "code": "GG",
+        "name": "Gyeonggi"
+      },
+      {
+        "code": "GW",
+        "name": "Gangwon"
+      },
+      {
+        "code": "CB",
+        "name": "North Chungcheong"
+      },
+      {
+        "code": "CN",
+        "name": "South Chungcheong"
+      },
+      {
+        "code": "JB",
+        "name": "North Jeolla"
+      },
+      {
+        "code": "JN",
+        "name": "South Jeolla"
+      },
+      {
+        "code": "GB",
+        "name": "North Gyeongsang"
+      },
+      {
+        "code": "GN",
+        "name": "South Gyeongsang"
+      },
+      {
+        "code": "JJ",
+        "name": "Jeju"
+      }
+    ],
+    "CHN": [
+      {
+        "code": "BJ",
+        "name": "Beijing"
+      },
+      {
+        "code": "SH",
+        "name": "Shanghai"
+      },
+      {
+        "code": "TJ",
+        "name": "Tianjin"
+      },
+      {
+        "code": "CQ",
+        "name": "Chongqing"
+      },
+      {
+        "code": "HEB",
+        "name": "Hebei"
+      },
+      {
+        "code": "SX",
+        "name": "Shanxi"
+      },
+      {
+        "code": "LN",
+        "name": "Liaoning"
+      },
+      {
+        "code": "JL",
+        "name": "Jilin"
+      },
+      {
+        "code": "HLJ",
+        "name": "Heilongjiang"
+      },
+      {
+        "code": "JS",
+        "name": "Jiangsu"
+      },
+      {
+        "code": "ZJ",
+        "name": "Zhejiang"
+      },
+      {
+        "code": "AH",
+        "name": "Anhui"
+      },
+      {
+        "code": "FJ",
+        "name": "Fujian"
+      },
+      {
+        "code": "JX",
+        "name": "Jiangxi"
+      },
+      {
+        "code": "SD",
+        "name": "Shandong"
+      },
+      {
+        "code": "HA",
+        "name": "Henan"
+      },
+      {
+        "code": "HB",
+        "name": "Hubei"
+      },
+      {
+        "code": "HN",
+        "name": "Hunan"
+      },
+      {
+        "code": "GD",
+        "name": "Guangdong"
+      },
+      {
+        "code": "GX",
+        "name": "Guangxi"
+      },
+      {
+        "code": "HI",
+        "name": "Hainan"
+      },
+      {
+        "code": "SC",
+        "name": "Sichuan"
+      },
+      {
+        "code": "GZ",
+        "name": "Guizhou"
+      },
+      {
+        "code": "YN",
+        "name": "Yunnan"
+      },
+      {
+        "code": "XZ",
+        "name": "Tibet"
+      },
+      {
+        "code": "SN",
+        "name": "Shaanxi"
+      },
+      {
+        "code": "GS",
+        "name": "Gansu"
+      },
+      {
+        "code": "QH",
+        "name": "Qinghai"
+      },
+      {
+        "code": "NX",
+        "name": "Ningxia"
+      },
+      {
+        "code": "XJ",
+        "name": "Xinjiang"
+      },
+      {
+        "code": "TW",
+        "name": "Taiwan"
+      },
+      {
+        "code": "HK",
+        "name": "Hong Kong"
+      },
+      {
+        "code": "MO",
+        "name": "Macau"
+      }
+    ],
+    "IDN": [
+      {
+        "code": "AC",
+        "name": "Aceh"
+      },
+      {
+        "code": "SU",
+        "name": "North Sumatra"
+      },
+      {
+        "code": "SB",
+        "name": "West Sumatra"
+      },
+      {
+        "code": "RI",
+        "name": "Riau"
+      },
+      {
+        "code": "KR",
+        "name": "Riau Islands"
+      },
+      {
+        "code": "JA",
+        "name": "Jambi"
+      },
+      {
+        "code": "BB",
+        "name": "Bengkulu"
+      },
+      {
+        "code": "SS",
+        "name": "South Sumatra"
+      },
+      {
+        "code": "LA",
+        "name": "Lampung"
+      },
+      {
+        "code": "BT",
+        "name": "Banten"
+      },
+      {
+        "code": "JK",
+        "name": "Jakarta"
+      },
+      {
+        "code": "JB",
+        "name": "West Java"
+      },
+      {
+        "code": "JT",
+        "name": "Central Java"
+      },
+      {
+        "code": "JI",
+        "name": "East Java"
+      },
+      {
+        "code": "YO",
+        "name": "Yogyakarta"
+      },
+      {
+        "code": "BA",
+        "name": "Bali"
+      },
+      {
+        "code": "NB",
+        "name": "West Nusa Tenggara"
+      },
+      {
+        "code": "NT",
+        "name": "East Nusa Tenggara"
+      },
+      {
+        "code": "KB",
+        "name": "West Kalimantan"
+      },
+      {
+        "code": "KT",
+        "name": "Central Kalimantan"
+      },
+      {
+        "code": "KS",
+        "name": "South Kalimantan"
+      },
+      {
+        "code": "KI",
+        "name": "East Kalimantan"
+      },
+      {
+        "code": "KU",
+        "name": "North Kalimantan"
+      },
+      {
+        "code": "SA",
+        "name": "North Sulawesi"
+      },
+      {
+        "code": "ST",
+        "name": "Central Sulawesi"
+      },
+      {
+        "code": "SG",
+        "name": "South Sulawesi"
+      },
+      {
+        "code": "SR",
+        "name": "Southeast Sulawesi"
+      },
+      {
+        "code": "GO",
+        "name": "Gorontalo"
+      },
+      {
+        "code": "MA",
+        "name": "West Sulawesi"
+      },
+      {
+        "code": "MU",
+        "name": "Maluku"
+      },
+      {
+        "code": "MK",
+        "name": "North Maluku"
+      },
+      {
+        "code": "PA",
+        "name": "Papua"
+      },
+      {
+        "code": "PB",
+        "name": "West Papua"
+      }
+    ],
+    "SAU": [
+      {
+        "code": "01",
+        "name": "Riyadh"
+      },
+      {
+        "code": "02",
+        "name": "Makkah"
+      },
+      {
+        "code": "03",
+        "name": "Madinah"
+      },
+      {
+        "code": "04",
+        "name": "Eastern Province"
+      },
+      {
+        "code": "05",
+        "name": "Qassim"
+      },
+      {
+        "code": "06",
+        "name": "Asir"
+      },
+      {
+        "code": "07",
+        "name": "Tabuk"
+      },
+      {
+        "code": "08",
+        "name": "Hail"
+      },
+      {
+        "code": "09",
+        "name": "Northern Borders"
+      },
+      {
+        "code": "10",
+        "name": "Jazan"
+      },
+      {
+        "code": "11",
+        "name": "Najran"
+      },
+      {
+        "code": "12",
+        "name": "Al Bahah"
+      },
+      {
+        "code": "13",
+        "name": "Al Jawf"
+      }
+    ],
+    "ITA": [
+      {
+        "code": "ABR",
+        "name": "Abruzzo"
+      },
+      {
+        "code": "BAS",
+        "name": "Basilicata"
+      },
+      {
+        "code": "CAL",
+        "name": "Calabria"
+      },
+      {
+        "code": "CAM",
+        "name": "Campania"
+      },
+      {
+        "code": "EMR",
+        "name": "Emilia-Romagna"
+      },
+      {
+        "code": "FVG",
+        "name": "Friuli-Venezia Giulia"
+      },
+      {
+        "code": "LAZ",
+        "name": "Lazio"
+      },
+      {
+        "code": "LIG",
+        "name": "Liguria"
+      },
+      {
+        "code": "LOM",
+        "name": "Lombardy"
+      },
+      {
+        "code": "MAR",
+        "name": "Marche"
+      },
+      {
+        "code": "MOL",
+        "name": "Molise"
+      },
+      {
+        "code": "PIE",
+        "name": "Piedmont"
+      },
+      {
+        "code": "PUG",
+        "name": "Apulia"
+      },
+      {
+        "code": "SAR",
+        "name": "Sardinia"
+      },
+      {
+        "code": "SIC",
+        "name": "Sicily"
+      },
+      {
+        "code": "TUS",
+        "name": "Tuscany"
+      },
+      {
+        "code": "TAA",
+        "name": "Trentino-South Tyrol"
+      },
+      {
+        "code": "UMB",
+        "name": "Umbria"
+      },
+      {
+        "code": "VAO",
+        "name": "Aosta Valley"
+      },
+      {
+        "code": "VEN",
+        "name": "Veneto"
+      }
+    ],
+    "ESP": [
+      {
+        "code": "AN",
+        "name": "Andalusia"
+      },
+      {
+        "code": "AR",
+        "name": "Aragon"
+      },
+      {
+        "code": "AS",
+        "name": "Asturias"
+      },
+      {
+        "code": "IB",
+        "name": "Balearic Islands"
+      },
+      {
+        "code": "PV",
+        "name": "Basque Country"
+      },
+      {
+        "code": "CN",
+        "name": "Canary Islands"
+      },
+      {
+        "code": "CB",
+        "name": "Cantabria"
+      },
+      {
+        "code": "CL",
+        "name": "Castile and León"
+      },
+      {
+        "code": "CM",
+        "name": "Castilla-La Mancha"
+      },
+      {
+        "code": "CT",
+        "name": "Catalonia"
+      },
+      {
+        "code": "EX",
+        "name": "Extremadura"
+      },
+      {
+        "code": "GA",
+        "name": "Galicia"
+      },
+      {
+        "code": "MD",
+        "name": "Madrid"
+      },
+      {
+        "code": "MC",
+        "name": "Murcia"
+      },
+      {
+        "code": "NV",
+        "name": "Navarre"
+      },
+      {
+        "code": "VC",
+        "name": "Valencian Community"
+      },
+      {
+        "code": "RI",
+        "name": "La Rioja"
+      }
+    ]
+  }
+}

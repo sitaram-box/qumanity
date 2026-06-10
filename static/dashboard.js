@@ -1,4 +1,25 @@
 (function () {
+  // Translation loading indicator. The global implementation lives in i18n.js
+  // (loaded on every page); these delegate to it so dashboard code can show a
+  // "Translating… please wait" overlay while a language change is in flight.
+  function showTranslationLoader() {
+    if (typeof window.showTranslationLoader === "function") {
+      window.showTranslationLoader();
+      return;
+    }
+    var el = document.getElementById("qb-translation-loader");
+    if (el) el.hidden = false;
+  }
+
+  function hideTranslationLoader() {
+    if (typeof window.hideTranslationLoader === "function") {
+      window.hideTranslationLoader();
+      return;
+    }
+    var el = document.getElementById("qb-translation-loader");
+    if (el) el.hidden = true;
+  }
+
   function text(el, value) {
     if (el) el.textContent = value;
   }
@@ -12,6 +33,58 @@
   function escAttr(s) {
     return escHtml(s).replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
+
+  /** Copy text to clipboard; show brief feedback on btn or feedbackEl. */
+  function qbCopyText(textValue, feedbackEl) {
+    var value = String(textValue || "");
+    function showCopied() {
+      if (!feedbackEl) return;
+      feedbackEl.textContent = "Copied!";
+      feedbackEl.hidden = false;
+      window.setTimeout(function () {
+        feedbackEl.hidden = true;
+      }, 1800);
+    }
+    function fallbackCopy() {
+      var ta = document.createElement("textarea");
+      ta.value = value;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand("copy");
+        showCopied();
+      } catch (_e) {}
+      document.body.removeChild(ta);
+    }
+    if (!value) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(value).then(showCopied).catch(fallbackCopy);
+    } else {
+      fallbackCopy();
+    }
+  }
+
+  function qbInitCopyButtons(root) {
+    var scope = root || document;
+    scope.querySelectorAll("[data-qb-copy-target]").forEach(function (btn) {
+      if (btn.getAttribute("data-qb-copy-bound") === "1") return;
+      btn.setAttribute("data-qb-copy-bound", "1");
+      btn.addEventListener("click", function () {
+        var targetId = btn.getAttribute("data-qb-copy-target");
+        var target = targetId ? document.getElementById(targetId) : null;
+        var value = target ? (target.textContent || target.value || "").trim() : "";
+        var feedbackId = btn.getAttribute("data-qb-copy-feedback");
+        var feedbackEl = feedbackId ? document.getElementById(feedbackId) : null;
+        qbCopyText(value, feedbackEl);
+      });
+    });
+  }
+
+  window.QBCopyText = qbCopyText;
+  window.QBInitCopyButtons = qbInitCopyButtons;
 
   /** Parse fetch responses safely — never assume JSON when the server returns HTML. */
   function fetchJson(url, options) {
@@ -50,12 +123,16 @@
     userHierarchy: [],
     villageStatsUrl: "#",
     defaultVillageId: "",
+    postFormLocationId: "",
     quantumPunchVillageId: "",
     userContinentId: "",
     userContinentName: "",
     userCountryId: "",
     userCountryName: "",
     userShowZoneTab: false,
+    showPublicAccount: true,
+    commerceEnabled: false,
+    isAdmin: false,
   };
   try {
     var cfgEl = document.getElementById("qb-dash-config-json");
@@ -63,6 +140,32 @@
       dashCfg = JSON.parse(cfgEl.textContent);
     }
   } catch (_e) {}
+
+  /* preferredLanguage + uiStrings come from server on each full page load (no client cache). */
+  var uiLang = String((dashCfg && dashCfg.preferredLanguage) || "en").toLowerCase();
+  var uiS = (dashCfg && dashCfg.uiStrings) || {};
+
+  function uiTr(key) {
+    if (uiS && uiS[key]) return uiS[key];
+    return key;
+  }
+
+  function uiTrLabel(enLabel) {
+    var m = {
+      Male: "male",
+      Female: "female",
+      Fire: "fire",
+      Earth: "earth",
+      Air: "air",
+      Water: "water",
+      Balak: "balak",
+      Yuvak: "yuvak",
+      Vridh: "vridh",
+      Sanyas: "sanyas",
+    };
+    var k = m[enLabel];
+    return k ? uiTr(k) : enLabel;
+  }
 
   var fneMemberSnapshot = null;
 
@@ -325,8 +428,18 @@
   document.querySelectorAll(".qb-dash-nav-btn").forEach(function (btn) {
     btn.addEventListener("click", function () {
       var tab = btn.getAttribute("data-dash-tab");
+      try {
+        localStorage.setItem("qbDashTab", tab);
+      } catch (_e) {}
+      try {
+        var u = new URL(window.location.href);
+        u.searchParams.set("tab", tab);
+        history.replaceState(null, "", u.toString());
+      } catch (_e) {}
       document.querySelectorAll(".qb-dash-nav-btn").forEach(function (b) {
-        b.classList.toggle("is-active", b === btn);
+        var on = b === btn;
+        b.classList.toggle("is-active", on);
+        b.classList.toggle("active", on);
       });
       document.querySelectorAll(".qb-dash-panel").forEach(function (panel) {
         panel.hidden = panel.getAttribute("data-dash-panel") !== tab;
@@ -346,15 +459,75 @@
           loadPrivateElectionAdminPanel();
         }
       }
+      if (window.qbPlanetary && window.qbPlanetary.onMainTabChange) {
+        window.qbPlanetary.onMainTabChange(tab);
+      }
     });
   });
 
   var activeNav = document.querySelector(".qb-dash-nav-btn.is-active");
   if (activeNav) {
     var t0 = activeNav.getAttribute("data-dash-tab");
+    document.querySelectorAll(".qb-dash-panel").forEach(function (panel) {
+      panel.hidden = panel.getAttribute("data-dash-panel") !== t0;
+    });
     if (t0 === "public" || t0 === "global") setExplorerMode(t0);
     if (t0 === "personal") refreshPersonalData();
+    if (t0 === "private") {
+      loadUserPrivateInfo();
+      loadPrivateElectionAdminPanel();
+    }
+    if (t0 === "global") {
+      initGlobalTreeOnce();
+      loadGlobalPanelStats();
+    }
   }
+
+  /* --- Restore last active tab from URL (?tab=) or localStorage --- */
+  (function restoreDashTab() {
+    var want = null;
+    try {
+      want = new URL(window.location.href).searchParams.get("tab");
+    } catch (_e) {}
+    if (!want) {
+      try {
+        want = localStorage.getItem("qbDashTab");
+      } catch (_e) {}
+    }
+    if (!want) return;
+    var target = document.querySelector(
+      '.qb-dash-nav-btn[data-dash-tab="' + want + '"]'
+    );
+    var current = document.querySelector(".qb-dash-nav-btn.is-active");
+    if (target && target !== current) target.click();
+  })();
+
+  /* --- Row 4 element selector (visual highlight only for now) --- */
+  (function elementRow() {
+    var row = document.getElementById("qb-element-row");
+    if (!row) return;
+    var btns = row.querySelectorAll(".qb-element-btn");
+    var LS_EL = "qbDashElement";
+    function setActive(el) {
+      btns.forEach(function (b) {
+        b.classList.toggle("is-active", b.getAttribute("data-element") === el);
+      });
+    }
+    var stored = null;
+    try {
+      stored = localStorage.getItem(LS_EL);
+    } catch (_e) {}
+    setActive(stored || row.getAttribute("data-user-element") || "Fire");
+    btns.forEach(function (b) {
+      b.addEventListener("click", function () {
+        var el = b.getAttribute("data-element");
+        setActive(el);
+        try {
+          localStorage.setItem(LS_EL, el);
+        } catch (_e) {}
+      });
+    });
+  })();
 
   /* --- Stats table helpers --- */
   function fillMapTable(tbody, dataMap, order) {
@@ -363,7 +536,12 @@
     order.forEach(function (key) {
       var tr = document.createElement("tr");
       var c = (dataMap && dataMap[key]) || 0;
-      tr.innerHTML = "<td>" + key + "</td><td class='text-end font-monospace'>" + c + "</td>";
+      tr.innerHTML =
+        "<td>" +
+        escHtml(uiTrLabel(key)) +
+        "</td><td class='text-end font-monospace'>" +
+        c +
+        "</td>";
       tbody.appendChild(tr);
     });
   }
@@ -437,13 +615,14 @@
   }
 
   var boardNames = {
-    village: "CVB (Collective Village Board)",
-    tehsil: "CTB (Collective Tehsil Board)",
-    district: "CDB (Collective District Board)",
-    state: "CSB (Collective State Board)",
-    country: "CCB (Collective Country Board)",
-    continent: "CCOB (Collective Continent Board)",
-    earth: "CEB (Collective Earth Board)",
+    village: uiTr("collective_village_board"),
+    tehsil: uiTr("collective_tehsil_board"),
+    district: uiTr("collective_district_board"),
+    state: uiTr("collective_state_board"),
+    zone: uiTr("collective_zone_board"),
+    country: uiTr("collective_country_board"),
+    continent: uiTr("collective_continent_board"),
+    earth: uiTr("collective_earth_board"),
   };
   var activeBoardState = "live";
   var activeBoardScope = "village";
@@ -663,8 +842,8 @@
       text(
         subtitle,
         activeBoardState === "live"
-          ? "Live posts currently open for voting at this level."
-          : "Posts that have already passed through this level."
+          ? uiTr("board_subtitle_live_voting")
+          : uiTr("board_subtitle_frozen")
       );
     }
   }
@@ -1799,13 +1978,33 @@
     });
   }
 
-  function loadWalletTransactions() {
+  function renderQoinChips(container, coins) {
+    if (!container) return;
+    container.innerHTML = "";
+    (coins || []).forEach(function (c) {
+      var span = document.createElement("span");
+      span.className = "qb-qoin-chip";
+      span.textContent = "₹" + c.rupee_value + "×" + c.count;
+      container.appendChild(span);
+    });
+    if (!coins || !coins.length) {
+      var empty = document.createElement("span");
+      empty.className = "qb-stmt-muted";
+      empty.textContent = "No Qoins yet";
+      container.appendChild(empty);
+    }
+  }
+
+  function loadWeeklyStatements() {
     var flash = document.getElementById("qb-wallet-txn-flash");
-    var ul = document.getElementById("qb-wallet-txn-list");
-    var empty = document.getElementById("qb-wallet-txn-empty");
+    var weeksUl = document.getElementById("qb-wallet-stmt-weeks");
+    var weeksEmpty = document.getElementById("qb-wallet-stmt-weeks-empty");
+    var detail = document.getElementById("qb-wallet-stmt-detail");
+    var hint = document.getElementById("qb-wallet-stmt-pick-hint");
+    var iframe = document.getElementById("qb-wallet-stmt-iframe");
     if (flash) text(flash, "Loading…");
-    if (ul) ul.innerHTML = "";
-    return fetch("/api/qoin/transactions", {
+    if (weeksUl) weeksUl.innerHTML = "";
+    return fetch("/api/qoin/statements", {
       credentials: "same-origin",
       headers: { Accept: "application/json" },
     })
@@ -1817,32 +2016,33 @@
       .then(function (x) {
         if (!x.ok) throw new Error((x.b && x.b.error) || "Load failed");
         if (flash) text(flash, "");
-        var rows = (x.b && x.b.transactions) || [];
-        if (!ul) return;
+        var rows = (x.b && x.b.statements) || [];
+        if (!weeksUl) return;
         if (!rows.length) {
-          if (empty) empty.hidden = false;
+          if (weeksEmpty) weeksEmpty.hidden = false;
+          if (detail) detail.hidden = true;
+          if (hint) hint.hidden = false;
           return;
         }
-        if (empty) empty.hidden = true;
-        rows.forEach(function (t) {
+        if (weeksEmpty) weeksEmpty.hidden = true;
+        rows.forEach(function (s) {
           var li = document.createElement("li");
-          li.className = "mb-2 pb-2 border-bottom border-secondary";
-          var rv = t.rupee_value ? " · ₹" + t.rupee_value : "";
-          li.innerHTML =
-            "<span class='text-info font-monospace'>" +
-            escHtml(String(t.amount)) +
-            "</span>" +
-            rv +
-            " · " +
-            escHtml(t.reason || t.type || "") +
-            "<br/><span class='text-muted'>" +
-            escHtml(t.created_at || "") +
-            "</span>";
-          ul.appendChild(li);
+          li.className = "mb-2";
+          var btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "qb-btn qb-btn-outline btn-sm w-100 text-start";
+          btn.textContent = s.week_start + " → " + s.week_end;
+          btn.addEventListener("click", function () {
+            if (hint) hint.hidden = true;
+            if (detail) detail.hidden = false;
+            if (iframe) iframe.src = "/api/qoin/statements/" + s.id + "/html";
+          });
+          li.appendChild(btn);
+          weeksUl.appendChild(li);
         });
       })
       .catch(function (err) {
-        if (flash) text(flash, err.message || "Could not load transactions");
+        if (flash) text(flash, err.message || "Could not load statements");
       });
   }
 
@@ -1850,7 +2050,7 @@
   if (walletTxnBtn) {
     walletTxnBtn.addEventListener("click", function () {
       openModal("qb-wallet-txn-modal");
-      loadWalletTransactions();
+      loadWeeklyStatements();
     });
   }
 
@@ -1868,14 +2068,33 @@
         if (!x.ok) throw new Error((x.b && x.b.error) || "Load failed");
         text(document.getElementById("qb-wallet-balance-qoins"), String(x.b.balance_qoins || 0));
         text(document.getElementById("qb-wallet-balance-rupees"), String(x.b.total_rupees || 0));
-        var br = document.getElementById("qb-wallet-coin-breakdown");
-        if (br) {
-          br.innerHTML = "";
-          (x.b.coins || []).forEach(function (c) {
-            var li = document.createElement("li");
-            li.textContent = c.count + " × ₹" + c.rupee_value + " Qoin(s)";
-            br.appendChild(li);
+        renderQoinChips(document.getElementById("qb-wallet-coin-chips"), x.b.coins || []);
+        return fetch("/api/qoin/pending", {
+          credentials: "same-origin",
+          headers: { Accept: "application/json" },
+        }).then(function (r2) {
+          return r2.json().then(function (p) {
+            return { pending: p };
           });
+        });
+      })
+      .then(function (wrap) {
+        var line = document.getElementById("qb-wallet-pending-line");
+        if (!line || !wrap || !wrap.pending) return;
+        var p = wrap.pending;
+        var n = p.pending_count || 0;
+        var k = (p.karma_pending || []).length;
+        if (n || k) {
+          line.hidden = false;
+          line.textContent =
+            "Pending this week: " +
+            n +
+            " transaction(s) (₹" +
+            (p.pending_rupees || 0) +
+            ")" +
+            (k ? " · " + k + " karma action(s)" : "");
+        } else {
+          line.hidden = true;
         }
       })
       .catch(function (err) {
@@ -2930,7 +3149,7 @@
         escHtml(m.subject || "(no subject)") +
         "</strong></div>" +
         '<div class="small text-muted">From ' +
-        escHtml(m.sender_name || "Quantum Box") +
+        escHtml(m.sender_name || "Qumanity") +
         "</div>" +
         '<div class="qb-notification-msg-preview small">' +
         escHtml((m.preview || "").slice(0, 220)) +
@@ -3056,8 +3275,79 @@
   });
 
   var qpVillageId = String((dashCfg && dashCfg.quantumPunchVillageId) || "").trim();
+  var electionsEnabled = !!(dashCfg && dashCfg.electionsEnabled);
   var electionPanel = document.getElementById("qb-election-panel");
   var electionCouncilCard = document.getElementById("qb-election-council-card");
+  var electionPausedBanner = document.getElementById("qb-election-paused-banner");
+
+  function renderLeadershipSlots(panelId, payload) {
+    var container = document.getElementById("qb-leadership-slots-" + panelId);
+    var subtitle = document.getElementById("qb-leadership-subtitle-" + panelId);
+    if (!container || !payload) return;
+    if (subtitle) {
+      text(subtitle, uiTr("quantum_punch_council_sub"));
+    }
+    container.innerHTML = "";
+    var levelKey = String(payload.level_type || payload.level_label || "").toLowerCase();
+    (payload.slots || []).forEach(function (slot) {
+      var item = document.createElement("div");
+      item.className = "qb-leadership-slot";
+      item.setAttribute("role", "listitem");
+      item.setAttribute("data-slot-rank", String(slot.hierarchy_rank || ""));
+      var holderClass =
+        slot.display_name === "Admin" ? "qb-leadership-slot-holder is-admin" : "qb-leadership-slot-holder";
+      var appointHtml = "";
+      if (payload.is_admin && slot.can_appoint && slot.display_name === "Vacant") {
+        appointHtml =
+          '<button type="button" class="qb-btn qb-btn-outline btn-sm qb-leadership-appoint-btn" disabled title="Coming soon">' +
+          escHtml(uiTr("appoint")) +
+          "</button>";
+      }
+      var desig = String(slot.designation || "").toLowerCase();
+      var roleLabel = uiTr(desig) || desig;
+      var levelLabel = uiTr(levelKey) || payload.level_label || levelKey;
+      var holderName =
+        slot.display_name === "Admin"
+          ? uiTr("admin")
+          : slot.display_name === "Vacant"
+            ? uiTr("vacant")
+            : slot.display_name;
+      item.innerHTML =
+        '<span class="qb-leadership-slot-title">' +
+        escHtml(levelLabel + " " + roleLabel) +
+        "</span>" +
+        '<span class="' +
+        holderClass +
+        '">' +
+        escHtml(holderName) +
+        "</span>" +
+        appointHtml;
+      container.appendChild(item);
+    });
+  }
+
+  function loadLeadershipCouncil(panelId, levelType, locationId) {
+    var lt = String(levelType || "").trim().toLowerCase();
+    var lid = String(locationId || "").trim();
+    if (!lt || !lid) return;
+    var container = document.getElementById("qb-leadership-slots-" + panelId);
+    if (container) {
+      container.querySelectorAll(".qb-leadership-slot").forEach(function (el) {
+        el.classList.add("qb-leadership-slot--loading");
+      });
+    }
+    fetchJson("/api/leadership/" + encodeURIComponent(lt) + "/" + encodeURIComponent(lid))
+      .then(function (x) {
+        if (!x.ok) throw new Error((x.body && x.body.error) || "Leadership load failed");
+        renderLeadershipSlots(panelId, x.body);
+      })
+      .catch(function (err) {
+        if (container) {
+          container.innerHTML =
+            '<p class="small text-muted mb-0">' + escHtml(err.message || "Could not load council") + "</p>";
+        }
+      });
+  }
 
   function manifestLines(m) {
     m = m || {};
@@ -3204,20 +3494,27 @@
     var upEl = document.getElementById("qb-election-upcoming-line");
     var listEl = document.getElementById("qb-election-council-zodiac-list");
     if (!kingEl || !data) return;
-    var k = data.king;
-    var q = data.queen;
+    if (data.paused) {
+      kingEl.innerHTML = "";
+      queenEl.innerHTML = "";
+      if (upEl) text(upEl, data.message || "");
+      if (listEl) listEl.innerHTML = "";
+      return;
+    }
+    var k = data.nayak || data.king;
+    var q = data.nayika || data.queen;
     kingEl.innerHTML = k
-      ? "<strong>King</strong> (current sign, male head): " +
+      ? "<strong>Nayak</strong> (current sign, male leader): " +
         escHtml(k.name || "") +
         " — " +
         escHtml(k.zodiac_sign || "")
-      : "<strong>King</strong>: —";
+      : "<strong>Nayak</strong>: —";
     queenEl.innerHTML = q
-      ? "<strong>Queen</strong> (current sign, female head): " +
+      ? "<strong>Nayika</strong> (current sign, female leader): " +
         escHtml(q.name || "") +
         " — " +
         escHtml(q.zodiac_sign || "")
-      : "<strong>Queen</strong>: —";
+      : "<strong>Nayika</strong>: —";
     var up = data.upcoming_election;
     upEl.innerHTML = up
       ? "Upcoming: <strong>" +
@@ -3265,6 +3562,19 @@
     var closedTxt = document.getElementById("qb-election-closed-text");
     var bad = document.getElementById("qb-election-ineligible");
     if (!stEl) return;
+    if (payload && (payload.paused || payload.elections_enabled === false)) {
+      if (electionPanel) electionPanel.hidden = true;
+      if (electionCouncilCard) electionCouncilCard.hidden = true;
+      if (electionPausedBanner) electionPausedBanner.hidden = false;
+      text(
+        stEl,
+        payload.message ||
+          "Elections are currently paused. They will resume during the Gemini month. Please check back later."
+      );
+      return;
+    }
+    if (electionPausedBanner) electionPausedBanner.hidden = true;
+    if (electionPanel) electionPanel.hidden = false;
     if (nom) nom.hidden = true;
     if (vot) vot.hidden = true;
     if (post) post.hidden = true;
@@ -3460,8 +3770,194 @@
     }
   }
 
+  function syncVillageHubPanel(locationId, scope) {
+    var hub = document.getElementById("qb-village-hub-panel");
+    if (!hub) return;
+    var show =
+      !!dashCfg.commerceEnabled &&
+      scope === "village" &&
+      qpVillageId &&
+      String(locationId || "").trim() === qpVillageId;
+    hub.hidden = !show;
+    if (show) {
+      loadVillageHubStatus();
+      loadKarmaTypes();
+      loadKarmaPending();
+    }
+  }
+
+  function loadVillageHubStatus() {
+    fetch("/api/village/hub-status", {
+      credentials: "same-origin",
+      headers: { Accept: "application/json" },
+    })
+      .then(function (r) {
+        return r.json().then(function (b) {
+          return { ok: r.ok, b: b };
+        });
+      })
+      .then(function (x) {
+        if (!x.ok) return;
+        var councilPanel = document.getElementById("qb-village-council-approvals");
+        if (councilPanel) {
+          councilPanel.hidden = !x.b.is_council;
+          if (x.b.is_council) {
+            loadCouncilKarmaClaims();
+            loadCouncilBusinessPending();
+          }
+        }
+      })
+      .catch(function () {});
+  }
+
+  function loadCouncilKarmaClaims() {
+    fetch("/api/karma/claims/pending", {
+      credentials: "same-origin",
+      headers: { Accept: "application/json" },
+    })
+      .then(function (r) {
+        return r.json().then(function (b) {
+          return { ok: r.ok, b: b };
+        });
+      })
+      .then(function (x) {
+        if (!x.ok) return;
+        var ul = document.getElementById("qb-council-karma-list");
+        if (!ul) return;
+        ul.innerHTML = "";
+        (x.b.claims || []).forEach(function (c) {
+          var li = document.createElement("li");
+          li.className = "mb-2 pb-2 border-bottom border-secondary";
+          li.innerHTML =
+            "<strong>" +
+            escHtml(c.action_label || c.action_code) +
+            "</strong> · " +
+            escHtml(c.first_name + " " + c.last_name) +
+            " <button type='button' class='qb-btn qb-btn-outline btn-sm ms-1' data-karma-approve='" +
+            c.id +
+            "'>Approve</button> <button type='button' class='qb-btn qb-btn-link btn-sm' data-karma-reject='" +
+            c.id +
+            "'>Reject</button>";
+          ul.appendChild(li);
+        });
+        ul.querySelectorAll("[data-karma-approve]").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            reviewKarmaClaim(btn.getAttribute("data-karma-approve"), "approved");
+          });
+        });
+        ul.querySelectorAll("[data-karma-reject]").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            reviewKarmaClaim(btn.getAttribute("data-karma-reject"), "rejected");
+          });
+        });
+      });
+  }
+
+  function reviewKarmaClaim(id, status) {
+    fetch("/api/karma/claims/" + id + "/review", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ status: status }),
+    })
+      .then(function (r) {
+        return r.json().then(function (b) {
+          return { ok: r.ok, b: b };
+        });
+      })
+      .then(function (x) {
+        if (!x.ok) throw new Error((x.b && x.b.error) || "Review failed");
+        loadCouncilKarmaClaims();
+        loadKarmaPending();
+      })
+      .catch(function (err) {
+        alert(err.message || "Review failed");
+      });
+  }
+
+  function loadCouncilBusinessPending() {
+    fetch("/api/businesses/pending", {
+      credentials: "same-origin",
+      headers: { Accept: "application/json" },
+    })
+      .then(function (r) {
+        return r.json().then(function (b) {
+          return { ok: r.ok, b: b };
+        });
+      })
+      .then(function (x) {
+        if (!x.ok) return;
+        var ul = document.getElementById("qb-council-business-list");
+        if (!ul) return;
+        ul.innerHTML = "";
+        (x.b.businesses || []).forEach(function (b) {
+          var li = document.createElement("li");
+          li.className = "mb-2 pb-2 border-bottom border-secondary";
+          li.innerHTML =
+            "<strong>" +
+            escHtml(b.business_name) +
+            "</strong> (" +
+            escHtml(b.business_type) +
+            ") · " +
+            escHtml(b.first_name + " " + b.last_name) +
+            " <button type='button' class='qb-btn qb-btn-outline btn-sm ms-1' data-biz-approve='" +
+            b.id +
+            "'>Approve</button>";
+          ul.appendChild(li);
+        });
+        ul.querySelectorAll("[data-biz-approve]").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            fetch("/api/businesses/" + btn.getAttribute("data-biz-approve") + "/review", {
+              method: "POST",
+              credentials: "same-origin",
+              headers: { "Content-Type": "application/json", Accept: "application/json" },
+              body: JSON.stringify({ status: "approved" }),
+            }).then(function () {
+              loadCouncilBusinessPending();
+            });
+          });
+        });
+      });
+  }
+
+  function openVillageServicesModal() {
+    var activeTab = document.querySelector(".qb-js-public-tab.is-active");
+    var lid = activeTab ? activeTab.getAttribute("data-location-id") || "" : "";
+    var sc = activeTab ? activeTab.getAttribute("data-scope") || "" : "";
+    syncVillageHubPanel(lid, sc);
+    openModal("qb-village-services-modal");
+  }
+
+  function openElectionsModal() {
+    if (!electionsEnabled) {
+      if (electionPausedBanner) electionPausedBanner.hidden = false;
+      if (electionPanel) electionPanel.hidden = true;
+      if (electionCouncilCard) electionCouncilCard.hidden = true;
+      openModal("qb-elections-modal");
+      return;
+    }
+    var activeTab = document.querySelector(".qb-js-public-tab.is-active");
+    var lid = activeTab ? activeTab.getAttribute("data-location-id") || "" : qpVillageId;
+    var sc = activeTab ? activeTab.getAttribute("data-scope") || "village" : "village";
+    loadQuantumElectionUi(lid, sc);
+    openModal("qb-elections-modal");
+  }
+
   function loadQuantumElectionUi(locationId, scope) {
-    if (!electionPanel || !qpVillageId) return;
+    if (!electionPanel) return;
+    if (!electionsEnabled) {
+      if (electionPausedBanner) electionPausedBanner.hidden = false;
+      electionPanel.hidden = true;
+      if (electionCouncilCard) electionCouncilCard.hidden = true;
+      fetchJson("/api/election/status")
+        .then(function (x) {
+          if (x.ok && x.body) renderElectionStatus(x.body);
+        })
+        .catch(function () {});
+      return;
+    }
+    if (electionPausedBanner) electionPausedBanner.hidden = true;
+    if (!qpVillageId) return;
     if (scope !== "village" || String(locationId || "").trim() !== qpVillageId) {
       electionPanel.hidden = true;
       if (electionCouncilCard) electionCouncilCard.hidden = true;
@@ -3588,6 +4084,7 @@
       publicTabs.forEach(function (t) {
         var on = t === tab;
         t.classList.toggle("is-active", on);
+        t.classList.toggle("active", on);
         t.setAttribute("aria-selected", on ? "true" : "false");
       });
       var lid = tab.getAttribute("data-location-id") || "";
@@ -3596,9 +4093,18 @@
       if (villageMembersBtn) {
         villageMembersBtn.hidden = !dashCfg.isAdmin || sc !== "village";
       }
+      var svcBtn = document.getElementById("qb-village-services-btn");
+      if (svcBtn) {
+        var scopeKey = tab.getAttribute("data-scope") || "";
+        var svcWord = uiTr("services");
+        svcBtn.textContent = scopeKey ? uiTr(scopeKey) + " " + svcWord : svcWord;
+      }
       loadPublicStats(lid);
       loadCollectiveBoard(lid, sc);
-      loadQuantumElectionUi(lid, sc);
+      loadLeadershipCouncil("public", sc, lid);
+      if (window.qbPlanetary && window.qbPlanetary.onLocationTabChange) {
+        window.qbPlanetary.onLocationTabChange(lid, sc, "public");
+      }
     }
     publicTabs.forEach(function (tab) {
       tab.addEventListener("click", function () {
@@ -5360,10 +5866,10 @@
     });
   }
 
-  if (postForm && dashCfg.defaultVillageId) {
+  if (postForm && (dashCfg.defaultVillageId || dashCfg.postFormLocationId)) {
     postForm.addEventListener("submit", function (ev) {
       ev.preventDefault();
-      var locationId = dashCfg.defaultVillageId;
+      var locationId = dashCfg.postFormLocationId || dashCfg.defaultVillageId;
       if (postLocationInput) postLocationInput.value = locationId;
       var content = (postContent && postContent.value) || "";
       text(postStatus, "Saving...");
@@ -5765,7 +6271,7 @@
     var contSrc = globalSel.continent || userDefaultContinent();
     var couSrc = globalSel.country || userDefaultCountry();
     if (earth) {
-      earth.querySelector(".qb-location-tab-name").textContent = "Earth";
+      earth.querySelector(".qb-location-tab-name").textContent = "Planet Earth";
       earth.setAttribute("data-global-id", "0");
     }
     if (cont) {
@@ -5787,13 +6293,7 @@
       }
     }
     if (zone) {
-      var effCou = couSrc;
-      var isInd = effCou && String(effCou.id).toUpperCase() === "IND";
-      if (!isInd && dashCfg.userShowZoneTab) {
-        var defC = userDefaultCountry();
-        if (defC && String(defC.id).toUpperCase() === "IND") isInd = true;
-      }
-      if (isInd) {
+      if (dashCfg.userShowZoneTab) {
         zone.hidden = false;
         if (globalSel.zone) {
           zone.querySelector(".qb-location-tab-name").textContent = globalSel.zone.name;
@@ -5809,6 +6309,17 @@
       } else {
         zone.hidden = true;
         globalSel.zone = null;
+        if (activeGlobalScope === "zone") {
+          activeGlobalScope = "earth";
+          activeGlobalGeoId = "0";
+          if (earth) {
+            document.querySelectorAll(".qb-js-global-tab").forEach(function (t) {
+              var on = t === earth;
+              t.classList.toggle("is-active", on);
+              t.setAttribute("aria-selected", on ? "true" : "false");
+            });
+          }
+        }
       }
     }
   }
@@ -5869,18 +6380,17 @@
     if (scope !== "earth" && !gid) {
       text(document.getElementById("qb-global-total"), "—");
       loadGlobalCollectiveBoard();
+      loadLeadershipCouncil("global", scope, scope === "earth" ? "0" : gid);
       return;
     }
+    loadLeadershipCouncil("global", scope, scope === "earth" ? "0" : gid);
     var boardTitle = document.getElementById("qb-global-board-title");
     var boardSub = document.getElementById("qb-global-board-subtitle");
     if (boardTitle) {
-      var tabName = tab.querySelector(".qb-location-tab-name");
-      boardTitle.textContent =
-        (tabName ? tabName.textContent : scope) + " Collective Board";
+      text(boardTitle, boardNames[scope] || uiTr("collective_earth_board"));
     }
     if (boardSub) {
-      boardSub.textContent =
-        "Live and frozen posts for " + scope + (gid ? " · " + gid : "") + ".";
+      text(boardSub, uiTr("board_subtitle_live"));
     }
     fetch(
       "/api/dashboard/global_stats?scope=" +
@@ -5911,9 +6421,16 @@
       document.querySelectorAll(".qb-js-global-tab").forEach(function (t) {
         var on = t === tab;
         t.classList.toggle("is-active", on);
+        t.classList.toggle("active", on);
         t.setAttribute("aria-selected", on ? "true" : "false");
       });
       loadGlobalPanelStats();
+      if (window.qbPlanetary && window.qbPlanetary.onLocationTabChange) {
+        var scope = tab.getAttribute("data-global-scope") || "";
+        var gid = tab.getAttribute("data-global-id") || "";
+        if (scope === "earth" && !gid) gid = "0";
+        window.qbPlanetary.onLocationTabChange(gid, scope, "global");
+      }
     });
   });
 
@@ -7220,7 +7737,7 @@
       if (!newType) return;
       var flash = document.getElementById("qb-admin-upgrade-flash");
       if (flash) text(flash, "Upgrading…");
-      fetch("/api/admin/upgrade_user", {
+      fetch("/api/upgrade/user", {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -7251,8 +7768,915 @@
     });
   }
 
+  function initVillageCommerce() {
+    /* Marketplace moved to /marketplace — village hub handles karma & business registration. */
+  }
+
+  function loadKarmaTypes() {
+    return fetch("/api/qoin/karma/types", {
+      credentials: "same-origin",
+      headers: { Accept: "application/json" },
+    })
+      .then(function (r) {
+        return r.json().then(function (b) {
+          return { ok: r.ok, b: b };
+        });
+      })
+      .then(function (x) {
+        if (!x.ok) return;
+        var sel = document.getElementById("qb-karma-action-select");
+        if (!sel) return;
+        sel.innerHTML = "";
+        (x.b.actions || []).forEach(function (a) {
+          var opt = document.createElement("option");
+          opt.value = a.action_code;
+          opt.textContent = a.label + " (₹" + a.rupee_value + ")";
+          sel.appendChild(opt);
+        });
+      });
+  }
+
+  function loadKarmaPending() {
+    return fetch("/api/karma/claims", {
+      credentials: "same-origin",
+      headers: { Accept: "application/json" },
+    })
+      .then(function (r) {
+        return r.json().then(function (b) {
+          return { ok: r.ok, b: b };
+        });
+      })
+      .then(function (x) {
+        if (!x.ok) return;
+        var ul = document.getElementById("qb-karma-pending-list");
+        var empty = document.getElementById("qb-karma-pending-empty");
+        if (!ul) return;
+        ul.innerHTML = "";
+        var rows = (x.b.claims || []).filter(function (c) {
+          return c.status === "pending" || c.status === "partially_approved";
+        });
+        if (!rows.length) {
+          if (empty) empty.hidden = false;
+          return;
+        }
+        if (empty) empty.hidden = true;
+        rows.forEach(function (c) {
+          var li = document.createElement("li");
+          li.className = "mb-2";
+          li.textContent =
+            (c.action_label || c.action_code) +
+            " · " +
+            (c.status || "") +
+            " · ₹" +
+            (c.amount_rupees || 0);
+          ul.appendChild(li);
+        });
+      });
+  }
+
+  var karmaClaimForm = document.getElementById("qb-village-karma-claim-form");
+  if (karmaClaimForm) {
+    karmaClaimForm.addEventListener("submit", function (ev) {
+      ev.preventDefault();
+      var flash = document.getElementById("qb-karma-flash");
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          function (pos) {
+            var lat = document.getElementById("qb-karma-gps-lat");
+            var lng = document.getElementById("qb-karma-gps-lng");
+            if (lat) lat.value = String(pos.coords.latitude);
+            if (lng) lng.value = String(pos.coords.longitude);
+            submitKarmaClaimForm(flash);
+          },
+          function () {
+            submitKarmaClaimForm(flash);
+          }
+        );
+      } else {
+        submitKarmaClaimForm(flash);
+      }
+    });
+  }
+
+  function submitKarmaClaimForm(flash) {
+    var form = document.getElementById("qb-village-karma-claim-form");
+    if (!form) return;
+    if (flash) text(flash, "Submitting…");
+    fetch("/api/karma/claims", {
+      method: "POST",
+      credentials: "same-origin",
+      body: new FormData(form),
+    })
+      .then(function (r) {
+        return r.json().then(function (b) {
+          return { ok: r.ok, b: b };
+        });
+      })
+      .then(function (x) {
+        if (!x.ok) throw new Error((x.b && x.b.error) || "Failed");
+        if (flash) {
+          text(
+            flash,
+            x.b && x.b.karma_recorded
+              ? "Karma recorded! You can share your good deed."
+              : "Karma claim submitted for Council review."
+          );
+        }
+        form.reset();
+        loadKarmaPending();
+        if (x.b && x.b.karma_recorded) {
+          qbShowShareKarma({
+            action_code: x.b.action_code,
+            amount_rupees: x.b.amount_rupees,
+            action_label: x.b.action_label,
+          });
+        }
+      })
+      .catch(function (err) {
+        if (flash) text(flash, err.message || "Error");
+      });
+  }
+
+  var villageBusinessBtn = document.getElementById("qb-village-business-btn");
+  if (villageBusinessBtn) {
+    villageBusinessBtn.addEventListener("click", function () {
+      openModal("qb-business-register-modal");
+    });
+  }
+
+  var businessRegisterForm = document.getElementById("qb-business-register-form");
+  if (businessRegisterForm) {
+    businessRegisterForm.addEventListener("submit", function (ev) {
+      ev.preventDefault();
+      var flash = document.getElementById("qb-business-register-flash");
+      fetch("/api/businesses/register", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          business_name: (document.getElementById("qb-biz-name") || {}).value || "",
+          business_type: (document.getElementById("qb-biz-type") || {}).value || "",
+          address: (document.getElementById("qb-biz-address") || {}).value || "",
+          gst_number: (document.getElementById("qb-biz-gst") || {}).value || "",
+          pan_number: (document.getElementById("qb-biz-pan") || {}).value || "",
+          terms_accepted: !!(document.getElementById("qb-biz-terms") || {}).checked,
+        }),
+      })
+        .then(function (r) {
+          return r.json().then(function (b) {
+            return { ok: r.ok, b: b };
+          });
+        })
+        .then(function (x) {
+          if (!x.ok) throw new Error((x.b && x.b.error) || "Registration failed");
+          if (flash) text(flash, "Business registration submitted for Council approval.");
+          closeModal("qb-business-register-modal");
+        })
+        .catch(function (err) {
+          if (flash) text(flash, err.message || "Error");
+        });
+    });
+  }
+
+  function loadAdminQoinPanel() {
+    if (!dashCfg.isAdmin) return;
+    fetch("/api/qoin/pending", {
+      credentials: "same-origin",
+      headers: { Accept: "application/json" },
+    })
+      .then(function (r) {
+        return r.json().then(function (b) {
+          return { ok: r.ok, b: b };
+        });
+      })
+      .then(function (x) {
+        if (!x.ok) return;
+        var el = document.getElementById("qb-admin-pending-summary");
+        if (el) {
+          el.textContent =
+            "Pending: " +
+            (x.b.pending_count || 0) +
+            " txn · ₹" +
+            (x.b.pending_rupees || 0) +
+            " · " +
+            (x.b.unsettled_karma || 0) +
+            " karma";
+        }
+      });
+    fetch("/api/admin/qoin/nested-wallets", {
+      credentials: "same-origin",
+      headers: { Accept: "application/json" },
+    })
+      .then(function (r) {
+        return r.json().then(function (b) {
+          return { ok: r.ok, b: b };
+        });
+      })
+      .then(function (x) {
+        if (!x.ok) return;
+        var circ = document.getElementById("qb-admin-circulation-summary");
+        if (circ && x.b.circulation) {
+          circ.textContent =
+            "Circulation: " +
+            x.b.circulation.total_qoins +
+            " Qoins (₹" +
+            x.b.circulation.total_rupees +
+            ")";
+        }
+        var nw = document.getElementById("qb-admin-nested-wallets");
+        if (!nw) return;
+        nw.innerHTML = "";
+        (x.b.wallets || []).slice(0, 12).forEach(function (w) {
+          var li = document.createElement("li");
+          li.textContent =
+            w.owner_type +
+            " / " +
+            w.owner_id +
+            " — " +
+            w.balance_qoins +
+            " Qoins (₹" +
+            w.total_rupees +
+            ")";
+          nw.appendChild(li);
+        });
+      });
+    fetch("/api/admin/qoin/karma-types", {
+      credentials: "same-origin",
+      headers: { Accept: "application/json" },
+    })
+      .then(function (r) {
+        return r.json().then(function (b) {
+          return { ok: r.ok, b: b };
+        });
+      })
+      .then(function (x) {
+        if (!x.ok) return;
+        var ul = document.getElementById("qb-admin-karma-types-list");
+        if (!ul) return;
+        ul.innerHTML = "";
+        (x.b.actions || []).forEach(function (a) {
+          var li = document.createElement("li");
+          li.textContent = a.action_code + " — " + a.label + " (₹" + a.rupee_value + ")";
+          ul.appendChild(li);
+        });
+      });
+  }
+
+  var adminSettlementBtn = document.getElementById("qb-admin-settlement-btn");
+  if (adminSettlementBtn) {
+    adminSettlementBtn.addEventListener("click", function () {
+      var flash = document.getElementById("qb-admin-settlement-flash");
+      if (flash) text(flash, "Running settlement…");
+      fetch("/api/admin/qoin/settlement", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ force: true }),
+      })
+        .then(function (r) {
+          return r.json().then(function (b) {
+            return { ok: r.ok, b: b };
+          });
+        })
+        .then(function (x) {
+          if (!x.ok) throw new Error((x.b && x.b.error) || "Settlement failed");
+          var res = (x.b && x.b.result) || {};
+          if (flash) {
+            text(
+              flash,
+              "Done — " +
+                (res.users_settled || 0) +
+                " statement(s). Insufficient: " +
+                ((res.insufficient_users || []).length || 0)
+            );
+          }
+          loadAdminQoinPanel();
+        })
+        .catch(function (err) {
+          if (flash) text(flash, err.message || "Error");
+        });
+    });
+  }
+
+  var adminKarmaSave = document.getElementById("qb-admin-karma-save");
+  if (adminKarmaSave) {
+    adminKarmaSave.addEventListener("click", function () {
+      var code = (document.getElementById("qb-admin-karma-code") || {}).value || "";
+      var label = (document.getElementById("qb-admin-karma-label") || {}).value || "";
+      var val = parseInt(String((document.getElementById("qb-admin-karma-value") || {}).value || ""), 10);
+      fetch("/api/admin/qoin/karma-types", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          action_code: code.trim(),
+          label: label.trim(),
+          rupee_value: val,
+        }),
+      })
+        .then(function (r) {
+          return r.json().then(function (b) {
+            return { ok: r.ok, b: b };
+          });
+        })
+        .then(function (x) {
+          if (!x.ok) throw new Error((x.b && x.b.error) || "Save failed");
+          loadAdminQoinPanel();
+          loadKarmaTypes();
+        })
+        .catch(function (err) {
+          alert(err.message || "Could not save karma type");
+        });
+    });
+  }
+
+  loadKarmaTypes();
+  loadAdminQoinPanel();
+
+  function refreshLocationMode(nextMode) {
+    return fetch("/api/user/location-mode", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ mode: nextMode }),
+    })
+      .then(function (r) {
+        return r.json().then(function (b) {
+          return { ok: r.ok, b: b };
+        });
+      })
+      .then(function (x) {
+        if (!x.ok) throw new Error((x.b && x.b.error) || "Could not switch location");
+        window.location.reload();
+      });
+  }
+
+  function bindLocationToggle(btnId) {
+    var btn = document.getElementById(btnId);
+    if (!btn) return;
+    btn.addEventListener("click", function () {
+      var cur = btn.getAttribute("data-mode") || "present";
+      var next = cur === "birth" ? "present" : "birth";
+      refreshLocationMode(next).catch(function (err) {
+        alert(err.message || "Location switch failed");
+      });
+    });
+  }
+  bindLocationToggle("qb-location-toggle-public");
+
+  var saveMotherTongueBtn = document.getElementById("save-mother-tongue");
+  if (saveMotherTongueBtn) {
+    saveMotherTongueBtn.addEventListener("click", function () {
+      var sel = document.getElementById("mother-tongue");
+      var flash = document.getElementById("qb-mother-tongue-flash");
+      if (!sel) return;
+      var code = (sel.value || "").trim();
+      var opt = sel.options[sel.selectedIndex];
+      var name = opt ? opt.getAttribute("data-name") || opt.textContent || "" : "";
+      text(flash, "Saving…");
+      fetch("/api/user/mother-tongue", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          mother_tongue_code: code || null,
+          mother_tongue_name: name || null,
+        }),
+      })
+        .then(function (r) {
+          return r.json().then(function (b) {
+            return { ok: r.ok, b: b };
+          });
+        })
+        .then(function (x) {
+          if (!x.ok) throw new Error((x.b && x.b.error) || "Save failed");
+          text(flash, "Saved.");
+          window.setTimeout(function () {
+            window.location.reload();
+          }, 400);
+        })
+        .catch(function (err) {
+          text(flash, err.message || "Error");
+        });
+    });
+  }
+
+  var villageServicesBtn = document.getElementById("qb-village-services-btn");
+  if (villageServicesBtn) {
+    villageServicesBtn.addEventListener("click", openVillageServicesModal);
+  }
+  var electionsBtn = document.getElementById("qb-elections-btn");
+  if (electionsBtn) {
+    electionsBtn.addEventListener("click", openElectionsModal);
+  }
+  if (!electionsEnabled && electionPausedBanner) {
+    electionPausedBanner.hidden = false;
+  }
+
+  var accountIdsBtn = document.getElementById("qb-my-account-ids-btn");
+  if (accountIdsBtn) {
+    accountIdsBtn.addEventListener("click", function () {
+      fetch("/api/user/account-ids", {
+        credentials: "same-origin",
+        headers: { Accept: "application/json" },
+      })
+        .then(function (r) {
+          return r.json().then(function (b) {
+            return { ok: r.ok, b: b };
+          });
+        })
+        .then(function (x) {
+          if (!x.ok) throw new Error((x.b && x.b.error) || "Load failed");
+          var list = document.getElementById("qb-account-ids-list");
+          var empty = document.getElementById("qb-account-ids-empty");
+          if (!list) return;
+          list.innerHTML = "";
+          var rows = x.b.accounts || [];
+          if (!rows.length) {
+            if (empty) empty.hidden = false;
+          } else {
+            if (empty) empty.hidden = true;
+            rows.forEach(function (row) {
+              var li = document.createElement("li");
+              li.className = "mb-2 p-2 border rounded";
+              var primary = parseInt(row.is_primary, 10) === 1;
+              li.innerHTML =
+                "<strong class=\"font-monospace\">" +
+                (row.account_id || "") +
+                "</strong>" +
+                (primary ? ' <span class="badge bg-primary">Primary</span>' : "") +
+                "<br><span class=\"text-muted\">" +
+                (row.location_type || "") +
+                " · " +
+                (row.location_path || "") +
+                "</span>" +
+                (row.last_used_at
+                  ? '<br><span class="text-muted">Last used: ' + row.last_used_at + "</span>"
+                  : "");
+              list.appendChild(li);
+            });
+          }
+          openModal("qb-account-ids-modal");
+        })
+        .catch(function (err) {
+          alert(err.message || "Could not load account IDs");
+        });
+    });
+  }
+
   window.qbOpenModal = openModal;
   window.qbCloseModal = closeModal;
+
+  /* --- Referral panel & Share Karma --- */
+  var lastShareKarmaPayload = null;
+
+  function qbReferralConfig() {
+    return (dashCfg && {
+      code: dashCfg.referralCode,
+      count: dashCfg.referralCount,
+      earnings: dashCfg.referralEarnings,
+      regUrl: dashCfg.referralRegistrationUrl,
+      qr: dashCfg.referralQrBase64,
+    }) || {};
+  }
+
+  function qbLogShare(shareType) {
+    fetch("/api/referral/share", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ share_type: shareType }),
+    }).catch(function () {});
+  }
+
+  function qbCopyText(value, toastMsg) {
+    if (!value) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(value).then(function () {
+        if (window.qbToast) window.qbToast(toastMsg || uiTr("copied"), "success");
+      });
+    } else {
+      var ta = document.createElement("textarea");
+      ta.value = value;
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand("copy");
+        if (window.qbToast) window.qbToast(toastMsg || uiTr("copied"), "success");
+      } catch (_e) {}
+      document.body.removeChild(ta);
+    }
+  }
+
+  function qbShareWhatsApp(text) {
+    if (!text) return;
+    qbLogShare("whatsapp");
+    window.open("https://wa.me/?text=" + encodeURIComponent(text), "_blank");
+  }
+
+  function qbReferralInviteText() {
+    var cfg = qbReferralConfig();
+    return (
+      "Join Qumanity — India's quantum governance platform. " +
+      "Sign up with my referral code " +
+      (cfg.code || "") +
+      ": " +
+      (cfg.regUrl || "")
+    );
+  }
+
+  function qbShowShareKarma(payload) {
+    lastShareKarmaPayload = payload || null;
+    var btn = document.getElementById("qb-share-karma-btn");
+    if (btn) btn.hidden = false;
+    fetch("/api/referral/karma-share-text", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({
+        action_code: (payload && payload.action_code) || "",
+        amount_rupees: (payload && payload.amount_rupees) || 0,
+      }),
+    })
+      .then(function (r) {
+        return r.json().then(function (b) {
+          return { ok: r.ok, b: b };
+        });
+      })
+      .then(function (x) {
+        if (!x.ok) return;
+        var el = document.getElementById("qb-share-karma-text");
+        if (el) el.textContent = x.b.text || "";
+        openModal("qb-share-karma-modal");
+      })
+      .catch(function () {});
+  }
+
+  window.qbShowShareKarma = qbShowShareKarma;
+
+  (function initReferralPanel() {
+    var cfg = qbReferralConfig();
+    var copyCode = document.getElementById("qb-referral-copy-code");
+    if (copyCode) {
+      copyCode.addEventListener("click", function () {
+        qbCopyText(cfg.code, uiTr("copied"));
+        qbLogShare("copy_code");
+      });
+    }
+    var copyLink = document.getElementById("qb-referral-copy-link");
+    if (copyLink) {
+      copyLink.addEventListener("click", function () {
+        qbCopyText(cfg.regUrl, uiTr("copied"));
+        qbLogShare("copy_link");
+      });
+    }
+    var wa = document.getElementById("qb-referral-whatsapp");
+    if (wa) {
+      wa.addEventListener("click", function () {
+        qbShareWhatsApp(qbReferralInviteText());
+      });
+    }
+    var showQr = document.getElementById("qb-referral-show-qr");
+    var qrWrap = document.getElementById("qb-referral-qr-wrap");
+    if (showQr && qrWrap) {
+      showQr.addEventListener("click", function () {
+        qrWrap.hidden = !qrWrap.hidden;
+        if (!qrWrap.hidden) qbLogShare("qr_code");
+        if (!cfg.qr && !qrWrap.hidden) {
+          fetch("/api/referral/generate-qr", {
+            credentials: "same-origin",
+            headers: { Accept: "application/json" },
+          })
+            .then(function (r) {
+              return r.json();
+            })
+            .then(function (b) {
+              var img = document.getElementById("qb-referral-qr-img");
+              if (img && b.qr_code_base64) {
+                img.src = "data:image/png;base64," + b.qr_code_base64;
+              }
+              var linkEl = document.getElementById("qb-referral-link-text");
+              if (linkEl && b.registration_url) linkEl.textContent = b.registration_url;
+            })
+            .catch(function () {});
+        }
+      });
+    }
+  })();
+
+  (function initShareKarmaModal() {
+    var shareBtn = document.getElementById("qb-share-karma-btn");
+    if (shareBtn) {
+      shareBtn.addEventListener("click", function () {
+        qbShowShareKarma(lastShareKarmaPayload || {});
+      });
+    }
+    var wa = document.getElementById("qb-share-karma-whatsapp");
+    if (wa) {
+      wa.addEventListener("click", function () {
+        var t = document.getElementById("qb-share-karma-text");
+        qbShareWhatsApp(t ? t.textContent : "");
+      });
+    }
+    var copy = document.getElementById("qb-share-karma-copy");
+    if (copy) {
+      copy.addEventListener("click", function () {
+        var t = document.getElementById("qb-share-karma-text");
+        qbCopyText(t ? t.textContent : "", uiTr("copied"));
+        qbLogShare("copy_text");
+      });
+    }
+    var qrBtn = document.getElementById("qb-share-karma-qr");
+    var qrWrap = document.getElementById("qb-share-karma-qr-wrap");
+    if (qrBtn && qrWrap) {
+      qrBtn.addEventListener("click", function () {
+        qrWrap.hidden = !qrWrap.hidden;
+        if (!qrWrap.hidden) {
+          qbLogShare("share_qr");
+          fetch("/api/referral/generate-qr", {
+            credentials: "same-origin",
+            headers: { Accept: "application/json" },
+          })
+            .then(function (r) {
+              return r.json();
+            })
+            .then(function (b) {
+              var img = document.getElementById("qb-share-karma-qr-img");
+              if (img && b.qr_code_base64) {
+                img.src = "data:image/png;base64," + b.qr_code_base64;
+              }
+            })
+            .catch(function () {});
+        }
+      });
+    }
+  })();
+
+  (function initVolunteerFeatures() {
+    var applyOpen = document.getElementById("applyVolunteerBtn");
+    if (applyOpen) {
+      applyOpen.addEventListener("click", function () {
+        openModal("qb-volunteer-apply-modal");
+      });
+    }
+    var applyForm = document.getElementById("qb-volunteer-apply-form");
+    if (applyForm) {
+      applyForm.addEventListener("submit", function (ev) {
+        ev.preventDefault();
+        var status = document.getElementById("qb-volunteer-apply-status");
+        fetch("/api/volunteer/apply", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({
+            bank_name: (document.getElementById("qb-volunteer-bank-name") || {}).value || "",
+            account_number: (document.getElementById("qb-volunteer-account-number") || {}).value || "",
+            branch: (document.getElementById("qb-volunteer-branch") || {}).value || "",
+            ifsc_code: (document.getElementById("qb-volunteer-ifsc") || {}).value || "",
+            reason: (document.getElementById("qb-volunteer-reason") || {}).value || "",
+          }),
+        })
+          .then(function (r) {
+            return r.json().then(function (b) {
+              return { ok: r.ok, b: b };
+            });
+          })
+          .then(function (x) {
+            if (!x.ok) throw new Error((x.b && x.b.error) || "Failed");
+            closeModal("qb-volunteer-apply-modal");
+            if (status) status.textContent = "Application submitted. Admin will review your request.";
+            if (window.qbToast) window.qbToast("Volunteer application submitted", "success");
+          })
+          .catch(function (err) {
+            if (window.qbToast) window.qbToast(err.message || "Error", "error");
+          });
+      });
+    }
+
+    var dashOpen = document.getElementById("qb-volunteer-dashboard-open");
+    if (dashOpen) {
+      dashOpen.addEventListener("click", function () {
+        openModal("qb-volunteer-dashboard-modal");
+        loadVolunteerDashboard();
+      });
+    }
+
+    function loadVolunteerDashboard() {
+      var codeEl = document.getElementById("qb-volunteer-dash-code");
+      var perfBody = document.getElementById("qb-volunteer-perf-body");
+      var signupsBody = document.getElementById("qb-volunteer-signups-body");
+      fetch("/api/volunteer/dashboard", {
+        credentials: "same-origin",
+        headers: { Accept: "application/json" },
+      })
+        .then(function (r) {
+          return r.json().then(function (b) {
+            return { ok: r.ok, b: b };
+          });
+        })
+        .then(function (x) {
+          if (!x.ok) throw new Error((x.b && x.b.error) || "Failed");
+          if (codeEl) codeEl.textContent = x.b.volunteer_code || "—";
+          var perf = x.b.performance || {};
+          if (perfBody) {
+            perfBody.innerHTML =
+              "<tr><td>Signups</td><td>" +
+              ((perf.week && perf.week.signups) || 0) +
+              "</td><td>" +
+              ((perf.month && perf.month.signups) || 0) +
+              "</td><td>" +
+              ((perf.year && perf.year.signups) || 0) +
+              "</td><td>" +
+              ((perf.total && perf.total.signups) || 0) +
+              "</td></tr>" +
+              "<tr><td>Qoins</td><td>" +
+              ((perf.week && perf.week.qoins) || 0) +
+              "</td><td>" +
+              ((perf.month && perf.month.qoins) || 0) +
+              "</td><td>" +
+              ((perf.year && perf.year.qoins) || 0) +
+              "</td><td>" +
+              ((perf.total && perf.total.qoins) || 0) +
+              "</td></tr>";
+          }
+        })
+        .catch(function () {
+          if (perfBody) perfBody.innerHTML = "<tr><td colspan='5' class='text-danger'>Could not load dashboard</td></tr>";
+        });
+      fetch("/api/volunteer/signups", {
+        credentials: "same-origin",
+        headers: { Accept: "application/json" },
+      })
+        .then(function (r) {
+          return r.json();
+        })
+        .then(function (b) {
+          if (!signupsBody) return;
+          signupsBody.innerHTML = "";
+          (b.signups || []).forEach(function (row) {
+            var tr = document.createElement("tr");
+            tr.innerHTML =
+              "<td>" +
+              (row.user_name || "") +
+              "</td><td>" +
+              (row.signup_date || "") +
+              "</td><td>" +
+              (row.status || "") +
+              "</td><td>" +
+              (row.qoins_earned || 0) +
+              " Qoins</td>";
+            signupsBody.appendChild(tr);
+          });
+          if (!signupsBody.children.length) {
+            signupsBody.innerHTML = "<tr><td colspan='4' class='text-muted'>No signups yet.</td></tr>";
+          }
+        })
+        .catch(function () {
+          if (signupsBody) signupsBody.innerHTML = "<tr><td colspan='4' class='text-danger'>Could not load signups</td></tr>";
+        });
+    }
+
+    var copyBtn = document.getElementById("qb-volunteer-dash-copy");
+    if (copyBtn) {
+      copyBtn.addEventListener("click", function () {
+        var code = (document.getElementById("qb-volunteer-dash-code") || {}).textContent || "";
+        if (code && navigator.clipboard) {
+          navigator.clipboard.writeText(code.trim());
+          if (window.qbToast) window.qbToast("Volunteer code copied", "success");
+        }
+      });
+    }
+
+    var exportBtn = document.getElementById("qb-volunteer-export");
+    if (exportBtn) {
+      exportBtn.addEventListener("click", function () {
+        fetch("/api/volunteer/signups", {
+          credentials: "same-origin",
+          headers: { Accept: "application/json" },
+        })
+          .then(function (r) {
+            return r.json();
+          })
+          .then(function (b) {
+            var lines = ["User Name,Signup Date,Status,Qoins Earned"];
+            (b.signups || []).forEach(function (row) {
+              lines.push(
+                [
+                  row.user_name || "",
+                  row.signup_date || "",
+                  row.status || "",
+                  row.qoins_earned || 0,
+                ].join(",")
+              );
+            });
+            var blob = new Blob([lines.join("\n")], { type: "text/csv" });
+            var a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = "volunteer-signups.csv";
+            a.click();
+          });
+      });
+    }
+
+    function loadEmploymentRequests() {
+      var list = document.getElementById("qb-admin-employment-list");
+      if (!list) return;
+      fetch("/api/admin/employment/requests", {
+        credentials: "same-origin",
+        headers: { Accept: "application/json" },
+      })
+        .then(function (r) {
+          return r.json();
+        })
+        .then(function (b) {
+          list.innerHTML = "";
+          (b.requests || []).forEach(function (req) {
+            var li = document.createElement("li");
+            li.className = "mb-3 p-2 border border-secondary rounded";
+            li.innerHTML =
+              "<strong>" +
+              (req.applicant_name || "") +
+              "</strong><br>" +
+              (req.applicant_state || "") +
+              " · " +
+              (req.applicant_village_id || "") +
+              "<br><span class='text-muted'>" +
+              (req.reason || "") +
+              "</span><br><span class='text-muted small'>" +
+              (req.bank_name || req.bank_account_details || "") +
+              (req.ifsc_code ? " · IFSC: " + req.ifsc_code : "") +
+              "</span>";
+            var actions = document.createElement("div");
+            actions.className = "d-flex gap-2 mt-2";
+            var approve = document.createElement("button");
+            approve.type = "button";
+            approve.className = "qb-btn qb-btn-primary btn-sm";
+            approve.textContent = "Approve";
+            approve.addEventListener("click", function () {
+              fetch("/api/admin/employment/approve", {
+                method: "POST",
+                credentials: "same-origin",
+                headers: { "Content-Type": "application/json", Accept: "application/json" },
+                body: JSON.stringify({ request_id: req.id }),
+              })
+                .then(function (r) {
+                  return r.json().then(function (body) {
+                    return { ok: r.ok, body: body };
+                  });
+                })
+                .then(function (x) {
+                  if (!x.ok) throw new Error((x.body && x.body.error) || "Failed");
+                  loadEmploymentRequests();
+                  if (window.qbToast) window.qbToast("Approved — code " + (x.body.volunteer_code || x.body.agent_code || ""), "success");
+                })
+                .catch(function (err) {
+                  if (window.qbToast) window.qbToast(err.message || "Error", "error");
+                });
+            });
+            var reject = document.createElement("button");
+            reject.type = "button";
+            reject.className = "qb-btn qb-btn-outline btn-sm";
+            reject.textContent = "Reject";
+            reject.addEventListener("click", function () {
+              var note = window.prompt("Rejection reason (optional):") || "";
+              fetch("/api/admin/employment/reject", {
+                method: "POST",
+                credentials: "same-origin",
+                headers: { "Content-Type": "application/json", Accept: "application/json" },
+                body: JSON.stringify({ request_id: req.id, review_note: note }),
+              })
+                .then(function (r) {
+                  return r.json().then(function (body) {
+                    return { ok: r.ok, body: body };
+                  });
+                })
+                .then(function (x) {
+                  if (!x.ok) throw new Error((x.body && x.body.error) || "Failed");
+                  loadEmploymentRequests();
+                })
+                .catch(function (err) {
+                  if (window.qbToast) window.qbToast(err.message || "Error", "error");
+                });
+            });
+            actions.appendChild(approve);
+            actions.appendChild(reject);
+            li.appendChild(actions);
+            list.appendChild(li);
+          });
+          if (!list.children.length) {
+            list.innerHTML = "<li class='text-muted'>No pending requests.</li>";
+          }
+        })
+        .catch(function () {});
+    }
+    var refreshBtn = document.getElementById("qb-admin-employment-refresh");
+    if (refreshBtn) {
+      refreshBtn.addEventListener("click", loadEmploymentRequests);
+      loadEmploymentRequests();
+    }
+  })();
+
+  qbInitCopyButtons(document);
   window.qbFamilyFlash = familyFlash;
   window.qbOpenMarkDeceasedModal = openMarkDeceasedModal;
   window.qbOpenFamilyTreeAddModal = openFamilyTreeAddModal;
@@ -7281,4 +8705,147 @@
         familyFlash(err.message || "Could not open editor", "error");
       });
   };
+
+  /* ── Varna / Dharma Profile ── */
+  function qbVarnaFetch(path, opts) {
+    return fetch("/api/varna" + path, Object.assign({ credentials: "same-origin", headers: { Accept: "application/json" } }, opts || {}))
+      .then(function (r) { return r.json().then(function (b) { return { ok: r.ok, b: b }; }); });
+  }
+
+  var varnaAppealBtn = document.getElementById("qb-varna-appeal-btn");
+  var varnaAppealModal = document.getElementById("qb-varna-appeal-modal");
+  if (varnaAppealBtn && varnaAppealModal && window.bootstrap) {
+    var appealModal = new bootstrap.Modal(varnaAppealModal);
+    varnaAppealBtn.addEventListener("click", function () { appealModal.show(); });
+    var appealSubmit = document.getElementById("qb-varna-appeal-submit");
+    if (appealSubmit) {
+      appealSubmit.addEventListener("click", function () {
+        var reason = (document.getElementById("qb-varna-appeal-reason") || {}).value || "";
+        var evidence = (document.getElementById("qb-varna-appeal-evidence") || {}).value || "";
+        qbVarnaFetch("/appeal", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reason: reason, evidence: evidence }),
+        }).then(function (x) {
+          if (!x.ok) throw new Error((x.b && x.b.error) || "Appeal failed");
+          if (window.qbToast) window.qbToast(x.b.message || "Appeal submitted", "success");
+          appealModal.hide();
+        }).catch(function (err) {
+          if (window.qbToast) window.qbToast(err.message || "Appeal failed", "error");
+        });
+      });
+    }
+  }
+
+  var varnaHistoryBtn = document.getElementById("qb-varna-history-btn");
+  if (varnaHistoryBtn && window.bootstrap) {
+    var historyModalEl = document.getElementById("qb-varna-history-modal");
+    var historyModal = historyModalEl ? new bootstrap.Modal(historyModalEl) : null;
+    varnaHistoryBtn.addEventListener("click", function () {
+      qbVarnaFetch("/profile").then(function (x) {
+        if (!x.ok) return;
+        var list = document.getElementById("qb-varna-history-list");
+        if (!list) return;
+        list.innerHTML = "";
+        (x.b.history || []).forEach(function (h) {
+          var li = document.createElement("li");
+          li.className = "mb-2 pb-2 border-bottom border-secondary";
+          li.textContent = (h.calculation_date || "") + " — " + (h.primary_category || "?") + " (" + (h.category_type || "") + ")";
+          list.appendChild(li);
+        });
+        if (historyModal) historyModal.show();
+      });
+    });
+  }
+
+  var varnaRolesBtn = document.getElementById("qb-varna-roles-btn");
+  if (varnaRolesBtn && window.bootstrap) {
+    var rolesModalEl = document.getElementById("qb-varna-roles-modal");
+    var rolesModal = rolesModalEl ? new bootstrap.Modal(rolesModalEl) : null;
+    varnaRolesBtn.addEventListener("click", function () {
+      qbVarnaFetch("/eligible-roles").then(function (x) {
+        if (!x.ok) return;
+        var list = document.getElementById("qb-varna-roles-list");
+        if (!list) return;
+        list.innerHTML = "";
+        (x.b.eligible_roles || []).forEach(function (role) {
+          var li = document.createElement("li");
+          li.textContent = role;
+          list.appendChild(li);
+        });
+        if (rolesModal) rolesModal.show();
+      });
+    });
+  }
+
+  var adminVarnaRecalc = document.getElementById("qb-admin-varna-recalc-btn");
+  if (adminVarnaRecalc) {
+    adminVarnaRecalc.addEventListener("click", function () {
+      var flash = document.getElementById("qb-admin-varna-flash");
+      fetch("/api/admin/recalculate-categories", { method: "POST", credentials: "same-origin", headers: { Accept: "application/json" } })
+        .then(function (r) { return r.json(); })
+        .then(function (b) {
+          if (flash) flash.textContent = b.success ? "Recalculation complete." : (b.error || "Failed");
+          if (window.qbToast && b.success) window.qbToast("Categories recalculated", "success");
+        })
+        .catch(function () { if (flash) flash.textContent = "Recalculation failed"; });
+    });
+  }
+
+  function loadAdminVarnaStats() {
+    if (!document.getElementById("qb-admin-varna-section")) return;
+    qbVarnaFetch("/admin/stats").then(function (x) {
+      if (!x.ok || !x.b) return;
+      var dist = x.b.distribution || {};
+      document.querySelectorAll("#qb-admin-varna-distribution [data-cat]").forEach(function (el) {
+        var k = el.getAttribute("data-cat");
+        el.textContent = dist[k] != null ? dist[k] : "0";
+      });
+      var pc = document.getElementById("qb-admin-varna-pending-count");
+      if (pc) pc.textContent = String(x.b.pending_appeals || 0);
+    });
+  }
+  loadAdminVarnaStats();
+
+  var adminAppealsBtn = document.getElementById("qb-admin-varna-appeals-btn");
+  if (adminAppealsBtn) {
+    adminAppealsBtn.addEventListener("click", function () {
+      var panel = document.getElementById("qb-admin-varna-appeals-panel");
+      var list = document.getElementById("qb-admin-varna-appeals-list");
+      qbVarnaFetch("/admin/appeals").then(function (x) {
+        if (!x.ok || !list) return;
+        list.innerHTML = "";
+        (x.b || []).forEach(function (a) {
+          var li = document.createElement("li");
+          li.className = "mb-2 p-2 border border-secondary rounded";
+          li.innerHTML = "<strong>" + (a.first_name || "") + " " + (a.last_name || "") + "</strong><br>" +
+            (a.reason || "") +
+            "<br><button type='button' class='qb-btn qb-btn-primary btn-sm mt-1 me-1' data-approve='" + a.id + "'>Approve</button>" +
+            "<button type='button' class='qb-btn qb-btn-danger btn-sm mt-1' data-reject='" + a.id + "'>Reject</button>";
+          list.appendChild(li);
+        });
+        list.querySelectorAll("[data-approve]").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            fetch("/api/varna/admin/appeal/" + btn.getAttribute("data-approve"), {
+              method: "POST", credentials: "same-origin",
+              headers: { "Content-Type": "application/json", Accept: "application/json" },
+              body: JSON.stringify({ action: "approve" }),
+            }).then(function () { loadAdminVarnaStats(); adminAppealsBtn.click(); });
+          });
+        });
+        list.querySelectorAll("[data-reject]").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            fetch("/api/varna/admin/appeal/" + btn.getAttribute("data-reject"), {
+              method: "POST", credentials: "same-origin",
+              headers: { "Content-Type": "application/json", Accept: "application/json" },
+              body: JSON.stringify({ action: "reject" }),
+            }).then(function () { loadAdminVarnaStats(); adminAppealsBtn.click(); });
+          });
+        });
+        if (panel) panel.hidden = false;
+      });
+    });
+  }
+
+  document.dispatchEvent(new CustomEvent("qb-dash-ready"));
 })();

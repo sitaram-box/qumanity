@@ -1,0 +1,34 @@
+version: "3.8"
+
+services:
+  web:
+    build: .
+    ports:
+      - "8080:5000"
+    environment:
+      # Qumanity is SQLite-native today. Use SQLite for a working local stack:
+      - DATABASE_URL=sqlite:////data/indiaq.db
+      # Uncomment below once PostgreSQL migration is complete:
+      # - DATABASE_URL=postgresql://quantum:quantum123@db:5432/quantumdb
+      - FLASK_ENV=development
+    depends_on:
+      - db
+    volumes:
+      - ./:/app
+      - app_data:/data
+    command: gunicorn --bind 0.0.0.0:5000 --reload app:app
+
+  db:
+    image: postgres:15
+    environment:
+      - POSTGRES_USER=quantum
+      - POSTGRES_PASSWORD=quantum123
+      - POSTGRES_DB=quantumdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
+  app_data:

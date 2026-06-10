@@ -1,0 +1,44 @@
+{
+  "name": "qumanity-crm",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "scripts": {
+    "dev": "nocobase dev",
+    "start": "nocobase start",
+    "build": "nocobase build",
+    "install-app": "nocobase install --skip-install-deps",
+    "setup": "npm install && nocobase install --skip-install-deps",
+    "setup:clean": "rm -rf node_modules package-lock.json && npm install && nocobase install --skip-install-deps"
+  },
+  "dependencies": {
+    "@nocobase/cli": "1.9.63",
+    "@nocobase/server": "1.9.63",
+    "@nocobase/client": "1.9.63",
+    "@nocobase/plugin-workflow": "1.9.63",
+    "@nocobase/plugin-workflow-webhook": "1.9.63",
+    "@nocobase/plugin-charts": "1.9.63",
+    "axios": "^1.7.0",
+    "bcrypt": "^5.1.1",
+    "jsonwebtoken": "^9.0.2"
+  },
+  "overrides": {
+    "@nocobase/client": "1.9.63",
+    "@nocobase/server": "1.9.63",
+    "@nocobase/plugin-collection-sql": {
+      "@nocobase/client": "1.9.63",
+      "@nocobase/server": "1.9.63"
+    }
+  },
+  "nocobase": {
+    "plugins": [
+      "@qumanity/plugin-tickets",
+      "@qumanity/plugin-vendors",
+      "@qumanity/plugin-orders",
+      "@qumanity/plugin-ratings"
+    ]
+  }
+}

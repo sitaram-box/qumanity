@@ -1,5 +1,5 @@
 """
-Quantum Box — Flask prototype.
+Qumanity — Flask prototype.
 Geography reads from indiaq.db; app users live in the same database `users` table.
 """
 
@@ -18,14 +18,33 @@ from datetime import date, datetime, timedelta, timezone
 from functools import wraps
 from pathlib import Path
 from typing import Any
+from urllib.parse import unquote, urlparse
 
 import bcrypt
 
+try:
+    import psycopg2
+except ImportError:
+    psycopg2 = None  # type: ignore[assignment,misc]
+
+import config  # loads .env at import time; single source of truth for settings
 import birth_chart
 import calendar_time
 import election_scheduler
+import language_core
+import leadership_core
+import identity_core
+import donation_core
+import referral_core
+from translations import TRANSLATIONS, get_dashboard_ui_strings, get_text
 import qoin_core
+import scheduler as qoin_scheduler
 import social_core
+import varna_core
+import planetary_core
+import element_core
+import global_core
+import deceased_core
 import zodiac_calendar
 from flask import (
     Flask,
@@ -41,7 +60,65 @@ from flask import (
 )
 
 BASE_DIR = Path(__file__).resolve().parent
-DB_PATH = BASE_DIR / "indiaq.db"
+
+# Database configuration (SQLite default; PostgreSQL scaffold for future cloud migration)
+DATABASE_URL = os.environ.get("DATABASE_URL")
+
+
+def _resolve_sqlite_path(base_dir: Path) -> Path:
+    """Resolve the on-disk SQLite path from DATABASE_URL.
+
+    Slash convention (matches SQLAlchemy), so the URL is unambiguous:
+      sqlite:///indiaq.db        -> RELATIVE to the project root (base_dir)
+      sqlite:////data/indiaq.db  -> ABSOLUTE path /data/indiaq.db
+    A bare filesystem path with no scheme is also accepted, e.g.
+      /Users/me/qumanity/indiaq.db   or   ./indiaq.db
+
+    Any relative result is anchored to base_dir, so the directory Flask is
+    launched from does not matter. (Previously ``sqlite:///indiaq.db`` was
+    parsed to the root path ``/indiaq.db``, which SQLite cannot open.)
+    """
+    default = base_dir / "indiaq.db"
+    url = (DATABASE_URL or "").strip()
+    if not url or url.startswith("postgres"):
+        return default
+
+    if url.startswith("sqlite:"):
+        # Strip the "sqlite://" scheme prefix, keep the remaining path portion.
+        raw = unquote(url[len("sqlite://"):])
+        if raw.startswith("//"):
+            candidate = Path(raw[1:])           # four-slash form: absolute
+        else:
+            candidate = Path(raw.lstrip("/"))   # three-slash form: relative
+    else:
+        candidate = Path(url)                   # bare filesystem path
+
+    text = str(candidate).strip()
+    if not text or text == ".":
+        return default
+    if not candidate.is_absolute():
+        candidate = base_dir / candidate
+    return candidate
+
+
+def get_db_connection():
+    """Return a database connection (PostgreSQL or SQLite).
+
+    PostgreSQL is scaffolded for cloud deploy; the app still uses SQLite SQL via
+    ``get_db()`` until a full migration is complete.
+    """
+    if DATABASE_URL and DATABASE_URL.startswith("postgres"):
+        if psycopg2 is None:
+            raise RuntimeError(
+                "psycopg2 is required for PostgreSQL. Install psycopg2-binary."
+            )
+        return psycopg2.connect(DATABASE_URL)
+    conn = sqlite3.connect(str(_resolve_sqlite_path(BASE_DIR)))
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+DB_PATH = _resolve_sqlite_path(BASE_DIR)
 
 PATH_PREFIX = "0.राम|"
 _GEO_CHILD_TABLES = frozenset({"district", "tehsil", "village"})
@@ -93,12 +170,16 @@ SIGNS_BY_ELEMENT: dict[str, tuple[str, str, str]] = {
 UPGRADE_ACCOUNT_TYPES = frozenset(
     {"Volunteer", "Agent", "Manager", "Leader", "Mentor"}
 )
+COUNCIL_UPGRADE_TYPES = frozenset({"Volunteer", "Agent", "Manager"})
+ADMIN_ONLY_UPGRADE_TYPES = frozenset({"Leader", "Mentor"})
 
 DEMO_ACCOUNT_TYPE_PREFIX = "D_U"
 
 # Legacy registration IDs (U-XXXXXXXX); login accepts any stored private_id shape.
 PRIVATE_ID_RE = re.compile(r"^\s*(U-[A-Za-z0-9]{8})\s*$", re.I)
-PRIVATE_ID_LOGIN_RE = re.compile(r"^[\w./|\-]{3,190}$")
+# Login: 9-digit numeric Private ID, or the fixed admin account id.
+PRIVATE_ID_LOGIN_RE = re.compile(r"^\d{9}$")
+ADMIN_PRIVATE_ID = "H_U_ADMIN"
 
 USER_TABLE_SQL = """
 CREATE TABLE IF NOT EXISTS users (
@@ -154,6 +235,8 @@ CREATE TABLE IF NOT EXISTS posts (
     content TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     current_level TEXT NOT NULL DEFAULT 'personal',
+    -- Levels: personal | village | tehsil | district | state | country | continent | earth
+    -- Global users (no Indian village origin) escalate: personal -> country -> continent -> earth
     level_start_time TIMESTAMP,
     status TEXT NOT NULL DEFAULT 'live',
     total_score INTEGER NOT NULL DEFAULT 0,
@@ -461,15 +544,135 @@ def build_geo_public_url(kind: str, gid: str) -> str:
     abort(404)
 
 app = Flask(__name__)
-# Session signing: set SECRET_KEY or QUANTUM_BOX_SECRET in production.
-app.config["SECRET_KEY"] = (
-    os.environ.get("SECRET_KEY")
-    or os.environ.get("QUANTUM_BOX_SECRET")
-    or "dev"
-)
+# Session signing and cookie hardening come from config.py (env-driven).
+app.config.update(config.as_flask_config())
 app.secret_key = app.config["SECRET_KEY"]
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.DEBUG if config.DEBUG else logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
+logger = logging.getLogger("qumanity")
+config.log_warnings()
+
+
+def _language_geo_helpers() -> dict[str, Any]:
+    return {
+        "geo_path_to_state_path": geo_path_to_state_path,
+        "raw_path_fn": raw_path,
+    }
+
+
+def resolve_user_language(
+    conn: sqlite3.Connection, user_row: sqlite3.Row | None
+) -> str:
+    return language_core.resolve_preferred_language(
+        conn, session, user_row, **_language_geo_helpers()
+    )
+
+
+def active_ui_language(
+    conn: sqlite3.Connection | None = None,
+    user_row: sqlite3.Row | None = None,
+) -> str:
+    """UI label language — honors explicit dropdown choice over auto-detect."""
+    helpers = _language_geo_helpers()
+    if conn is None:
+        try:
+            conn = get_db()
+        except Exception:
+            conn = None
+    if user_row is None and session.get("user_pk") and conn is not None:
+        try:
+            user_row = conn.execute(
+                "SELECT * FROM users WHERE id = ?",
+                (int(session["user_pk"]),),
+            ).fetchone()
+        except Exception:
+            user_row = None
+    return language_core.ui_language_code(
+        conn, session, user_row, **helpers
+    )
+
+
+def language_dropdown_options(
+    conn: sqlite3.Connection, user_row: sqlite3.Row | None
+) -> list[dict[str, str]]:
+    return language_core.build_language_dropdown_options(
+        conn, user_row, **_language_geo_helpers()
+    )
+
+
+@app.template_filter("tr")
+def translate_filter(key: str, language_code: str | None = None) -> str:
+    lang = (language_code or getattr(g, "ui_language", None) or "en").strip().lower()
+    return get_text(key, lang)
+
+
+@app.before_request
+def _bind_ui_language() -> None:
+    if session.get("language_user_choice"):
+        g.ui_language = str(session.get("preferred_language") or "en").strip().lower() or "en"
+        return
+    try:
+        g.ui_language = active_ui_language()
+    except Exception:
+        g.ui_language = str(session.get("preferred_language") or "en").strip().lower() or "en"
+
+
+@app.context_processor
+def inject_language_context() -> dict[str, Any]:
+    # English is the default for everyone. The dropdown shows ONLY the languages
+    # relevant to this user: their state's default language, their mother tongue
+    # (if different), and English — never the full list. Logged-out visitors see
+    # just English.
+    lang = (getattr(g, "ui_language", None) or "en").strip().lower()
+    if lang not in TRANSLATIONS:
+        lang = "en"
+    options: list[dict[str, str]] = [{"code": "en", "label": "English"}]
+    try:
+        conn = get_db()
+        user_row = None
+        if session.get("user_pk"):
+            user_row = conn.execute(
+                "SELECT * FROM users WHERE id = ?",
+                (int(session["user_pk"]),),
+            ).fetchone()
+        options = language_dropdown_options(conn, user_row)
+    except Exception:
+        options = [{"code": "en", "label": "English"}]
+    # Ensure the active language is always selectable even if it is outside the
+    # relevant set (e.g. a user explicitly chose another language earlier).
+    if lang not in {o["code"] for o in options}:
+        options.append(
+            {"code": lang, "label": language_core.language_option_label(lang)}
+        )
+    return {
+        "preferred_language": lang,
+        "current_language": lang,
+        "language_options": options,
+    }
+
+
+@app.context_processor
+def inject_council_context() -> dict[str, Any]:
+    """Expose council / mentor flags to templates (hamburger menu, Space sections)."""
+    try:
+        if not session.get("user_pk"):
+            return {"is_council_member": False, "is_mentor": False}
+        conn = get_db()
+        user_row = getattr(g, "current_user", None)
+        if user_row is None:
+            user_row = conn.execute(
+                "SELECT * FROM users WHERE id = ?",
+                (int(session["user_pk"]),),
+            ).fetchone()
+        return {
+            "is_council_member": is_council_member(conn, user_row),
+            "is_mentor": deceased_core.is_mentor_user(conn, user_row),
+        }
+    except Exception:
+        return {"is_council_member": False, "is_mentor": False}
 app.logger.setLevel(logging.INFO)
 _last_escalation_check = 0.0
 
@@ -506,6 +709,11 @@ except ImportError:
 
 
 def get_db() -> sqlite3.Connection:
+    if DATABASE_URL and DATABASE_URL.startswith("postgres"):
+        raise RuntimeError(
+            "PostgreSQL DATABASE_URL is set but Qumanity still uses SQLite SQL. "
+            "Use DATABASE_URL=sqlite:////data/indiaq.db for Docker/cloud deploy."
+        )
     if "db" not in g:
         conn = sqlite3.connect(DB_PATH)
         conn.row_factory = sqlite3.Row
@@ -982,6 +1190,62 @@ def is_admin_user(user_row: sqlite3.Row | None) -> bool:
         return False
 
 
+def is_council_member(conn: sqlite3.Connection, user_row: sqlite3.Row | None) -> bool:
+    """True if the user is Admin (Mentor) or holds any filled leadership slot at
+    any geographic level (Village → Earth)."""
+    if user_row is None:
+        return False
+    if is_admin_user(user_row):
+        return True
+    try:
+        private_id = str(user_row["private_id"] or "").strip()
+    except (KeyError, TypeError):
+        private_id = ""
+    if not private_id:
+        return False
+    try:
+        row = conn.execute(
+            """
+            SELECT COUNT(*) AS c FROM leadership_council
+            WHERE current_holder_private_id = ? AND status = 'filled'
+            """,
+            (private_id,),
+        ).fetchone()
+        return bool(row and int(row["c"] or 0) > 0)
+    except sqlite3.Error:
+        return False
+
+
+def user_can_upgrade_to(
+    conn: sqlite3.Connection,
+    upgrader: sqlite3.Row | None,
+    target_type: str,
+) -> bool:
+    target = str(target_type or "").strip()
+    if not target:
+        return False
+    if is_admin_user(upgrader):
+        return target in UPGRADE_ACCOUNT_TYPES
+    if is_council_member(conn, upgrader):
+        return target in COUNCIL_UPGRADE_TYPES
+    return False
+
+
+def council_or_admin_required(view):
+    """Decorator: admin or elected council member. Implies login."""
+
+    @wraps(view)
+    @login_required
+    def _wrap(*args: Any, **kwargs: Any):
+        conn = get_db()
+        user = getattr(g, "current_user", None)
+        if not is_admin_user(user) and not is_council_member(conn, user):
+            return jsonify({"error": "Admin or Council member only"}), 403
+        return view(*args, **kwargs)
+
+    return _wrap
+
+
 def admin_required(view):
     """Decorator: 403 unless ``g.current_user.is_admin`` is truthy. Implies login."""
     @wraps(view)
@@ -1189,6 +1453,38 @@ def user_zone_info(
     return {"zone_code": code, "zone_id": zid, "zone_name": name}
 
 
+def donation_location_context(
+    conn: sqlite3.Connection,
+    *,
+    village_id: str,
+    country_id: str = "IND",
+    continent_id: str = "",
+) -> dict[str, str]:
+    """Resolve wallet IDs for the 8 geographic donation tiers."""
+    vid = (village_id or "").strip()
+    by_scope: dict[str, str] = {}
+    if vid:
+        by_scope = {h["scope"]: h["id"] for h in current_location_hierarchy(conn, vid)}
+    zone_id = ""
+    if vid:
+        zc = zone_code_from_village_location_id(vid)
+        if zc:
+            zone_id = full_id_from_raw(f"IND.{zc}")
+    ctry = (country_id or "IND").strip().upper() or "IND"
+    cont = (continent_id or "").strip().upper()
+    if not cont and ctry == "IND":
+        cont = "AS"
+    return donation_core.build_location_context(
+        village_id=vid,
+        country_id=ctry,
+        continent_id=cont,
+        zone_id=zone_id,
+        state_id=by_scope.get("state", ""),
+        district_id=by_scope.get("district", ""),
+        tehsil_id=by_scope.get("tehsil", ""),
+    )
+
+
 def user_location_predicate_fk(scope: str, full_id: str) -> tuple[str, tuple]:
     fid = full_id.strip()
     if scope == "village":
@@ -1249,20 +1545,54 @@ def _indian_users_predicate(conn: sqlite3.Connection) -> tuple[str, tuple]:
     return where_sql, ()
 
 
+def get_countries_by_continent(
+    conn: sqlite3.Connection, continent_id: str
+) -> list[str]:
+    """Return country ids belonging to a continent (from ``country`` table)."""
+    cid = (continent_id or "").strip().upper()
+    if not cid or not _geo_table_exists(conn, "country"):
+        return []
+    cur = conn.execute(
+        "SELECT id FROM country WHERE continent_id = ? ORDER BY id",
+        (cid,),
+    )
+    return [str(r["id"]).strip() for r in cur if str(r["id"] or "").strip()]
+
+
 def user_location_predicate(
     conn: sqlite3.Connection, scope: str, full_id: str | None
 ) -> tuple[str, tuple]:
     if scope == "earth":
         return "1=1", ()
 
+    user_cols = _table_columns(conn, "users")
+    has_current_country = "current_country_id" in user_cols
+
     if scope == "continent":
         cont = (full_id or "").strip().upper()
+        if has_current_country and _geo_table_exists(conn, "country"):
+            return (
+                "TRIM(COALESCE(u.current_country_id, '')) IN "
+                "(SELECT id FROM country WHERE continent_id = ?)",
+                (cont,),
+            )
         if cont == "AS":
             return _indian_users_predicate(conn)
         return "1=0", ()
 
     if scope == "country":
         ctry = (full_id or "").strip().upper()
+        if has_current_country:
+            if ctry == "IND":
+                ind_pred, ind_params = _indian_users_predicate(conn)
+                return (
+                    f"(TRIM(COALESCE(u.current_country_id, '')) = ? OR ({ind_pred}))",
+                    (ctry,) + ind_params,
+                )
+            return (
+                "TRIM(COALESCE(u.current_country_id, '')) = ?",
+                (ctry,),
+            )
         if ctry == "IND":
             return _indian_users_predicate(conn)
         cols_zone = _table_columns(conn, "zone")
@@ -1787,6 +2117,22 @@ def life_stage_from_age(age: int) -> str:
     return "Sanyas"
 
 
+def validate_password_strength(password: str) -> tuple[bool, str]:
+    """Minimum 9 chars, upper, lower, digit, special."""
+    pw = password or ""
+    if len(pw) < 9:
+        return False, "Password must be at least 9 characters."
+    if not re.search(r"[A-Z]", pw):
+        return False, "Password must contain at least one capital letter."
+    if not re.search(r"[a-z]", pw):
+        return False, "Password must contain at least one small letter."
+    if not re.search(r"[0-9]", pw):
+        return False, "Password must contain at least one number."
+    if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", pw):
+        return False, "Password must contain at least one special character."
+    return True, "Valid"
+
+
 def age_group_from_age(age: int) -> str:
     return life_stage_from_age(age)
 
@@ -1893,6 +2239,77 @@ def village_exists(conn: sqlite3.Connection, vid: str) -> bool:
         ((vid or "").strip(),),
     ).fetchone()
     return row is not None
+
+
+def _india_chain_ids_from_village(
+    conn: sqlite3.Connection, village_id: str | None
+) -> dict[str, str]:
+    """State/district/tehsil/village full ids for registration form restore."""
+    vid = (village_id or "").strip()
+    if not vid:
+        return {}
+    hier = current_location_hierarchy(conn, vid)
+    by_scope = {str(h["scope"]): str(h["id"]) for h in hier}
+    return {
+        "state_id": by_scope.get("state", ""),
+        "district_id": by_scope.get("district", ""),
+        "tehsil_id": by_scope.get("tehsil", ""),
+        "village_id": by_scope.get("village", vid),
+    }
+
+
+def _enrich_register_form_geo(conn: sqlite3.Connection, form: dict[str, Any]) -> None:
+    """Add birth_/current_ state_id… keys from village ids for chained dropdown restore."""
+    for prefix, loc_key in (
+        ("birth", "birth_location_id"),
+        ("current", "current_location_id"),
+    ):
+        chain = _india_chain_ids_from_village(conn, form.get(loc_key))
+        for k, v in chain.items():
+            form[f"{prefix}_{k}"] = v
+
+    birth_ctry = str(form.get("birth_country_id") or "").strip().upper()
+    curr_ctry = str(form.get("current_country_id") or "").strip().upper()
+    if form.get("birth_location_selected") != "1":
+        if birth_ctry == "IND" and form.get("birth_location_id"):
+            form["birth_location_selected"] = "1"
+        elif birth_ctry and birth_ctry != "IND":
+            if global_core.country_has_states(conn, birth_ctry):
+                if form.get("birth_global_state_id"):
+                    form["birth_location_selected"] = "1"
+            else:
+                form["birth_location_selected"] = "1"
+    if form.get("current_location_selected") != "1":
+        if curr_ctry == "IND" and form.get("current_location_id"):
+            form["current_location_selected"] = "1"
+        elif curr_ctry and curr_ctry != "IND":
+            if global_core.country_has_states(conn, curr_ctry):
+                if form.get("current_global_state_id"):
+                    form["current_location_selected"] = "1"
+            else:
+                form["current_location_selected"] = "1"
+
+
+def user_in_indian_village(conn: sqlite3.Connection, user_row: sqlite3.Row) -> bool:
+    """Village commerce/wallet features only for users at an Indian village location."""
+    try:
+        cloc = str(user_row["current_location_id"] or "").strip()
+    except (KeyError, IndexError):
+        return False
+    if not cloc or not _current_location_suggests_india(conn, cloc):
+        return False
+    return village_exists(conn, cloc)
+
+
+def _qoin_hierarchy_resolver(user_private_id: str) -> list[dict[str, str]]:
+    conn = get_db()
+    row = conn.execute(
+        "SELECT current_location_id FROM users WHERE private_id = ?",
+        (user_private_id,),
+    ).fetchone()
+    if not row or not row["current_location_id"]:
+        return []
+    return current_location_hierarchy(conn, str(row["current_location_id"]))
 
 
 def _location_display_label_join(conn: sqlite3.Connection, village_id: str) -> str | None:
@@ -2173,41 +2590,28 @@ def user_has_full_dashboard(
     conn: sqlite3.Connection | None, user_row: sqlite3.Row
 ) -> bool:
     """
-    India dashboard (stats, posts) vs limited global viewer.
+    India-associated dashboard features (Public timeline, village posts, etc.).
 
-    Mirrors ``_indian_users_predicate`` intent: honour explicit non-Indian
-    ``current_country_id``, but treat ``country='India'`` and Indian village paths
-    or FK lookups as qualifying when codes are missing or stale.
+    Available when the user has India as birth and/or present country (Types A, B, D).
+    Type C (global-only) users use Private, Personal, and Global accounts instead.
     """
-    cc = ""
-    if "current_country_id" in user_row.keys():
-        raw = user_row["current_country_id"]
-        if raw is not None:
-            cc = str(raw).strip().upper()
+    _ = conn
+    return identity_core.user_birth_in_india(user_row) or identity_core.user_present_in_india(
+        user_row
+    )
 
-    cloc = ""
-    if user_row["current_location_id"] is not None:
-        cloc = str(user_row["current_location_id"]).strip()
 
-    # Registration selected a non-India current country — no override.
-    if cc and cc != "IND":
-        return False
+GLOBAL_COLLECTIVE_BOARD_LEVELS = frozenset({"earth", "continent", "country"})
 
-    if cc == "IND":
+
+def user_can_access_collective_board(
+    conn: sqlite3.Connection | None, user_row: sqlite3.Row, level: str
+) -> bool:
+    if level in GLOBAL_COLLECTIVE_BOARD_LEVELS:
         return True
-
-    if _user_text_country_is_india(user_row):
-        return True
-
-    if conn is not None and _current_location_suggests_india(conn, cloc):
-        return True
-
-    # Backward-compat: path-only installs without FK columns when conn not passed.
-    if conn is None and cloc:
-        cu = cloc.upper()
-        return "IND/" in cu or "IND." in cu
-
-    return False
+    if level == "state" and global_core.is_global_only_user(user_row):
+        return bool(global_core.user_global_state_id(user_row))
+    return user_has_full_dashboard(conn, user_row)
 
 
 def gender_letter_account(gender: str | None) -> str:
@@ -2319,14 +2723,91 @@ def current_location_hierarchy(
 
 
 def user_public_allowed_location_ids(
-    conn: sqlite3.Connection, user_row: sqlite3.Row
+    conn: sqlite3.Connection,
+    user_row: sqlite3.Row,
+    *,
+    village_id: str | None = None,
 ) -> set[str]:
-    """IDs in the logged-in user's current village hierarchy (State…Village)."""
-    cloc = user_row["current_location_id"]
+    """IDs in the logged-in user's active village hierarchy (State…Village)."""
+    if global_core.is_global_only_user(user_row):
+        sid = global_core.user_global_state_id(user_row)
+        allowed = set()
+        if sid:
+            allowed.add(sid)
+        try:
+            cid = str(user_row["current_country_id"] or "").strip().upper()
+        except (KeyError, IndexError):
+            cid = ""
+        if cid:
+            allowed.add(cid)
+        return allowed
+    cloc = village_id or effective_dashboard_village_id(conn, user_row)
     if cloc is None or str(cloc).strip() == "":
         return set()
     hier = current_location_hierarchy(conn, str(cloc).strip())
     return {str(item["id"]).strip() for item in hier if str(item.get("id") or "").strip()}
+
+
+def session_location_mode(user_row: sqlite3.Row) -> str:
+    mode = session.get("location_mode")
+    if mode in ("birth", "present") and identity_core.can_toggle_location(user_row):
+        return str(mode)
+    return identity_core.default_location_mode(user_row)
+
+
+def effective_dashboard_village_id(
+    conn: sqlite3.Connection, user_row: sqlite3.Row
+) -> str:
+    mode = session_location_mode(user_row)
+    vid = identity_core.active_location_id(user_row, mode)
+    return str(vid or "").strip()
+
+
+def dashboard_hierarchy_for_user(
+    conn: sqlite3.Connection, user_row: sqlite3.Row
+) -> tuple[list[dict[str, str]], str]:
+    vid = effective_dashboard_village_id(conn, user_row)
+    if not vid:
+        return [], ""
+    hier = current_location_hierarchy(conn, vid)
+    return hier, vid
+
+
+def present_village_id(user_row: sqlite3.Row) -> str:
+    """User's current (present) village — used for Public Account timeline."""
+    return str(user_row["current_location_id"] or "").strip()
+
+
+def public_hierarchy_for_user(
+    conn: sqlite3.Connection,
+    user_row: sqlite3.Row,
+    *,
+    language_code: str | None = None,
+) -> tuple[list[dict[str, str]], str]:
+    """Public Account always reflects present location, never birth."""
+    if global_core.is_global_only_user(user_row):
+        return global_core.global_public_hierarchy(conn, user_row)
+    vid = present_village_id(user_row)
+    if not vid:
+        return [], ""
+    hier = current_location_hierarchy(conn, vid)
+    lang = language_code or resolve_user_language(conn, user_row)
+    return language_core.apply_hierarchy_translations(conn, hier, lang), vid
+
+
+def user_public_allowed_location_ids_present(
+    conn: sqlite3.Connection, user_row: sqlite3.Row
+) -> set[str]:
+    """IDs in the user's present-village hierarchy (State…Village)."""
+    cloc = present_village_id(user_row)
+    if not cloc:
+        return set()
+    hier = current_location_hierarchy(conn, cloc)
+    return {str(item["id"]).strip() for item in hier if str(item.get("id") or "").strip()}
+
+
+def elections_are_enabled() -> bool:
+    return bool(getattr(election_scheduler, "ELECTIONS_ENABLED", False))
 
 
 def user_effective_country_id(
@@ -2406,7 +2887,7 @@ def user_dashboard_geo_displays(
     else:
         global_id = f"{PATH_PREFIX}{earth_slug}.?.?"
 
-    show_zone_tab = ctry_id == "IND"
+    show_zone_tab = identity_core.user_show_zone_tab(user_row)
     zinfo = user_zone_info(conn, user_row) if show_zone_tab else {
         "zone_code": None,
         "zone_id": None,
@@ -2492,13 +2973,14 @@ def _escalation_label_for_frozen(post: sqlite3.Row | dict[str, Any]) -> str:
     if not frozen_at:
         return "Frozen"
     try:
-        idx = social_core.POST_LEVEL_ORDER.index(frozen_at)
+        order = social_core.post_level_order(d)
+        idx = order.index(frozen_at)
     except ValueError:
         return "Frozen"
     if frozen_at == "earth":
         return "Journey complete"
-    if idx + 1 < len(social_core.POST_LEVEL_ORDER):
-        nxt = social_core.POST_LEVEL_ORDER[idx + 1]
+    if idx + 1 < len(order):
+        nxt = order[idx + 1]
         return f"Escalated to {nxt.title()}"
     return "Frozen"
 
@@ -2853,16 +3335,60 @@ def _before_request() -> None:
         migrate_user_education_work_v2(conn)
         migrate_connection_requests_life_stage(conn)
         election_scheduler.migrate_election_tables(conn)
+        leadership_core.migrate_leadership_council(conn)
+        leadership_core.seed_mentor_slots(conn)
+        language_core.migrate_and_seed(conn)
         social_core.ensure_wallet_and_vote_tables(conn)
         qoin_core.migrate_qoin_transactions(conn)
         qoin_core.migrate_cash_donations(conn)
+        qoin_core.migrate_qoin_economy_tables(conn)
         zodiac_calendar.migrate_calendar_event_tables(conn)
+        import village_platform
+
+        village_platform.migrate_village_platform_tables(conn)
+        identity_core.migrate_identity_tables(conn)
+        referral_core.migrate_referral_schema(conn)
+        donation_core.migrate_donation_schema(conn)
+        varna_core.migrate_varna_schema(conn)
+        planetary_core.migrate_space_schema(conn)
+        global_core.migrate_global_location_schema(conn)
+        element_core.migrate_element_core_schema(conn)
+        if elections_are_enabled():
+            try:
+                election_scheduler.process_election_cycles(
+                    conn, send_system_message_fn=send_system_message
+                )
+            except sqlite3.Error:
+                app.logger.exception("election cycle processing failed")
         try:
-            election_scheduler.process_election_cycles(
-                conn, send_system_message_fn=send_system_message
+            qoin_scheduler.run_weekly_settlement_if_due(
+                conn,
+                hierarchy_resolver=_qoin_hierarchy_resolver,
+                notify_fn=send_system_message,
             )
         except sqlite3.Error:
-            app.logger.exception("election cycle processing failed")
+            app.logger.exception("weekly qoin settlement failed")
+        try:
+            qoin_scheduler.run_monthly_varna_recalc_if_due(conn)
+        except sqlite3.Error:
+            app.logger.exception("monthly varna recalc failed")
+        try:
+            qoin_scheduler.run_daily_planetary_update_if_due(conn)
+        except sqlite3.Error:
+            app.logger.exception("daily planetary update failed")
+        try:
+            qoin_scheduler.run_akashic_archive_jobs_if_due(conn)
+        except sqlite3.Error:
+            app.logger.exception("akashic archive jobs failed")
+        try:
+            qoin_scheduler.run_daily_age_category_update_if_due(
+                conn,
+                life_stage_from_age_fn=life_stage_from_age,
+                compute_age_fn=compute_age,
+                notify_fn=send_system_message,
+            )
+        except sqlite3.Error:
+            app.logger.exception("daily age category update failed")
         social_core.ensure_wallet_and_vote_tables(conn)
         social_core.ensure_posts_escalation_columns(conn)
         migrate_posts_deletion_columns(conn)
@@ -2954,6 +3480,7 @@ def _geo_statistics_page(scope: str, geo_id: str) -> str:
         admin_members_list_url=admin_members_list_url,
         village_wallet_qoins=village_wallet_qoins,
         village_wallet_rupees=village_wallet_rupees,
+        location_id=geo_id.strip(),
     )
 
 
@@ -2996,6 +3523,7 @@ def location_india():
         wallet_account_id="IND",
         signs_by_element=SIGNS_BY_ELEMENT,
         admin_members_list_url=admin_members_list_url,
+        location_id="IND",
     )
 
 
@@ -3172,30 +3700,53 @@ def api_location_count():
 
 def _api_create_post_core() -> tuple[Any, int]:
     conn = get_db()
-    if not user_has_full_dashboard(conn, g.current_user):
-        return jsonify({"error": "Dashboard features are limited to India residents."}), 403
     user_row = g.current_user
     payload = request.get_json(silent=True) or {}
-    location_id = str(user_row["current_location_id"] or "").strip()
     content = str(
         payload.get("content") or request.form.get("content") or ""
     ).strip()
 
-    if not location_id:
-        return jsonify({"error": "Your current village is required to create a post"}), 400
     if not content:
         return jsonify({"error": "Post content cannot be empty"}), 400
     if len(content) > 500:
         return jsonify({"error": "Post content is too long (max 500 characters)"}), 400
-    if infer_geo_scope_from_full_id(conn, location_id) != "village":
-        return jsonify({"error": "Your current location must be a village"}), 400
 
-    hier = current_location_hierarchy(conn, location_id)
-    origins = social_core.origins_from_hierarchy(
-        hier,
-        str(user_row["current_country_id"] or "IND"),
-        str(user_row["current_continent_id"] or "AS"),
-    )
+    situation = identity_core.user_situation_type(user_row)
+    is_global_only = situation == "C"
+
+    if is_global_only:
+        country_id = str(user_row["current_country_id"] or "").strip().upper()
+        continent_id = str(user_row["current_continent_id"] or "").strip().upper()
+        state_id = global_core.user_global_state_id(user_row)
+        if not country_id:
+            return jsonify(
+                {"error": "Your current country is required to create a post"}
+            ), 400
+        if global_core.country_has_states(conn, country_id) and not state_id:
+            return jsonify(
+                {"error": "Your state/province is required to create a post"}
+            ), 400
+        origins = social_core.origins_for_global_user(
+            country_id, continent_id, state_id=state_id
+        )
+        location_id = state_id or country_id
+    else:
+        if not user_has_full_dashboard(conn, user_row):
+            return jsonify(
+                {"error": "Posting requires an India birth or present location."}
+            ), 403
+        location_id = str(user_row["current_location_id"] or "").strip()
+        if not location_id:
+            return jsonify({"error": "Your current village is required to create a post"}), 400
+        if infer_geo_scope_from_full_id(conn, location_id) != "village":
+            return jsonify({"error": "Your current location must be a village"}), 400
+        hier = current_location_hierarchy(conn, location_id)
+        origins = social_core.origins_from_hierarchy(
+            hier,
+            str(user_row["current_country_id"] or "IND"),
+            str(user_row["current_continent_id"] or "AS"),
+        )
+
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     conn.execute(
         """
@@ -3394,16 +3945,36 @@ def _validate_collective_board_request(
 
     allowed_profile_locations = user_public_allowed_location_ids(conn, user_row)
     if level in {"village", "tehsil", "district", "state"}:
+        if global_core.is_global_only_user(user_row) and level == "state":
+            gs = global_core.user_global_state_id(user_row)
+            if gs and location_id == gs:
+                return True, location_id, ""
         if location_id not in allowed_profile_locations:
             return False, location_id, "location_id must be your profile hierarchy"
         scope = infer_geo_scope_from_full_id(conn, location_id)
-        if scope != level:
+        if scope != level and not (
+            level == "state"
+            and global_core.is_global_only_user(user_row)
+            and location_id == global_core.user_global_state_id(user_row)
+        ):
             return False, location_id, "level and location_id do not match"
     elif level == "country":
+        if _geo_table_exists(conn, "country"):
+            crow = conn.execute(
+                "SELECT id FROM country WHERE id = ?", (location_id,)
+            ).fetchone()
+            if crow:
+                return True, location_id, ""
         user_country = str(user_row["current_country_id"] or "").strip()
         if location_id != user_country:
             return False, location_id, "location_id must match your country"
     elif level == "continent":
+        if _geo_table_exists(conn, "continent"):
+            conr = conn.execute(
+                "SELECT id FROM continent WHERE id = ?", (location_id,)
+            ).fetchone()
+            if conr:
+                return True, location_id, ""
         user_continent = str(user_row["current_continent_id"] or "").strip()
         if location_id != user_continent:
             return False, location_id, "location_id must match your continent"
@@ -3623,8 +4194,7 @@ def _personal_board_rows(
 @_api_handle_errors
 def api_personal_board():
     conn = get_db()
-    if not user_has_full_dashboard(conn, g.current_user):
-        return jsonify({"error": "Dashboard features are limited to India residents."}), 403
+    _ = conn
     _safe_escalate_posts(conn)
 
     board_state = (request.args.get("state") or "live").strip().lower()
@@ -4236,7 +4806,7 @@ def api_notifications_unread():
             f"{str(row['sender_last'] or '').strip()}"
         ).strip()
         if sender_id == SYSTEM_SENDER_ID:
-            sender_name = "Quantum Box (System)"
+            sender_name = "Qumanity (System)"
         elif not sender_name:
             sender_name = sender_id or "Unknown sender"
         messages_list.append(
@@ -4442,16 +5012,7 @@ def _is_demo_account_type(account_type: str | None) -> bool:
 
 
 def _validate_agent_public_id(conn: sqlite3.Connection, agent_public_id: str) -> bool:
-    pid = (agent_public_id or "").strip()
-    if not pid:
-        return False
-    row = conn.execute(
-        "SELECT account_type FROM users WHERE public_id = ? COLLATE NOCASE",
-        (pid,),
-    ).fetchone()
-    if not row:
-        return False
-    return str(row["account_type"] or "").strip() == "Agent"
+    return identity_core.validate_cash_recipient_public_id(conn, agent_public_id)
 
 
 def _user_karma_index(user_row: sqlite3.Row) -> int:
@@ -4678,10 +5239,102 @@ def migrate_admin_user_profile(conn: sqlite3.Connection) -> None:
         qoin_core.credit_signup_bonus(conn, "H_U_ADMIN")
 
 
+@app.post("/api/set-language")
+def api_set_language():
+    from translations import LANGUAGE_META, TRANSLATIONS
+
+    data = request.get_json(silent=True) or {}
+    lang = str(data.get("language") or "").strip().lower()
+    if not lang:
+        return jsonify({"error": "language is required"}), 400
+    if lang not in TRANSLATIONS and lang not in LANGUAGE_META:
+        return jsonify({"error": "unsupported language"}), 400
+    session.permanent = True
+    session["preferred_language"] = lang
+    session["language_user_choice"] = True
+    session.modified = True
+    return jsonify({"ok": True, "status": "ok", "language": lang})
+
+
+@app.post("/api/user/mother-tongue")
+@login_required
+@_api_handle_errors
+def api_user_mother_tongue():
+    conn = get_db()
+    data = request.get_json(silent=True) or {}
+    code = str(data.get("mother_tongue_code") or data.get("code") or "").strip().lower()
+    name = str(data.get("mother_tongue_name") or data.get("name") or "").strip()
+    if not code:
+        conn.execute(
+            """
+            UPDATE users SET mother_tongue_code = NULL, mother_tongue_name = NULL
+            WHERE id = ?
+            """,
+            (int(g.current_user["id"]),),
+        )
+        conn.commit()
+        return jsonify({"ok": True, "mother_tongue_code": None, "mother_tongue_name": None})
+    if not name:
+        for ch in language_core.all_language_choices(conn):
+            if ch["code"] == code:
+                name = ch["name"]
+                break
+    conn.execute(
+        """
+        UPDATE users SET mother_tongue_code = ?, mother_tongue_name = ?
+        WHERE id = ?
+        """,
+        (code, name or code, int(g.current_user["id"])),
+    )
+    conn.commit()
+    return jsonify({"ok": True, "mother_tongue_code": code, "mother_tongue_name": name})
+
+
+@app.get("/api/leadership/<level_type>/<path:location_id>")
+@login_required
+@_api_handle_errors
+def api_leadership_get(level_type: str, location_id: str):
+    conn = get_db()
+    try:
+        payload = leadership_core.get_leadership_for_location(
+            conn, level_type, location_id
+        )
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    payload["is_admin"] = is_admin_user(g.current_user)
+    return jsonify(payload)
+
+
+@app.post("/api/leadership/appoint")
+@login_required
+@_api_handle_errors
+def api_leadership_appoint():
+    if not is_admin_user(g.current_user):
+        return jsonify({"error": "Admin only"}), 403
+    return jsonify(
+        {
+            "error": "Appointments are not available in this prototype phase.",
+            "ok": False,
+        }
+    ), 501
+
+
 @app.get("/api/election/status")
 @login_required
 @_api_handle_errors
 def api_election_status():
+    if not elections_are_enabled():
+        return jsonify(
+            {
+                "elections_enabled": False,
+                "paused": True,
+                "message": (
+                    "Elections are currently paused. They will resume during the "
+                    "Gemini month. Please check back later."
+                ),
+                "phase": "paused",
+            }
+        )
     conn = get_db()
     user = g.current_user
     uid = str(user["private_id"])
@@ -4764,6 +5417,19 @@ def api_election_status():
 @login_required
 def api_election_history():
     """Prototype placeholder — past cycles will be listed here later."""
+    if not elections_are_enabled():
+        return jsonify(
+            {
+                "paused": True,
+                "past_nominations": [],
+                "past_voting_results": [],
+                "past_winners": [],
+                "message": (
+                    "Elections are currently paused. They will resume during the "
+                    "Gemini month. Please check back later."
+                ),
+            }
+        )
     return jsonify(
         {
             "past_nominations": [],
@@ -4777,6 +5443,15 @@ def api_election_history():
 @app.post("/api/election/nominate")
 @login_required
 def api_election_nominate():
+    if not elections_are_enabled():
+        return jsonify(
+            {
+                "error": (
+                    "Elections are currently paused. They will resume during the "
+                    "Gemini month. Please check back later."
+                )
+            }
+        ), 403
     conn = get_db()
     user = g.current_user
     cycle_row, active = _election_cycle_row_for_today(conn)
@@ -4807,6 +5482,21 @@ def api_election_nominate():
     if st != "nomination":
         return jsonify({"error": "Nominations are closed"}), 400
     payload = request.get_json(silent=True) or {}
+    target_role = str(payload.get("target_role") or payload.get("slot_designation") or "").strip().lower()
+    if target_role and not varna_core.can_nominate_for_council(
+        conn, str(user["private_id"]), target_role
+    ):
+        return jsonify(
+            {
+                "error": (
+                    "Your Dharma profile suggests other council roles. "
+                    "See eligible roles on your Private Account dashboard."
+                ),
+                "eligible_roles": varna_core.eligible_roles_for_user(
+                    conn, str(user["private_id"])
+                ),
+            }
+        ), 403
     why = str(payload.get("why_stand") or "").strip()
     changes = str(payload.get("changes") or "").strip()
     if not why or not changes:
@@ -5274,6 +5964,15 @@ def api_admin_location_members_json():
 @app.post("/api/election/vote")
 @login_required
 def api_election_vote():
+    if not elections_are_enabled():
+        return jsonify(
+            {
+                "error": (
+                    "Elections are currently paused. They will resume during the "
+                    "Gemini month. Please check back later."
+                )
+            }
+        ), 403
     conn = get_db()
     user = g.current_user
     uid = str(user["private_id"])
@@ -5344,13 +6043,18 @@ def api_election_vote():
         """,
         (cid, uid, cand_pid, gender_slot),
     )
+    rewards_activated = donation_core.activate_rewards(
+        conn, uid, notify_fn=send_system_message
+    )
     conn.commit()
-    return jsonify({"ok": True})
+    return jsonify({"ok": True, "rewards_activated": rewards_activated})
 
 
 @app.get("/api/election/results")
 @login_required
 def api_election_results():
+    if not elections_are_enabled():
+        return jsonify({"paused": True, "cycles": []})
     conn = get_db()
     cur = conn.execute(
         """
@@ -5382,6 +6086,21 @@ def api_election_results():
 @app.get("/api/election/council")
 @login_required
 def api_election_council():
+    if not elections_are_enabled():
+        return jsonify(
+            {
+                "paused": True,
+                "king": None,
+                "queen": None,
+                "nayak": None,
+                "nayika": None,
+                "members": [],
+                "message": (
+                    "Elections are currently paused. They will resume during the "
+                    "Gemini month. Please check back later."
+                ),
+            }
+        )
     conn = get_db()
     today = date.today()
     active = election_scheduler.sun_sign_for_election_day(today)
@@ -7684,20 +8403,10 @@ def api_wallet_balance():
 
 
 def _user_wallet_coin_breakdown(conn: sqlite3.Connection, pid: str) -> list[dict[str, Any]]:
-    cur = conn.execute(
-        """
-        SELECT rupee_value, COUNT(*) AS n
-        FROM qoin_transactions
-        WHERE recipient_type = 'user' AND recipient_id = ?
-          AND COALESCE(rupee_value, 0) > 0
-        GROUP BY rupee_value
-        ORDER BY rupee_value DESC
-        """,
-        (pid,),
-    )
+    coins = qoin_core.wallet_breakdown(conn, "user", pid)
     return [
-        {"rupee_value": int(r["rupee_value"]), "count": int(r["n"])}
-        for r in cur
+        {"rupee_value": int(c["denom"]), "count": int(c["count"])}
+        for c in coins
     ]
 
 
@@ -7721,7 +8430,7 @@ def api_qoin_donate():
             return jsonify({"error": "Agent Account ID is required for cash donations"}), 400
         if not _validate_agent_public_id(conn, agent_id):
             return jsonify(
-                {"error": "Agent Account ID must belong to an Agent account"}
+                {"error": "Account ID must belong to an Agent or Admin account"}
             ), 400
     pid = str(g.current_user["private_id"])
     village_id = str(g.current_user["current_location_id"] or "").strip() or None
@@ -7750,6 +8459,884 @@ def api_qoin_transactions():
     except (TypeError, ValueError):
         limit = 50
     return jsonify({"transactions": qoin_core.user_transactions(conn, pid, limit=limit)})
+
+
+@app.get("/api/qoin/statements")
+@login_required
+def api_qoin_statements_list():
+    conn = get_db()
+    pid = str(g.current_user["private_id"])
+    return jsonify({"statements": qoin_core.list_weekly_statements(conn, pid)})
+
+
+@app.get("/api/qoin/statements/<int:statement_id>")
+@login_required
+def api_qoin_statement_detail(statement_id: int):
+    conn = get_db()
+    pid = str(g.current_user["private_id"])
+    stmt = qoin_core.get_weekly_statement(conn, pid, statement_id=statement_id)
+    if not stmt:
+        return jsonify({"error": "Statement not found"}), 404
+    return jsonify(stmt)
+
+
+@app.get("/api/qoin/statements/<int:statement_id>/html")
+@login_required
+def api_qoin_statement_html(statement_id: int):
+    conn = get_db()
+    pid = str(g.current_user["private_id"])
+    stmt = qoin_core.get_weekly_statement(conn, pid, statement_id=statement_id)
+    if not stmt:
+        return "Statement not found", 404
+    html = qoin_core.statement_html_report(stmt)
+    return html, 200, {"Content-Type": "text/html; charset=utf-8"}
+
+
+@app.get("/api/qoin/pending")
+@login_required
+def api_qoin_pending_summary():
+    conn = get_db()
+    pid = str(g.current_user["private_id"])
+    summary = qoin_core.pending_summary(conn)
+    karma = qoin_core.user_pending_karma(conn, pid)
+    return jsonify({**summary, "karma_pending": karma})
+
+
+@app.post("/api/qoin/commercial")
+@login_required
+def api_qoin_commercial():
+    conn = get_db()
+    if not user_in_indian_village(conn, g.current_user):
+        return jsonify({"error": "Commerce is available only in Indian villages"}), 403
+    payload = request.get_json(silent=True) or {}
+    try:
+        amount = int(payload.get("amount_rupees") or payload.get("amount") or 0)
+    except (TypeError, ValueError):
+        return jsonify({"error": "amount_rupees must be an integer"}), 400
+    seller = str(payload.get("seller_private_id") or "").strip()
+    if amount <= 0 or not seller:
+        return jsonify({"error": "seller_private_id and positive amount required"}), 400
+    pid = str(g.current_user["private_id"])
+    if seller == pid:
+        return jsonify({"error": "Cannot trade with yourself"}), 400
+    txid = qoin_core.record_commercial_transaction(
+        conn,
+        buyer_private_id=pid,
+        seller_private_id=seller,
+        amount_rupees=amount,
+        description=str(payload.get("description") or ""),
+    )
+    conn.commit()
+    return jsonify({"ok": True, "transaction_id": txid, "pending": True})
+
+
+@app.post("/api/qoin/karma")
+@login_required
+def api_qoin_karma_record():
+    conn = get_db()
+    payload = request.get_json(silent=True) or {}
+    action_code = str(payload.get("action_code") or "").strip()
+    if not action_code:
+        return jsonify({"error": "action_code is required"}), 400
+    pid = str(g.current_user["private_id"])
+    try:
+        result = qoin_core.record_karma_action(
+            conn,
+            user_private_id=pid,
+            action_code=action_code,
+            description=str(payload.get("description") or ""),
+            verified=bool(payload.get("verified", True)),
+        )
+        conn.commit()
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify({"ok": True, **result})
+
+
+@app.get("/api/qoin/karma/types")
+@login_required
+def api_qoin_karma_types():
+    conn = get_db()
+    return jsonify({"actions": qoin_core.karma_action_types_list(conn)})
+
+
+def _public_base_url() -> str:
+    if config.PUBLIC_BASE_URL:
+        return config.PUBLIC_BASE_URL
+    env_url = (os.environ.get("BASE_URL") or "").strip()
+    if env_url:
+        return env_url.rstrip("/")
+    try:
+        return request.url_root.rstrip("/")
+    except RuntimeError:
+        return "https://qumanity.in"
+
+
+def _razorpay_client():
+    try:
+        import razorpay
+    except ImportError:
+        return None
+    key_id = getattr(config, "RAZORPAY_KEY_ID", "") or ""
+    key_secret = getattr(config, "RAZORPAY_KEY_SECRET", "") or ""
+    if not key_id or not key_secret:
+        return None
+    return razorpay.Client(auth=(key_id, key_secret))
+
+
+def _create_razorpay_order(amount_rupees: int, *, receipt: str = "") -> dict[str, Any]:
+    client = _razorpay_client()
+    if client is None:
+        raise ValueError("Payment gateway is not configured")
+    order_data = {
+        "amount": int(amount_rupees) * 100,
+        "currency": "INR",
+        "payment_capture": 1,
+        "receipt": receipt or f"donation-{secrets.token_hex(6)}",
+    }
+    return client.order.create(data=order_data)
+
+
+def _verify_razorpay_payment(
+    payment_id: str, order_id: str, signature: str
+) -> None:
+    client = _razorpay_client()
+    if client is None:
+        raise ValueError("Payment gateway is not configured")
+    params_dict = {
+        "razorpay_payment_id": payment_id,
+        "razorpay_order_id": order_id,
+        "razorpay_signature": signature,
+    }
+    client.utility.verify_payment_signature(params_dict)
+
+
+@app.get("/api/referral/stats")
+@login_required
+def api_referral_stats():
+    conn = get_db()
+    pid = str(g.current_user["private_id"])
+    stats = referral_core.get_referral_stats(conn, pid)
+    base = _public_base_url()
+    reg_url = referral_core.build_registration_url(base, stats["referral_code"])
+    qr = referral_core.generate_qr_base64(reg_url)
+    return jsonify(
+        {
+            **stats,
+            "registration_url": reg_url,
+            "qr_code_base64": qr,
+        }
+    )
+
+
+@app.post("/api/referral/share")
+@login_required
+def api_referral_share():
+    conn = get_db()
+    pid = str(g.current_user["private_id"])
+    payload = request.get_json(silent=True) or {}
+    share_type = str(payload.get("share_type") or "").strip().lower()
+    if not share_type:
+        return jsonify({"error": "share_type is required"}), 400
+    referral_core.log_share(conn, pid, share_type)
+    conn.commit()
+    return jsonify({"ok": True})
+
+
+@app.get("/api/referral/leaderboard")
+@login_required
+def api_referral_leaderboard():
+    conn = get_db()
+    limit = request.args.get("limit", 10, type=int)
+    rows = referral_core.get_leaderboard(conn, limit=limit or 10)
+    return jsonify({"leaderboard": rows})
+
+
+@app.get("/api/referral/generate-qr")
+@login_required
+def api_referral_generate_qr():
+    conn = get_db()
+    pid = str(g.current_user["private_id"])
+    stats = referral_core.get_referral_stats(conn, pid)
+    base = _public_base_url()
+    reg_url = referral_core.build_registration_url(base, stats["referral_code"])
+    qr = referral_core.generate_qr_base64(reg_url)
+    if not qr:
+        return jsonify({"error": "QR generation unavailable (install qrcode)"}), 503
+    return jsonify({"registration_url": reg_url, "qr_code_base64": qr})
+
+
+@app.post("/api/referral/karma-share-text")
+@login_required
+def api_referral_karma_share_text():
+    conn = get_db()
+    pid = str(g.current_user["private_id"])
+    payload = request.get_json(silent=True) or {}
+    action_code = str(payload.get("action_code") or "").strip()
+    amount = int(payload.get("amount_rupees") or 0)
+    stats = referral_core.get_referral_stats(conn, pid)
+    text = referral_core.karma_share_text(action_code, amount, stats["referral_code"])
+    reg_url = referral_core.build_registration_url(
+        _public_base_url(), stats["referral_code"]
+    )
+    return jsonify({"text": text, "registration_url": reg_url, "referral_code": stats["referral_code"]})
+
+
+@app.post("/api/referral/validate")
+def api_referral_validate():
+    conn = get_db()
+    payload = request.get_json(silent=True) or {}
+    code = str(payload.get("referral_code") or payload.get("code") or "").strip()
+    result = referral_core.validate_referral_code(conn, code)
+    status = 200 if result.get("valid") else 400
+    return jsonify(result), status
+
+
+@app.post("/api/donation/preview")
+def api_donation_preview():
+    conn = get_db()
+    payload = request.get_json(silent=True) or {}
+    try:
+        amount = int(payload.get("donation_amount") if payload.get("donation_amount") is not None else payload.get("amount", 0))
+    except (TypeError, ValueError):
+        return jsonify({"error": "amount must be an integer"}), 400
+    if amount < 0 or amount > 200:
+        return jsonify({"error": "Donation must be between ₹0 and ₹200"}), 400
+    village_id = str(payload.get("village_id") or payload.get("current_location_id") or "").strip()
+    country_id = str(payload.get("country_id") or "IND").strip().upper()
+    continent_id = str(payload.get("continent_id") or "").strip().upper()
+    referrer_private_id = str(payload.get("referrer_private_id") or "").strip()
+    if not referrer_private_id:
+        ref_code = str(payload.get("referral_code") or "").strip()
+        if ref_code:
+            referrer_private_id = (
+                referral_core.lookup_referrer_by_code(conn, ref_code) or ""
+            )
+    loc_ctx = donation_location_context(
+        conn,
+        village_id=village_id,
+        country_id=country_id,
+        continent_id=continent_id,
+    )
+    try:
+        if not referrer_private_id:
+            distribution, meta = donation_core.calculate_no_referral_distribution(
+                amount,
+                location_context=loc_ctx,
+            )
+            preview = donation_core.preview_donation(amount, distribution, meta=meta)
+        else:
+            distribution = donation_core.calculate_donation_distribution(
+                amount,
+                location_context=loc_ctx,
+                referrer_private_id=referrer_private_id,
+            )
+            preview = donation_core.preview_donation(amount, distribution)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify(preview)
+
+
+@app.post("/api/donation/preview/no-referral")
+def api_donation_preview_no_referral():
+    """Public JSON preview for registration without referral (no login required)."""
+    try:
+        payload = request.get_json(silent=True) or {}
+        try:
+            amount = int(
+                payload.get("donation_amount")
+                if payload.get("donation_amount") is not None
+                else payload.get("amount", 0)
+            )
+        except (TypeError, ValueError):
+            return jsonify({"success": False, "error": "amount must be an integer"}), 400
+        if amount < 0 or amount > 200:
+            return jsonify(
+                {"success": False, "error": "Donation must be between ₹0 and ₹200"}
+            ), 400
+
+        conn = get_db()
+        village_id = str(
+            payload.get("village_id") or payload.get("current_location_id") or ""
+        ).strip()
+        country_id = str(payload.get("country_id") or "IND").strip().upper()
+        continent_id = str(payload.get("continent_id") or "").strip().upper()
+        loc_ctx = donation_location_context(
+            conn,
+            village_id=village_id,
+            country_id=country_id,
+            continent_id=continent_id,
+        )
+        preview = donation_core.preview_no_referral_donation(
+            amount,
+            location_context=loc_ctx,
+        )
+
+        tier_labels = {
+            "earth": "Earth",
+            "continent": "Continent",
+            "country": "Country",
+            "zone": "Zone",
+            "state": "State",
+            "district": "District",
+            "tehsil": "Tehsil",
+            "village": "Village",
+        }
+        location_rows: list[dict[str, Any]] = []
+        user_share_rupees = preview.get("user_pending_rupees", 0)
+        for item in preview.get("distribution") or []:
+            tier = str(item.get("tier") or "")
+            if tier == "new_user":
+                user_share_rupees = float(item.get("rupee_amount") or user_share_rupees)
+                continue
+            if tier not in tier_labels:
+                continue
+            paise = int(item.get("amount_paise") or round(float(item.get("rupee_amount") or 0) * 100))
+            location_rows.append(
+                {
+                    "name": tier_labels[tier],
+                    "tier": tier,
+                    "amount_rupees": round(paise / 100.0, 2),
+                    "amount_paise": paise,
+                    "rupee_amount": paise / 100.0,
+                }
+            )
+
+        per_loc = location_rows[0]["amount_paise"] if location_rows else 0
+        response: dict[str, Any] = {
+            "success": True,
+            "donation_amount": amount,
+            "total_paise": int(round(float(preview.get("effective_rupees") or 0) * 100)),
+            "total_rupees": preview.get("effective_rupees") or preview.get("total_rupees"),
+            "effective_rupees": preview.get("effective_rupees"),
+            "location_share_paise": per_loc,
+            "location_share_rupees": round(per_loc / 100.0, 2),
+            "user_share_paise": int(round(float(user_share_rupees) * 100)),
+            "user_share_rupees": round(float(user_share_rupees), 2),
+            "user_pending_rupees": user_share_rupees,
+            "user_share_after_vote": True,
+            "system_generated": bool(preview.get("system_generated")),
+            "distribution": location_rows,
+            "location_total_rupees": preview.get("location_share_rupees"),
+        }
+        resp = jsonify(response)
+        resp.headers["Content-Type"] = "application/json; charset=utf-8"
+        return resp, 200
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+    except Exception as exc:
+        app.logger.exception("no-referral donation preview failed")
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+
+@app.post("/api/register/no-referral")
+def api_register_no_referral():
+    """Alias for Indian registration donation when no referral code is used."""
+    pending = session.get("pending_registration")
+    if not pending:
+        return jsonify({"error": "No pending registration. Complete the form first."}), 400
+    if pending.get("referred_by_private_id"):
+        return jsonify({"error": "This endpoint is for registration without a referral code"}), 400
+    return api_register_donate()
+
+
+@app.post("/api/rewards/activate-after-vote")
+@login_required
+def api_rewards_activate_after_vote():
+    conn = get_db()
+    pid = str(g.current_user["private_id"])
+    activated = donation_core.activate_user_reward_after_vote(
+        conn, pid, notify_fn=send_system_message
+    )
+    conn.commit()
+    return jsonify({"ok": True, "activated": activated})
+
+
+@app.post("/api/volunteer/apply")
+@login_required
+def api_volunteer_apply():
+    conn = get_db()
+    user = g.current_user
+    payload = request.get_json(silent=True) or {}
+    bank_name = str(payload.get("bank_name") or "").strip()
+    account_number = str(payload.get("account_number") or "").strip()
+    branch = str(payload.get("branch") or "").strip()
+    ifsc_code = str(payload.get("ifsc_code") or "").strip()
+    reason = str(payload.get("reason") or "").strip()
+    if not all([bank_name, account_number, branch, ifsc_code]):
+        return jsonify({"error": "All bank fields are required"}), 400
+    if not reason:
+        return jsonify({"error": "Please explain why you want to become a volunteer"}), 400
+    pid = str(user["private_id"])
+    vid = str(user["current_location_id"] or "").strip()
+    hier = current_location_hierarchy(conn, vid) if vid else []
+    state_name = next((h["name"] for h in hier if h["scope"] == "state"), "")
+    try:
+        req_id = referral_core.submit_volunteer_application(
+            conn,
+            applicant_private_id=pid,
+            applicant_name=f'{user["first_name"]} {user["last_name"]}'.strip(),
+            applicant_village_id=vid,
+            applicant_state=str(state_name or ""),
+            reason=reason,
+            bank_name=bank_name,
+            account_number=account_number,
+            branch=branch,
+            ifsc_code=ifsc_code,
+        )
+        conn.commit()
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify({"ok": True, "request_id": req_id})
+
+
+@app.get("/api/volunteer/status")
+@login_required
+def api_volunteer_status():
+    conn = get_db()
+    pid = str(g.current_user["private_id"])
+    return jsonify(referral_core.get_volunteer_status(conn, pid))
+
+
+@app.get("/api/volunteer/dashboard")
+@login_required
+def api_volunteer_dashboard():
+    conn = get_db()
+    pid = str(g.current_user["private_id"])
+    try:
+        data = referral_core.get_volunteer_dashboard(conn, pid)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 404
+    base = _public_base_url()
+    data["registration_url"] = referral_core.build_registration_url(
+        base, data.get("volunteer_code") or ""
+    )
+    return jsonify(data)
+
+
+@app.get("/api/volunteer/signups")
+@login_required
+def api_volunteer_signups():
+    conn = get_db()
+    pid = str(g.current_user["private_id"])
+    vol = referral_core.get_volunteer_by_private_id(conn, pid)
+    if not vol or str(vol.get("status")) != "active":
+        return jsonify({"error": "Active volunteer record not found"}), 404
+    signups = referral_core.list_volunteer_signups(conn, pid)
+    return jsonify({"signups": signups})
+
+
+@app.get("/api/upgrade/check-permission")
+@login_required
+def api_upgrade_check_permission():
+    conn = get_db()
+    user = g.current_user
+    target = str(request.args.get("role") or request.args.get("new_account_type") or "").strip()
+    allowed = user_can_upgrade_to(conn, user, target) if target else False
+    if is_admin_user(user):
+        allowed_roles = sorted(UPGRADE_ACCOUNT_TYPES)
+    elif is_council_member(conn, user):
+        allowed_roles = sorted(COUNCIL_UPGRADE_TYPES)
+    else:
+        allowed_roles = []
+    return jsonify(
+        {
+            "allowed": allowed,
+            "allowed_roles": allowed_roles,
+            "is_admin": is_admin_user(user),
+            "is_council_member": is_council_member(conn, user),
+        }
+    )
+
+
+@app.post("/api/upgrade/user")
+@council_or_admin_required
+def api_upgrade_user():
+    payload = request.get_json(silent=True) or {}
+    lookup = str(payload.get("public_id") or payload.get("private_id") or "").strip()
+    new_type = str(payload.get("new_account_type") or payload.get("role") or "").strip()
+    if not lookup:
+        return jsonify({"error": "public_id or private_id is required"}), 400
+    if new_type not in UPGRADE_ACCOUNT_TYPES:
+        return jsonify(
+            {
+                "error": "new_account_type must be one of: "
+                + ", ".join(sorted(UPGRADE_ACCOUNT_TYPES))
+            }
+        ), 400
+    conn = get_db()
+    upgrader = g.current_user
+    if not user_can_upgrade_to(conn, upgrader, new_type):
+        return jsonify({"error": f"You cannot upgrade users to {new_type}"}), 403
+    row = conn.execute(
+        """
+        SELECT * FROM users
+        WHERE public_id = ? COLLATE NOCASE OR private_id = ? COLLATE NOCASE
+        """,
+        (lookup, lookup),
+    ).fetchone()
+    if not row:
+        return jsonify({"error": "User not found"}), 404
+    at = str(row["account_type"] or "")
+    if _is_demo_account_type(at):
+        return jsonify({"error": "Demo users cannot be upgraded"}), 400
+    if at not in ("H_U",) and at not in UPGRADE_ACCOUNT_TYPES:
+        return jsonify({"error": "Only Human User accounts can be upgraded"}), 400
+    pid = str(row["private_id"])
+    conn.execute(
+        "UPDATE users SET account_type = ? WHERE private_id = ?",
+        (new_type, pid),
+    )
+    nm = f'{row["first_name"] or ""} {row["last_name"] or ""}'.strip() or pid
+    upgraded_by = "an administrator" if is_admin_user(upgrader) else "a council member"
+    send_system_message(
+        conn,
+        pid,
+        "Account upgraded",
+        f"Your Qumanity account has been upgraded to {new_type} by {upgraded_by}.",
+    )
+    conn.commit()
+    return jsonify(
+        {
+            "ok": True,
+            "private_id": pid,
+            "public_id": str(row["public_id"]),
+            "account_type": new_type,
+            "full_name": nm,
+        }
+    )
+
+
+@app.post("/api/donation/create-order")
+def api_donation_create_order():
+    pending = session.get("pending_registration")
+    if not pending and not getattr(g, "current_user", None):
+        return jsonify({"error": "Complete registration or log in first"}), 401
+    payload = request.get_json(silent=True) or {}
+    try:
+        amount = int(payload.get("amount", 0))
+    except (TypeError, ValueError):
+        return jsonify({"error": "amount must be an integer"}), 400
+    if amount < 1 or amount > 200:
+        return jsonify({"error": "Donation must be between ₹1 and ₹200"}), 400
+    try:
+        order = _create_razorpay_order(amount)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 503
+    return jsonify(
+        {
+            "ok": True,
+            "order_id": order.get("id"),
+            "amount": amount,
+            "currency": order.get("currency", "INR"),
+            "key_id": getattr(config, "RAZORPAY_KEY_ID", ""),
+        }
+    )
+
+
+@app.post("/api/donation/verify")
+@login_required
+def api_donation_verify():
+    payload = request.get_json(silent=True) or {}
+    payment_id = str(payload.get("razorpay_payment_id") or payload.get("payment_id") or "").strip()
+    order_id = str(payload.get("razorpay_order_id") or payload.get("order_id") or "").strip()
+    signature = str(payload.get("razorpay_signature") or payload.get("signature") or "").strip()
+    try:
+        amount = int(payload.get("amount", 0))
+    except (TypeError, ValueError):
+        return jsonify({"error": "amount must be an integer"}), 400
+    if not all([payment_id, order_id, signature]):
+        return jsonify({"error": "payment_id, order_id, and signature are required"}), 400
+    try:
+        _verify_razorpay_payment(payment_id, order_id, signature)
+    except Exception as exc:
+        return jsonify({"error": f"Payment verification failed: {exc}"}), 400
+    conn = get_db()
+    pid = str(g.current_user["private_id"])
+    donation_core.record_donation_transaction(
+        conn,
+        user_private_id=pid,
+        amount=amount,
+        payment_method=str(payload.get("payment_method") or "card"),
+        transaction_id=payment_id,
+        status="completed",
+    )
+    conn.commit()
+    return jsonify({"ok": True, "payment_id": payment_id})
+
+
+@app.post("/api/location/donate")
+@login_required
+def api_location_donate():
+    payload = request.get_json(silent=True) or {}
+    scope = str(payload.get("location_scope") or payload.get("scope") or "").strip().lower()
+    location_id = str(payload.get("location_id") or "").strip()
+    try:
+        amount = int(payload.get("amount", 0))
+    except (TypeError, ValueError):
+        return jsonify({"error": "amount must be an integer"}), 400
+    if amount < 1 or amount > 200:
+        return jsonify({"error": "Donation must be between ₹1 and ₹200"}), 400
+    if not scope or not location_id:
+        return jsonify({"error": "location_scope and location_id are required"}), 400
+
+    payment_id = str(payload.get("razorpay_payment_id") or "").strip()
+    order_id = str(payload.get("razorpay_order_id") or "").strip()
+    signature = str(payload.get("razorpay_signature") or "").strip()
+    method = str(payload.get("payment_method") or "upi").strip().lower()
+
+    conn = get_db()
+    user = g.current_user
+    pid = str(user["private_id"])
+    village_id = str(user["current_location_id"] or "").strip()
+    loc_ctx = donation_location_context(
+        conn,
+        village_id=village_id,
+        country_id=str(user["current_country_id"] or "IND"),
+        continent_id=str(user["current_continent_id"] or ""),
+    )
+    if scope in loc_ctx:
+        loc_ctx[scope] = location_id
+    if scope == "india":
+        loc_ctx["country"] = "IND"
+    referrer_private_id = str(user["referred_by"] or "").strip()
+    ref_code = str(payload.get("referral_code") or "").strip()
+    if ref_code and not referrer_private_id:
+        referrer_private_id = referral_core.lookup_referrer_by_code(conn, ref_code) or ""
+    distribution = donation_core.calculate_donation_distribution(
+        amount,
+        location_context=loc_ctx,
+        referrer_private_id=referrer_private_id,
+        new_user_private_id=pid,
+    )
+
+    if payment_id and order_id and signature:
+        try:
+            _verify_razorpay_payment(payment_id, order_id, signature)
+        except Exception as exc:
+            return jsonify({"error": f"Payment verification failed: {exc}"}), 400
+        status = "completed"
+    elif method == "cash":
+        agent_private_id = str(payload.get("agent_private_id") or "").strip()
+        if not agent_private_id or not referral_core.lookup_active_volunteer_by_private_id(
+            conn, agent_private_id
+        ):
+            return jsonify({"error": "Valid volunteer Private ID required for cash"}), 400
+        status = "completed"
+        payment_id = f"cash-{secrets.token_hex(4)}"
+    else:
+        return jsonify({"error": "Complete online payment or use cash with volunteer ID"}), 400
+
+    donation_core.record_donation_transaction(
+        conn,
+        user_private_id=pid,
+        amount=amount,
+        payment_method=method,
+        transaction_id=payment_id,
+        status=status,
+        distribution=distribution,
+        location_scope=scope,
+        location_id=location_id,
+    )
+    for item in distribution:
+        donation_core._credit_distribution_item(
+            conn, item, ref_suffix=f"loc-{location_id}-{payment_id[:8]}"
+        )
+    conn.commit()
+    return jsonify({"ok": True, "distribution": distribution})
+
+
+@app.post("/api/employment/apply")
+@login_required
+def api_employment_apply():
+    conn = get_db()
+    user = g.current_user
+    payload = request.get_json(silent=True) or {}
+    bank = str(payload.get("bank_account_details") or "").strip()
+    bank_name = str(payload.get("bank_name") or "").strip()
+    account_number = str(payload.get("account_number") or "").strip()
+    branch = str(payload.get("branch") or "").strip()
+    ifsc_code = str(payload.get("ifsc_code") or "").strip()
+    reason = str(payload.get("reason") or "").strip()
+    availability = str(payload.get("availability") or "").strip()
+    pid = str(user["private_id"])
+    vid = str(user["current_location_id"] or "").strip()
+    hier = current_location_hierarchy(conn, vid) if vid else []
+    state_name = next((h["name"] for h in hier if h["scope"] == "state"), "")
+    if not reason:
+        return jsonify({"error": "Please explain why you want to become a volunteer"}), 400
+    if bank_name and account_number:
+        try:
+            req_id = referral_core.submit_volunteer_application(
+                conn,
+                applicant_private_id=pid,
+                applicant_name=f'{user["first_name"]} {user["last_name"]}'.strip(),
+                applicant_village_id=vid,
+                applicant_state=str(state_name or ""),
+                reason=reason,
+                bank_name=bank_name,
+                account_number=account_number,
+                branch=branch,
+                ifsc_code=ifsc_code,
+            )
+            conn.commit()
+            return jsonify({"ok": True, "request_id": req_id})
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+    if not bank:
+        return jsonify({"error": "Bank account details are required"}), 400
+    try:
+        req_id = referral_core.submit_employment_request(
+            conn,
+            applicant_private_id=pid,
+            applicant_name=f'{user["first_name"]} {user["last_name"]}'.strip(),
+            applicant_village_id=vid,
+            applicant_state=str(state_name or ""),
+            reason=reason,
+            bank_account_details=bank,
+            availability=availability,
+        )
+        conn.commit()
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify({"ok": True, "request_id": req_id})
+
+
+@app.get("/api/admin/employment/requests")
+@admin_required
+def api_admin_employment_requests():
+    conn = get_db()
+    return jsonify({"requests": referral_core.list_pending_employment_requests(conn)})
+
+
+@app.post("/api/admin/employment/approve")
+@admin_required
+def api_admin_employment_approve():
+    conn = get_db()
+    payload = request.get_json(silent=True) or {}
+    try:
+        req_id = int(payload.get("request_id") or 0)
+    except (TypeError, ValueError):
+        return jsonify({"error": "request_id required"}), 400
+    try:
+        result = referral_core.approve_employment_request(
+            conn,
+            req_id,
+            approved_by=str(g.current_user["private_id"]),
+            notify_fn=send_system_message,
+        )
+        conn.commit()
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify({"ok": True, **result})
+
+
+@app.post("/api/admin/employment/reject")
+@admin_required
+def api_admin_employment_reject():
+    conn = get_db()
+    payload = request.get_json(silent=True) or {}
+    try:
+        req_id = int(payload.get("request_id") or 0)
+    except (TypeError, ValueError):
+        return jsonify({"error": "request_id required"}), 400
+    note = str(payload.get("review_note") or payload.get("reason") or "").strip()
+    try:
+        referral_core.reject_employment_request(
+            conn,
+            req_id,
+            reviewed_by=str(g.current_user["private_id"]),
+            review_note=note,
+            notify_fn=send_system_message,
+        )
+        conn.commit()
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify({"ok": True})
+
+
+@app.post("/api/rewards/activate")
+@login_required
+def api_rewards_activate():
+    conn = get_db()
+    pid = str(g.current_user["private_id"])
+    activated = donation_core.activate_rewards(
+        conn, pid, notify_fn=send_system_message
+    )
+    conn.commit()
+    return jsonify({"ok": True, "activated": activated})
+
+
+@app.get("/api/qoin/karma/pending")
+@login_required
+def api_qoin_karma_pending():
+    conn = get_db()
+    pid = str(g.current_user["private_id"])
+    return jsonify({"items": qoin_core.user_pending_karma(conn, pid)})
+
+
+@app.post("/api/admin/qoin/settlement")
+@admin_required
+def api_admin_qoin_settlement():
+    conn = get_db()
+    payload = request.get_json(silent=True) or {}
+    force = bool(payload.get("force", True))
+    result = qoin_scheduler.run_weekly_settlement_if_due(
+        conn,
+        hierarchy_resolver=_qoin_hierarchy_resolver,
+        notify_fn=send_system_message,
+        force=force,
+    )
+    if result is None:
+        result = qoin_core.process_weekly_settlement(
+            conn,
+            triggered_by="admin",
+            hierarchy_resolver=_qoin_hierarchy_resolver,
+            notify_fn=send_system_message,
+        )
+        conn.commit()
+    return jsonify({"ok": True, "result": result})
+
+
+@app.get("/api/admin/qoin/nested-wallets")
+@admin_required
+def api_admin_nested_wallets():
+    conn = get_db()
+    circulation = qoin_core.circulation_total(conn)
+    wallets = qoin_core.nested_wallets_summary(conn)
+    pending = qoin_core.pending_summary(conn)
+    return jsonify({"circulation": circulation, "wallets": wallets, "pending": pending})
+
+
+@app.get("/api/admin/qoin/karma-types")
+@admin_required
+def api_admin_karma_types_list():
+    conn = get_db()
+    return jsonify({"actions": qoin_core.karma_action_types_list(conn)})
+
+
+@app.post("/api/admin/qoin/karma-types")
+@admin_required
+def api_admin_karma_types_upsert():
+    conn = get_db()
+    payload = request.get_json(silent=True) or {}
+    code = str(payload.get("action_code") or "").strip()
+    label = str(payload.get("label") or "").strip()
+    try:
+        val = int(payload.get("rupee_value") or 0)
+    except (TypeError, ValueError):
+        return jsonify({"error": "rupee_value must be an integer"}), 400
+    if not code or not label or val <= 0:
+        return jsonify({"error": "action_code, label, and positive rupee_value required"}), 400
+    qoin_core.upsert_karma_action_type(
+        conn,
+        action_code=code,
+        label=label,
+        rupee_value=val,
+        active=bool(payload.get("active", True)),
+    )
+    conn.commit()
+    return jsonify({"ok": True})
 
 
 @app.get("/api/village/wallet")
@@ -7839,7 +9426,7 @@ def api_user_birth_chart():
 
 
 @app.get("/api/admin/users/search")
-@admin_required
+@council_or_admin_required
 def api_admin_users_search():
     q = (request.args.get("q") or "").strip()
     if len(q) < 2:
@@ -7877,57 +9464,9 @@ def api_admin_users_search():
 
 
 @app.post("/api/admin/upgrade_user")
-@admin_required
+@council_or_admin_required
 def api_admin_upgrade_user():
-    payload = request.get_json(silent=True) or {}
-    lookup = str(payload.get("public_id") or payload.get("private_id") or "").strip()
-    new_type = str(payload.get("new_account_type") or "").strip()
-    if not lookup:
-        return jsonify({"error": "public_id or private_id is required"}), 400
-    if new_type not in UPGRADE_ACCOUNT_TYPES:
-        return jsonify(
-            {
-                "error": "new_account_type must be one of: "
-                + ", ".join(sorted(UPGRADE_ACCOUNT_TYPES))
-            }
-        ), 400
-    conn = get_db()
-    row = conn.execute(
-        """
-        SELECT * FROM users
-        WHERE public_id = ? COLLATE NOCASE OR private_id = ? COLLATE NOCASE
-        """,
-        (lookup, lookup),
-    ).fetchone()
-    if not row:
-        return jsonify({"error": "User not found"}), 404
-    at = str(row["account_type"] or "")
-    if _is_demo_account_type(at):
-        return jsonify({"error": "Demo users cannot be upgraded"}), 400
-    if at not in ("H_U",) and at not in UPGRADE_ACCOUNT_TYPES:
-        return jsonify({"error": "Only Human User accounts can be upgraded"}), 400
-    pid = str(row["private_id"])
-    conn.execute(
-        "UPDATE users SET account_type = ? WHERE private_id = ?",
-        (new_type, pid),
-    )
-    nm = f'{row["first_name"] or ""} {row["last_name"] or ""}'.strip() or pid
-    send_system_message(
-        conn,
-        pid,
-        "Account upgraded",
-        f"Your Quantum Box account has been upgraded to {new_type} by an administrator.",
-    )
-    conn.commit()
-    return jsonify(
-        {
-            "ok": True,
-            "private_id": pid,
-            "public_id": str(row["public_id"]),
-            "account_type": new_type,
-            "full_name": nm,
-        }
-    )
+    return api_upgrade_user()
 
 
 @app.get("/api/admin/villages/search")
@@ -9286,8 +10825,7 @@ def api_post_history():
 @login_required
 def api_my_posts_previous():
     conn = get_db()
-    if not user_has_full_dashboard(conn, g.current_user):
-        return jsonify({"error": "Dashboard features are limited to India residents."}), 403
+    _ = conn
     pid = str(g.current_user["private_id"])
     cur = conn.execute(
         """
@@ -9314,8 +10852,7 @@ def api_my_posts_previous():
 @login_required
 def api_my_posts_active():
     conn = get_db()
-    if not user_has_full_dashboard(conn, g.current_user):
-        return jsonify({"error": "Dashboard features are limited to India residents."}), 403
+    _ = conn
     pid = str(g.current_user["private_id"])
     cur = conn.execute(
         """
@@ -9350,11 +10887,11 @@ def api_my_posts_active():
 @_api_handle_errors
 def api_collective_board():
     conn = get_db()
-    if not user_has_full_dashboard(conn, g.current_user):
-        return jsonify({"error": "Dashboard features are limited to India residents."}), 403
+    level = (request.args.get("level") or "").strip().lower()
+    if not user_can_access_collective_board(conn, g.current_user, level):
+        return jsonify({"error": "This collective board level is not available for your account."}), 403
     _safe_escalate_posts(conn)
 
-    level = (request.args.get("level") or "").strip().lower()
     location_id = (request.args.get("location_id") or "").strip()
     board_state = (request.args.get("state") or "live").strip().lower()
     if board_state == "freeze":
@@ -9392,11 +10929,11 @@ def api_collective_board():
 @_api_handle_errors
 def api_posts():
     conn = get_db()
-    if not user_has_full_dashboard(conn, g.current_user):
-        return jsonify({"error": "Dashboard features are limited to India residents."}), 403
+    level = (request.args.get("level") or "").strip().lower()
+    if not user_can_access_collective_board(conn, g.current_user, level):
+        return jsonify({"error": "This collective board level is not available for your account."}), 403
     _safe_escalate_posts(conn)
 
-    level = (request.args.get("level") or "").strip().lower()
     location_id = (request.args.get("location_id") or "").strip()
     # Personal posts are PCB-only; never expose them through public APIs.
     if level == "personal":
@@ -9419,8 +10956,7 @@ def api_posts():
 @login_required
 def api_my_posts():
     conn = get_db()
-    if not user_has_full_dashboard(conn, g.current_user):
-        return jsonify({"error": "Dashboard features are limited to India residents."}), 403
+    _ = conn
     scope = (request.args.get("scope") or "active").strip().lower()
     if scope in {"previous", "archived", "history"}:
         return api_my_posts_previous()
@@ -9485,6 +11021,23 @@ def index():
     total_users_earth = count_registered_users(conn)
     total_users_asia = count_homepage_asia_users(conn)
     total_users_india = count_homepage_india_users(conn)
+
+    # Hero stats: villages with at least one resident + Qoins in circulation.
+    try:
+        row = conn.execute(
+            """
+            SELECT COUNT(DISTINCT TRIM(current_location_id)) AS c
+            FROM users
+            WHERE TRIM(COALESCE(current_location_id,'')) != ''
+            """
+        ).fetchone()
+        total_villages = int(row["c"]) if row else 0
+    except sqlite3.Error:
+        total_villages = 0
+    try:
+        total_qoins = int(qoin_core.circulation_total(conn).get("total_qoins") or 0)
+    except sqlite3.Error:
+        total_qoins = 0
     labels, values = users_per_state_from_current_location(conn)
     chart_states = {"labels": labels, "values": values}
 
@@ -9515,6 +11068,8 @@ def index():
         total_users_earth=total_users_earth,
         total_users_asia=total_users_asia,
         total_users_india=total_users_india,
+        total_villages=total_villages,
+        total_qoins=total_qoins,
         chart_states=chart_states,
         explorer=explorer,
         continents_list=continents_list,
@@ -9538,6 +11093,23 @@ def about():
 def contact():
     """Contact page."""
     return render_template("contact.html")
+
+
+@app.route("/settings")
+def settings_page():
+    """Settings placeholder — mother tongue & notification preferences (coming soon)."""
+    return render_template("settings.html")
+
+
+@app.route("/india-explorer")
+@login_required
+def india_explorer():
+    """Council-only screen: full India geography tree with search + stats links."""
+    conn = get_db()
+    if not is_council_member(conn, g.current_user):
+        flash("India Explorer is available to council members only.", "error")
+        return redirect(url_for("dashboard"))
+    return render_template("india_explorer.html")
 
 
 @app.route("/api/continents")
@@ -9567,11 +11139,133 @@ def api_countries():
     return jsonify([{"id": str(r["id"]), "name": str(r["name"])} for r in cur])
 
 
+def _geo_api_language() -> str:
+    """Language for geography dropdown labels (?lang= or session/UI default)."""
+    from translations import TRANSLATIONS as _TR
+
+    lang = (request.args.get("lang") or "").strip().lower()
+    if lang in _TR:
+        return lang
+    try:
+        conn = get_db()
+    except Exception:
+        conn = None
+    return active_ui_language(conn, None)
+
+
+def _jsonify_localized_geo(
+    conn: sqlite3.Connection,
+    rows: list[dict[str, str]],
+    location_type: str,
+) -> list[dict[str, str]]:
+    lang = _geo_api_language()
+    return language_core.localize_geo_rows(conn, rows, location_type, lang)
+
+
 @app.route("/api/states")
 def api_states():
     conn = get_db()
     cur = conn.execute("SELECT id, name FROM state ORDER BY name COLLATE NOCASE ASC")
-    return jsonify([{"id": str(r["id"]), "name": str(r["name"])} for r in cur])
+    rows = [{"id": str(r["id"]), "name": str(r["name"])} for r in cur]
+    return jsonify(_jsonify_localized_geo(conn, rows, "state"))
+
+
+@app.route("/api/country/<country_id>/languages")
+def api_country_languages(country_id: str):
+    """Languages available for mother-tongue selection in a country."""
+    iso = (country_id or "").strip().upper()
+    if not iso:
+        return jsonify({"error": "country_id is required"}), 400
+    conn = get_db()
+    element_core.migrate_element_core_schema(conn)
+    return jsonify({"languages": element_core.get_country_languages(conn, iso)})
+
+
+@app.route("/api/country/<country_id>/states")
+def api_country_states(country_id: str):
+    """States for a country; ``has_states`` false when none are seeded."""
+    iso = (country_id or "").strip().upper()
+    if not iso:
+        return jsonify({"error": "country_id is required"}), 400
+    if iso == "IND":
+        return jsonify({"country_id": iso, "has_states": False, "states": []})
+    conn = get_db()
+    return jsonify(global_core.country_states_payload(conn, iso))
+
+
+@app.get("/api/location/<path:location_id>/details")
+def api_location_details(location_id: str):
+    """Human-readable path for a village, global state, or country id."""
+    conn = get_db()
+    lid = (location_id or "").strip()
+    if not lid:
+        return jsonify({"error": "Missing location id"}), 400
+
+    if village_exists(conn, lid):
+        return jsonify(
+            {
+                "id": lid,
+                "type": "village",
+                "full_path": location_display_label(conn, lid),
+            }
+        )
+
+    state_row = conn.execute(
+        """
+        SELECT sg.name AS state_name, sg.country_id, c.name AS country_name
+          FROM states_global sg
+          LEFT JOIN country c ON c.id = sg.country_id
+         WHERE sg.state_id = ?
+        """,
+        (lid,),
+    ).fetchone()
+    if state_row:
+        parts = [str(state_row["state_name"] or "").strip()]
+        country_name = str(state_row["country_name"] or state_row["country_id"] or "").strip()
+        if country_name:
+            parts.append(country_name)
+        return jsonify(
+            {
+                "id": lid,
+                "type": "global_state",
+                "full_path": ", ".join(p for p in parts if p),
+            }
+        )
+
+    country_row = conn.execute(
+        """
+        SELECT c.name AS country_name, co.name AS continent_name
+          FROM country c
+          LEFT JOIN continent co ON co.id = c.continent_id
+         WHERE c.id = ?
+        """,
+        (lid.strip().upper(),),
+    ).fetchone()
+    if country_row:
+        parts = [
+            str(country_row["country_name"] or "").strip(),
+            str(country_row["continent_name"] or "").strip(),
+        ]
+        return jsonify(
+            {
+                "id": lid.strip().upper(),
+                "type": "country",
+                "full_path": ", ".join(p for p in parts if p),
+            }
+        )
+
+    return jsonify({"error": "Location not found"}), 404
+
+
+@app.route("/api/states/<country_id>")
+def api_global_states_for_country(country_id: str):
+    """Legacy alias — prefer ``/api/country/<id>/states``."""
+    iso = (country_id or "").strip().upper()
+    if iso == "IND":
+        return jsonify({"has_states": False, "states": [], "message": "Use /api/states for India"})
+    conn = get_db()
+    payload = global_core.country_states_payload(conn, iso)
+    return jsonify(payload)
 
 
 @app.route("/api/districts")
@@ -9585,9 +11279,11 @@ def api_districts():
             "SELECT id, name FROM district WHERE state_id = ? ORDER BY name COLLATE NOCASE",
             (state_id,),
         )
-        return jsonify([{"id": str(r["id"]), "name": str(r["name"])} for r in cur])
+        rows = [{"id": str(r["id"]), "name": str(r["name"])} for r in cur]
+        return jsonify(_jsonify_localized_geo(conn, rows, "district"))
     base = state_raw_to_district_base(raw_path(state_id))
-    return jsonify(fetch_direct_children_geo_path(conn, "district", base))
+    rows = fetch_direct_children_geo_path(conn, "district", base)
+    return jsonify(_jsonify_localized_geo(conn, rows, "district"))
 
 
 @app.route("/api/tehsils")
@@ -9601,10 +11297,10 @@ def api_tehsils():
             "SELECT id, name FROM tehsil WHERE district_id = ? ORDER BY name COLLATE NOCASE",
             (district_id,),
         )
-        return jsonify([{"id": str(r["id"]), "name": str(r["name"])} for r in cur])
-    return jsonify(
-        fetch_direct_children_geo_path(conn, "tehsil", raw_path(district_id))
-    )
+        rows = [{"id": str(r["id"]), "name": str(r["name"])} for r in cur]
+        return jsonify(_jsonify_localized_geo(conn, rows, "tehsil"))
+    rows = fetch_direct_children_geo_path(conn, "tehsil", raw_path(district_id))
+    return jsonify(_jsonify_localized_geo(conn, rows, "tehsil"))
 
 
 @app.route("/api/villages")
@@ -9622,10 +11318,10 @@ def api_villages():
             """,
             (tehsil_id,),
         )
-        return jsonify([{"id": str(r["id"]), "name": str(r["name"])} for r in cur])
-    return jsonify(
-        fetch_direct_children_geo_path(conn, "village", raw_path(tehsil_id))
-    )
+        rows = [{"id": str(r["id"]), "name": str(r["name"])} for r in cur]
+        return jsonify(_jsonify_localized_geo(conn, rows, "village"))
+    rows = fetch_direct_children_geo_path(conn, "village", raw_path(tehsil_id))
+    return jsonify(_jsonify_localized_geo(conn, rows, "village"))
 
 
 def _message_row_to_dict(r: sqlite3.Row) -> dict[str, Any]:
@@ -9796,14 +11492,18 @@ def api_locations_global_children():
 @_api_handle_errors
 def api_dashboard_public_stats():
     conn = get_db()
+    if not identity_core.user_show_public_account(g.current_user):
+        return jsonify({"error": "Public Account is not available for your profile."}), 403
     if not user_has_full_dashboard(conn, g.current_user):
-        return jsonify({"error": "Dashboard features are limited to India residents."}), 403
+        return jsonify({"error": "Public timeline requires an India birth or present location."}), 403
     lid = (request.args.get("location_id") or "").strip()
     if not lid:
+        lid = present_village_id(g.current_user)
+    if not lid:
         return jsonify({"error": "location_id is required"}), 400
-    allowed = user_public_allowed_location_ids(conn, g.current_user)
+    allowed = user_public_allowed_location_ids_present(conn, g.current_user)
     if lid not in allowed:
-        return jsonify({"error": "location_id must be your profile hierarchy"}), 403
+        return jsonify({"error": "location_id must be your present-location hierarchy"}), 403
     scope = infer_geo_scope_from_full_id(conn, lid)
     if not scope:
         return jsonify({"error": "location not found"}), 404
@@ -9816,6 +11516,7 @@ def api_dashboard_public_stats():
             "life_stage_counts": {str(r["label"]): int(r["count"]) for r in bundle["age_group"]},
             "stats_url": build_geo_public_url(scope, lid),
             "scope": scope,
+            "location_mode": "present",
         }
     )
 
@@ -9858,14 +11559,16 @@ def api_location_member_count():
 @login_required
 def api_dashboard_geo_feed():
     conn = get_db()
+    if not identity_core.user_show_public_account(g.current_user):
+        return jsonify({"error": "Public Account is not available for your profile."}), 403
     if not user_has_full_dashboard(conn, g.current_user):
-        return jsonify({"error": "Dashboard features are limited to India residents."}), 403
+        return jsonify({"error": "Public timeline requires an India birth or present location."}), 403
     lid = (request.args.get("location_id") or "").strip()
     if not lid:
         return jsonify({"error": "location_id is required"}), 400
-    allowed = user_public_allowed_location_ids(conn, g.current_user)
+    allowed = user_public_allowed_location_ids_present(conn, g.current_user)
     if lid not in allowed:
-        return jsonify({"error": "location_id must be your profile hierarchy"}), 403
+        return jsonify({"error": "location_id must be your present-location hierarchy"}), 403
     scope = infer_geo_scope_from_full_id(conn, lid)
     if not scope:
         return jsonify({"error": "location not found"}), 404
@@ -9884,9 +11587,19 @@ def api_dashboard_geo_feed():
 @app.get("/api/dashboard/global_stats")
 @login_required
 def api_dashboard_global_stats():
+    return _api_global_stats_response()
+
+
+@app.get("/api/global/stats")
+@login_required
+def api_global_stats():
+    """Alias for dashboard global statistics (Earth / Continent / Country / Zone)."""
+    return _api_global_stats_response()
+
+
+def _api_global_stats_response():
     conn = get_db()
-    if not user_has_full_dashboard(conn, g.current_user):
-        return jsonify({"error": "Dashboard features are limited to India residents."}), 403
+    _ = conn
     scope = (request.args.get("scope") or "earth").strip().lower()
     geo_id = (request.args.get("geo_id") or "").strip()
 
@@ -10192,7 +11905,13 @@ def _continent_country_valid(conn: sqlite3.Connection, cont: str, ctry: str) -> 
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
+    # Registration page is always English — mother tongue is stored for dashboard only.
+    session["preferred_language"] = "en"
+    g.ui_language = "en"
+
     conn = get_db()
+    global_core.migrate_global_location_schema(conn)
+    element_core.migrate_element_core_schema(conn)
     continents_form: list[dict[str, str]] = []
     if _geo_table_exists(conn, "continent"):
         continents_form = [
@@ -10202,19 +11921,43 @@ def register():
             )
         ]
 
+    language_choices = language_core.all_language_choices(conn)
+
     if request.method == "GET":
+        ref_prefill = referral_core.normalize_referral_code(
+            request.args.get("ref") or ""
+        )
+        form_prefill = {"referral_code": ref_prefill} if ref_prefill else {}
+        ref_locked = bool(request.args.get("ref"))
+        ref_referrer_name = ""
+        if ref_prefill:
+            ref_validation = referral_core.validate_referral_code(conn, ref_prefill)
+            if ref_validation.get("valid"):
+                ref_referrer_name = str(ref_validation.get("referrer_name") or "")
         return render_template(
             "register.html",
             gender_options=GENDER_OPTIONS,
             continents=continents_form,
-            form={},
+            language_choices=language_choices,
+            form=form_prefill,
             errors=None,
+            field_errors=None,
             new_private_id=None,
             new_public_id=None,
+            show_donation_step=False,
+            pending_registration=False,
+            ref_locked=ref_locked,
+            ref_referrer_name=ref_referrer_name,
         )
 
     form = dict(request.form)
     errors: list[str] = []
+    field_errors: dict[str, str] = {}
+
+    def add_error(field: str, message: str) -> None:
+        errors.append(message)
+        if field not in field_errors:
+            field_errors[field] = message
 
     first_name = (form.get("first_name") or "").strip()
     last_name = (form.get("last_name") or "").strip()
@@ -10228,75 +11971,164 @@ def register():
     curr_cont = (form.get("current_continent_id") or "").strip().upper()
     curr_ctry = (form.get("current_country_id") or "").strip().upper()
     email_raw = (form.get("email") or "").strip() or None
+    phone_raw = (form.get("phone") or "").strip() or None
     password = form.get("password") or ""
     confirm = form.get("confirm_password") or ""
+    mother_tongue_code = (form.get("mother_tongue_code") or "").strip().lower() or None
+    mother_tongue_name = None
+    if mother_tongue_code and birth_ctry:
+        ok_mt, mt_name = element_core.mother_tongue_allowed(conn, birth_ctry, mother_tongue_code)
+        if not ok_mt:
+            add_error(
+                "mother_tongue_code",
+                "Invalid mother tongue selection for the selected birth country.",
+            )
+        else:
+            mother_tongue_name = mt_name
+            if not mother_tongue_name:
+                for ch in language_choices:
+                    if ch["code"] == mother_tongue_code:
+                        mother_tongue_name = ch["name"]
+                        break
+    elif mother_tongue_code:
+        for ch in language_choices:
+            if ch["code"] == mother_tongue_code:
+                mother_tongue_name = ch["name"]
+                break
+        if not mother_tongue_name:
+            mother_tongue_code = None
+
+    if email_raw and not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email_raw):
+        add_error("email", "Please enter a valid email address.")
+
+    if phone_raw and len(re.sub(r"\D", "", phone_raw)) < 10:
+        add_error("phone", "Please enter a valid phone number (at least 10 digits).")
 
     if not first_name:
-        errors.append("First name is required.")
+        add_error("first_name", "First name is required.")
     if not last_name:
-        errors.append("Last name is required.")
+        add_error("last_name", "Last name is required.")
 
     if gender not in GENDER_OPTIONS:
-        errors.append("Please choose a valid gender option.")
+        add_error("gender", "Please choose a valid gender option.")
 
     dob_dt = parse_date_iso(dob_s)
     if not dob_dt:
-        errors.append("Please enter a valid date of birth.")
+        add_error("date_of_birth", "Please enter a valid date of birth.")
 
     if not birth_time:
-        errors.append("Birth time is required.")
+        add_error("birth_time", "Birth time is required.")
     else:
         m_time = re.match(r"^(\d{2}:\d{2})", birth_time)
         if not m_time:
-            errors.append("Birth time must be in HH:MM format.")
+            add_error("birth_time", "Birth time must be in HH:MM format.")
         else:
             birth_time = m_time.group(1)
 
     if not birth_cont or not birth_ctry:
-        errors.append("Birth continent and country are required.")
+        add_error("birth_continent_id", "Birth continent and country are required.")
     elif not _continent_country_valid(conn, birth_cont, birth_ctry):
-        errors.append("Invalid birth continent or country combination.")
+        add_error("birth_country_id", "Invalid birth continent or country combination.")
 
     if not curr_cont or not curr_ctry:
-        errors.append("Current continent and country are required.")
+        add_error("current_continent_id", "Current continent and country are required.")
     elif not _continent_country_valid(conn, curr_cont, curr_ctry):
-        errors.append("Invalid current continent or country combination.")
+        add_error(
+            "current_country_id",
+            "Invalid current continent or country combination.",
+        )
 
     if birth_ctry == "IND":
         if not birth_loc:
-            errors.append("For birth in India, select state through village.")
+            add_error("birth_village", "For birth in India, select state through village.")
         elif not village_exists(conn, birth_loc):
-            errors.append("Invalid birth village selection.")
+            add_error("birth_village", "Invalid birth village selection.")
     else:
         birth_loc = None
+        birth_global_state = (form.get("birth_global_state_id") or "").strip()
+        if global_core.country_has_states(conn, birth_ctry):
+            if not birth_global_state:
+                add_error(
+                    "birth_global_state_id",
+                    "Select your birth state or province.",
+                )
+            elif not conn.execute(
+                "SELECT 1 FROM states_global WHERE state_id = ?",
+                (birth_global_state,),
+            ).fetchone():
+                add_error("birth_global_state_id", "Invalid birth state selection.")
 
     if curr_ctry == "IND":
         if not curr_loc:
-            errors.append("For current residence in India, select state through village.")
+            add_error(
+                "current_village",
+                "For current residence in India, select state through village.",
+            )
         elif not village_exists(conn, curr_loc):
-            errors.append("Invalid current village selection.")
+            add_error("current_village", "Invalid current village selection.")
     else:
         curr_loc = None
+        curr_global_state = (form.get("current_global_state_id") or "").strip()
+        if global_core.country_has_states(conn, curr_ctry):
+            if not curr_global_state:
+                add_error(
+                    "current_global_state_id",
+                    "Select your current state or province.",
+                )
+            elif not conn.execute(
+                "SELECT 1 FROM states_global WHERE state_id = ?",
+                (curr_global_state,),
+            ).fetchone():
+                add_error("current_global_state_id", "Invalid current state selection.")
 
+    if len(password) < 9:
+        add_error("password", "Password must be at least 9 characters.")
+    else:
+        ok_pw, pw_msg = validate_password_strength(password)
+        if not ok_pw:
+            add_error("password", pw_msg)
     if password != confirm:
-        errors.append("Password and confirmation do not match.")
-    if len(password) < 8:
-        errors.append("Password must be at least 8 characters.")
+        add_error("confirm_password", "Password and confirmation do not match.")
+
+    referral_code_input = referral_core.normalize_referral_code(
+        (form.get("referral_code") or request.args.get("ref") or "").strip()
+    )
+    referred_by_private_id: str | None = None
+    referral_warning: str | None = None
+    is_indian = curr_ctry == "IND"
+    if referral_code_input:
+        referred_by_private_id = referral_core.lookup_referrer_by_code(
+            conn, referral_code_input
+        )
+        if not referred_by_private_id:
+            referral_warning = (
+                "Invalid referral code. You can still register without it."
+            )
+            if not is_indian:
+                add_error(
+                    "referral_code",
+                    "Referral code not found or inactive.",
+                )
 
     if dob_dt:
         age = compute_age(dob_dt)
         if age > 130:
-            errors.append("Age out of supported range.")
+            add_error("date_of_birth", "Age out of supported range.")
 
     if errors or not dob_dt:
+        _enrich_register_form_geo(conn, form)
         return render_template(
             "register.html",
             gender_options=GENDER_OPTIONS,
             continents=continents_form,
+            language_choices=language_choices,
             form=form,
             errors=errors,
+            field_errors=field_errors,
             new_private_id=None,
             new_public_id=None,
+            show_donation_step=False,
+            pending_registration=False,
         )
 
     dob_iso = dob_dt.strftime("%Y-%m-%d")
@@ -10310,7 +12142,7 @@ def register():
 
     pw_hash = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("ascii")
 
-    session["pending_registration"] = {
+    pending = {
         "first_name": first_name,
         "last_name": last_name,
         "gender": gender,
@@ -10323,35 +12155,146 @@ def register():
         "elem": elem,
         "birth_loc": birth_loc,
         "curr_loc": curr_loc,
+        "birth_global_state_id": (form.get("birth_global_state_id") or "").strip() or None,
+        "current_global_state_id": (form.get("current_global_state_id") or "").strip() or None,
         "birth_cont": birth_cont,
         "birth_ctry": birth_ctry,
         "curr_cont": curr_cont,
         "curr_ctry": curr_ctry,
         "legacy_country_text": legacy_country_text,
         "email_raw": email_raw,
+        "phone_raw": phone_raw,
         "password_hash": pw_hash,
+        "mother_tongue_code": mother_tongue_code,
+        "mother_tongue_name": mother_tongue_name,
+        "referred_by_private_id": referred_by_private_id,
+        "referral_code_input": referral_code_input,
+        "referral_warning": referral_warning,
     }
-    return redirect(url_for("register_donation"))
+
+    if is_indian:
+        session["pending_registration"] = pending
+        session.permanent = True
+        if referral_warning:
+            flash(referral_warning, "warning")
+        _enrich_register_form_geo(conn, form)
+        return render_template(
+            "register.html",
+            gender_options=GENDER_OPTIONS,
+            continents=continents_form,
+            language_choices=language_choices,
+            form=form,
+            errors=None,
+            field_errors=None,
+            new_private_id=None,
+            new_public_id=None,
+            show_donation_step=True,
+            pending_registration=True,
+        )
+
+    try:
+        private_id, public_id = _finalize_registration(conn, pending)
+        if referred_by_private_id:
+            loc_ctx = donation_location_context(
+                conn,
+                village_id=str(curr_loc or birth_loc or ""),
+                country_id=curr_ctry,
+                continent_id=curr_cont,
+            )
+            distribution = donation_core.calculate_donation_distribution(
+                0,
+                location_context=loc_ctx,
+                referrer_private_id=referred_by_private_id,
+                new_user_private_id=private_id,
+            )
+            donation_core.store_pending_distribution(
+                conn,
+                new_user_private_id=private_id,
+                referrer_private_id=referred_by_private_id,
+                donation_amount=0,
+                distribution=distribution,
+                payment_method="none",
+            )
+            conn.commit()
+    except sqlite3.IntegrityError:
+        conn.rollback()
+        errors.append("Could not create account. Try again.")
+        _enrich_register_form_geo(conn, form)
+        return render_template(
+            "register.html",
+            gender_options=GENDER_OPTIONS,
+            continents=continents_form,
+            language_choices=language_choices,
+            form=form,
+            errors=errors,
+            field_errors=field_errors,
+            new_private_id=None,
+            new_public_id=None,
+            show_donation_step=False,
+            pending_registration=False,
+        )
+
+    session.pop("pending_registration", None)
+    # Show the "save your IDs" screen instead of auto-login: the user must
+    # confirm they saved their Private ID before proceeding to login.
+    return render_template(
+        "register.html",
+        gender_options=GENDER_OPTIONS,
+        continents=continents_form,
+        language_choices=language_choices,
+        form=form,
+        errors=[],
+        field_errors={},
+        new_private_id=private_id,
+        new_public_id=public_id,
+        show_donation_step=False,
+        pending_registration=False,
+    )
 
 
-def _finalize_registration_with_donation(
+def generate_9_digit_private_id(conn: sqlite3.Connection) -> str:
+    """Generate a unique 9-digit numeric Private ID (100000000–999999999)."""
+    for _ in range(100_000):
+        candidate = str(secrets.randbelow(900_000_000) + 100_000_000)
+        row = conn.execute(
+            "SELECT 1 FROM users WHERE private_id = ?", (candidate,)
+        ).fetchone()
+        if not row:
+            return candidate
+    raise RuntimeError("Could not allocate a unique 9-digit private ID")
+
+
+def generate_unique_private_id(conn: sqlite3.Connection) -> str:
+    """Alias for generate_9_digit_private_id."""
+    return generate_9_digit_private_id(conn)
+
+
+def _finalize_registration(
     conn: sqlite3.Connection,
     pending: dict[str, Any],
-    donation_rupees: int,
-    *,
-    method: str = "upi",
-    agent_public_id: str | None = None,
 ) -> tuple[str, str]:
-    private_id = allocate_private_id(
+    """Create active user account and wallet (no registration donation). Returns (private, public)."""
+    birth_path = identity_core.location_path_for_id(
+        pending.get("birth_loc"),
+        country_id=pending.get("birth_ctry"),
+    )
+    present_path = identity_core.location_path_for_id(
+        pending.get("curr_loc"),
+        country_id=pending.get("curr_ctry"),
+    )
+    _structured_private_id, public_id = identity_core.generate_unique_ids(
         conn,
         pending["first_name"],
-        pending["dob_iso"],
-        pending["birth_time"],
-        pending.get("birth_loc"),
-        birth_country_id=pending.get("birth_ctry"),
-        birth_continent_id=pending.get("birth_cont"),
+        pending["last_name"],
+        pending["gender"],
+        pending["agroup"],
+        pending["sun"],
+        birth_path,
+        present_path,
     )
-    public_id = allocate_public_id(conn)
+    # Login identity is a unique 9-digit number; the structured format is kept
+    # only for the public (account) ID.
+    private_id = generate_9_digit_private_id(conn)
     conn.execute(
         """
         INSERT INTO users (
@@ -10361,9 +12304,11 @@ def _finalize_registration_with_donation(
             birth_location_id, current_location_id,
             birth_continent_id, birth_country_id,
             current_continent_id, current_country_id,
-            country, email, password_hash,
+            birth_global_state_id, current_global_state_id,
+            country, email, phone, password_hash,
+            mother_tongue_code, mother_tongue_name,
             account_type, is_active
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'H_U', 1)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'H_U', 1)
         """,
         (
             private_id,
@@ -10384,19 +12329,137 @@ def _finalize_registration_with_donation(
             pending.get("birth_ctry"),
             pending.get("curr_cont"),
             pending.get("curr_ctry"),
+            pending.get("birth_global_state_id"),
+            pending.get("current_global_state_id"),
             pending.get("legacy_country_text"),
             pending.get("email_raw"),
+            pending.get("phone_raw"),
             pending["password_hash"],
+            pending.get("mother_tongue_code"),
+            pending.get("mother_tongue_name"),
         ),
     )
-    qoin_core.process_donation(
+    identity_core.register_user_accounts(
         conn,
-        donor_private_id=private_id,
-        amount_rupees=donation_rupees,
-        village_id=str(pending.get("curr_loc") or "").strip() or None,
-        method=method,
-        agent_public_id=agent_public_id,
+        user_private_id=private_id,
+        public_id=public_id,
+        birth_location_id=pending.get("birth_loc"),
+        present_location_id=pending.get("curr_loc"),
+        birth_path=birth_path,
+        present_path=present_path,
     )
+    qoin_core.ensure_wallet(conn, "user", private_id)
+    referral_code = referral_core.generate_referral_code(conn)
+    conn.execute(
+        "UPDATE users SET referral_code = ? WHERE private_id = ?",
+        (referral_code, private_id),
+    )
+    referred_by = pending.get("referred_by_private_id")
+    if referred_by and referred_by != private_id:
+        referral_core.create_pending_referral(conn, str(referred_by), private_id)
+    conn.execute(
+        """
+        UPDATE users SET current_age_category = ? WHERE private_id = ?
+        """,
+        (pending["agroup"], private_id),
+    )
+    try:
+        planetary_core.save_user_birth_planets(
+            conn,
+            private_id,
+            date_of_birth=str(pending["dob_iso"]),
+            birth_time=str(pending.get("birth_time") or "12:00"),
+        )
+    except Exception:
+        app.logger.exception("birth planet calculation failed for %s", private_id)
+    conn.commit()
+    identity_core.notify_user_ids(
+        email=pending.get("email_raw"),
+        phone=pending.get("phone_raw"),
+        private_id=private_id,
+        public_id=public_id,
+        first_name=pending["first_name"],
+    )
+    return private_id, public_id
+
+
+def _finalize_registration_with_donation(
+    conn: sqlite3.Connection,
+    pending: dict[str, Any],
+    donation_rupees: int,
+    *,
+    method: str = "upi",
+    agent_private_id: str | None = None,
+) -> tuple[str, str]:
+    """Create account and store pending 10-tier distribution (credited after first vote)."""
+    referrer_private_id = str(pending.get("referred_by_private_id") or "").strip()
+    private_id, public_id = _finalize_registration(conn, pending)
+    village_id = str(pending.get("curr_loc") or pending.get("birth_loc") or "").strip()
+    loc_ctx = donation_location_context(
+        conn,
+        village_id=village_id,
+        country_id=str(pending.get("curr_ctry") or "IND"),
+        continent_id=str(pending.get("curr_cont") or ""),
+    )
+    referral_code_input = str(pending.get("referral_code_input") or "").strip()
+    if not referrer_private_id:
+        donation_core.process_no_referral_registration(
+            conn,
+            user_private_id=private_id,
+            donation_amount_rupees=int(donation_rupees),
+            location_context=loc_ctx,
+            payment_method=method,
+            referral_code=referral_code_input,
+        )
+    else:
+        distribution = donation_core.calculate_donation_distribution(
+            int(donation_rupees),
+            location_context=loc_ctx,
+            referrer_private_id=referrer_private_id,
+            new_user_private_id=private_id,
+        )
+        donation_core.store_pending_distribution(
+            conn,
+            new_user_private_id=private_id,
+            referrer_private_id=referrer_private_id,
+            donation_amount=int(donation_rupees),
+            distribution=distribution,
+            payment_method=method,
+            agent_private_id=agent_private_id,
+        )
+    if referrer_private_id:
+        vol = referral_core.lookup_active_volunteer_by_private_id(
+            conn, referrer_private_id
+        )
+        if vol:
+            distribution = donation_core.calculate_donation_distribution(
+                int(donation_rupees),
+                location_context=loc_ctx,
+                referrer_private_id=referrer_private_id,
+                new_user_private_id=private_id,
+            )
+            ref_earn = sum(
+                int(i.get("rupee_amount") or 0)
+                for i in distribution
+                if str(i.get("tier")) == "referrer"
+            )
+            referral_core.record_volunteer_signup(
+                conn,
+                volunteer_private_id=referrer_private_id,
+                earnings_rupees=ref_earn,
+            )
+    if method == "cash" and agent_private_id and donation_rupees > 0:
+        agent_row = conn.execute(
+            "SELECT public_id FROM users WHERE private_id = ?",
+            (agent_private_id,),
+        ).fetchone()
+        if agent_row:
+            qoin_core.record_cash_donation(
+                conn,
+                donor_private_id=private_id,
+                agent_public_id=str(agent_row["public_id"]),
+                amount_rupees=int(donation_rupees),
+            )
     conn.commit()
     return private_id, public_id
 
@@ -10423,33 +12486,54 @@ def register_donation():
 def api_register_donate():
     pending = session.get("pending_registration")
     if not pending:
-        return jsonify({"error": "No pending registration. Start at /register."}), 400
+        return jsonify({"error": "No pending registration. Complete the form first."}), 400
     payload = request.get_json(silent=True) or {}
     try:
-        amount = int(payload.get("amount") or 0)
+        amount = int(payload.get("amount") if payload.get("amount") is not None else payload.get("donation_amount", 0))
     except (TypeError, ValueError):
         return jsonify({"error": "amount must be an integer"}), 400
-    if amount < 1 or amount > 500:
-        return jsonify({"error": "Donation must be between ₹1 and ₹500"}), 400
-    method = str(payload.get("method") or "upi").strip().lower()
-    if method not in ("cash", "upi"):
-        return jsonify({"error": "method must be cash or upi"}), 400
-    agent_id = str(payload.get("agent_id") or "").strip()
+    if amount < 0 or amount > 200:
+        return jsonify({"error": "Donation must be between ₹0 and ₹200"}), 400
+    method = str(payload.get("method") or payload.get("payment_method") or "qr").strip().lower()
+    allowed_methods = ("qr", "cash", "upi", "card", "netbanking")
+    if method not in allowed_methods:
+        return jsonify({"error": "method must be one of: " + ", ".join(allowed_methods)}), 400
+    agent_private_id = str(
+        payload.get("agent_private_id") or payload.get("agent_id") or ""
+    ).strip()
+    referral_code = str(payload.get("referral_code") or "").strip()
+    payment_id = str(payload.get("razorpay_payment_id") or payload.get("payment_id") or "").strip()
+    order_id = str(payload.get("razorpay_order_id") or payload.get("order_id") or "").strip()
+    signature = str(payload.get("razorpay_signature") or payload.get("signature") or "").strip()
     conn = get_db()
     if method == "cash":
-        if not agent_id:
-            return jsonify({"error": "Agent Account ID is required for cash donations"}), 400
-        if not _validate_agent_public_id(conn, agent_id):
-            return jsonify(
-                {"error": "Agent Account ID must belong to an Agent account"}
-            ), 400
+        if referral_code:
+            ref_result = referral_core.validate_referral_code(conn, referral_code)
+            if not ref_result.get("valid"):
+                return jsonify({"error": ref_result.get("error") or "Invalid Referral ID"}), 400
+            agent_private_id = str(ref_result.get("referrer_private_id") or "")
+        elif agent_private_id:
+            if not referral_core.lookup_active_volunteer_by_private_id(conn, agent_private_id):
+                return jsonify({"error": "Private ID must belong to an active volunteer"}), 400
+        else:
+            return jsonify({"error": "Referral ID is required for cash payments"}), 400
+    elif method == "qr":
+        # QR payment is a placeholder for now — no gateway verification.
+        pass
+    elif method in ("upi", "card", "netbanking") and amount > 0:
+        if not all([payment_id, order_id, signature]):
+            return jsonify({"error": "Complete payment before verifying registration"}), 400
+        try:
+            _verify_razorpay_payment(payment_id, order_id, signature)
+        except Exception as exc:
+            return jsonify({"error": f"Payment verification failed: {exc}"}), 400
     try:
         private_id, public_id = _finalize_registration_with_donation(
             conn,
             pending,
             amount,
             method=method,
-            agent_public_id=agent_id if method == "cash" else None,
+            agent_private_id=agent_private_id if method == "cash" else None,
         )
     except sqlite3.IntegrityError:
         conn.rollback()
@@ -10458,19 +12542,344 @@ def api_register_donate():
         conn.rollback()
         return jsonify({"error": str(exc)}), 400
     session.pop("pending_registration", None)
-    row = conn.execute(
-        "SELECT id FROM users WHERE private_id = ?", (private_id,)
-    ).fetchone()
-    if row:
-        session["user_pk"] = int(row["id"])
     return jsonify(
         {
             "ok": True,
             "private_id": private_id,
             "public_id": public_id,
-            "redirect": url_for("dashboard"),
+            "message": (
+                "Account created! Your rewards will be credited after your first "
+                "village election vote."
+            ),
+            "redirect": url_for("login"),
         }
     )
+
+
+RECOVERY_VERIFY_FAIL_MSG = (
+    "Could not verify your identity. Please contact village council for assistance."
+)
+RECOVERY_SESSION_TTL_SEC = 600
+
+
+def _recovery_users_by_identity(
+    conn: sqlite3.Connection,
+    first_name: str,
+    last_name: str,
+    date_of_birth: str,
+) -> list[sqlite3.Row]:
+    return conn.execute(
+        """
+        SELECT id, private_id, public_id, first_name, last_name, gender,
+               birth_location_id, email, phone
+          FROM users
+         WHERE LOWER(TRIM(first_name)) = LOWER(TRIM(?))
+           AND LOWER(TRIM(last_name)) = LOWER(TRIM(?))
+           AND date_of_birth = ?
+         ORDER BY id ASC
+        """,
+        (first_name, last_name, date_of_birth),
+    ).fetchall()
+
+
+def _recovery_resolve_user(
+    conn: sqlite3.Connection,
+    *,
+    first_name: str,
+    last_name: str,
+    date_of_birth: str,
+    user_id: int | None,
+    user_private_id: str | None,
+) -> sqlite3.Row | None:
+    if user_private_id:
+        row = conn.execute(
+            "SELECT * FROM users WHERE private_id = ? LIMIT 1", (user_private_id,)
+        ).fetchone()
+        if not row:
+            return None
+        if (
+            str(row["date_of_birth"] or "") != date_of_birth
+            or str(row["first_name"] or "").strip().lower()
+            != first_name.strip().lower()
+            or str(row["last_name"] or "").strip().lower() != last_name.strip().lower()
+        ):
+            return None
+        return row
+
+    rows = _recovery_users_by_identity(conn, first_name, last_name, date_of_birth)
+    if not rows:
+        return None
+    if user_id is not None:
+        for row in rows:
+            if int(row["id"]) == int(user_id):
+                return conn.execute(
+                    "SELECT * FROM users WHERE id = ? LIMIT 1", (int(user_id),)
+                ).fetchone()
+        return None
+    if len(rows) == 1:
+        return conn.execute(
+            "SELECT * FROM users WHERE id = ? LIMIT 1", (int(rows[0]["id"]),)
+        ).fetchone()
+    return None
+
+
+def _recovery_birth_location_matches(user_row: sqlite3.Row, birth_location_id: str) -> bool:
+    stored = str(user_row["birth_location_id"] or "").strip()
+    selected = str(birth_location_id or "").strip()
+    if not stored or not selected:
+        return False
+    return stored == selected
+
+
+@app.route("/recovery", methods=["GET"])
+def recovery_page():
+    return render_template("recovery.html")
+
+
+@app.post("/api/recovery/search")
+def api_recovery_search():
+    payload = request.get_json(silent=True) or {}
+    first_name = (payload.get("first_name") or "").strip()
+    last_name = (payload.get("last_name") or "").strip()
+    dob = str(payload.get("date_of_birth") or "").strip()
+    if not first_name or not last_name or not dob:
+        return jsonify({"error": "First name, last name, and date of birth are required."}), 400
+    if not parse_date_iso(dob):
+        return jsonify({"error": "Please enter a valid date of birth."}), 400
+
+    conn = get_db()
+    rows = _recovery_users_by_identity(conn, first_name, last_name, dob)
+    if not rows:
+        return jsonify({"error": RECOVERY_VERIFY_FAIL_MSG}), 404
+
+    candidates = [
+        {
+            "user_id": int(r["id"]),
+            "first_name": str(r["first_name"]),
+            "last_name": str(r["last_name"]),
+            "gender": str(r["gender"] or ""),
+        }
+        for r in rows
+    ]
+    session["recovery_search"] = {
+        "first_name": first_name,
+        "last_name": last_name,
+        "date_of_birth": dob,
+        "candidate_ids": [int(r["id"]) for r in rows],
+        "searched_at": time.time(),
+    }
+    return jsonify(
+        {
+            "ok": True,
+            "multiple": len(candidates) > 1,
+            "count": len(candidates),
+            "candidates": candidates,
+        }
+    )
+
+
+@app.post("/api/recovery/verify")
+def api_recovery_verify():
+    payload = request.get_json(silent=True) or {}
+    purpose = str(payload.get("purpose") or "").strip()
+    if purpose not in ("recovery_id", "reset_password"):
+        return jsonify({"error": "Invalid purpose"}), 400
+
+    first_name = (payload.get("first_name") or "").strip()
+    last_name = (payload.get("last_name") or "").strip()
+    dob = str(payload.get("date_of_birth") or "").strip()
+    birth_location_id = str(payload.get("birth_location_id") or "").strip()
+    user_private_id = (payload.get("user_private_id") or "").strip() or None
+    user_id_raw = payload.get("user_id")
+    user_id: int | None
+    try:
+        user_id = int(user_id_raw) if user_id_raw is not None and str(user_id_raw).strip() else None
+    except (TypeError, ValueError):
+        user_id = None
+
+    if not first_name or not last_name or not dob or not birth_location_id:
+        return jsonify({"error": "Full name, date of birth, and birth location are required."}), 400
+    if not parse_date_iso(dob):
+        return jsonify({"error": "Please enter a valid date of birth."}), 400
+
+    search_ctx = session.get("recovery_search") or {}
+    if search_ctx:
+        if time.time() - float(search_ctx.get("searched_at") or 0) > RECOVERY_SESSION_TTL_SEC:
+            session.pop("recovery_search", None)
+            return jsonify({"error": "Recovery session expired. Start again."}), 403
+        if (
+            search_ctx.get("first_name", "").strip().lower() != first_name.lower()
+            or search_ctx.get("last_name", "").strip().lower() != last_name.lower()
+            or str(search_ctx.get("date_of_birth") or "") != dob
+        ):
+            return jsonify({"error": RECOVERY_VERIFY_FAIL_MSG}), 403
+        allowed_ids = {int(x) for x in (search_ctx.get("candidate_ids") or [])}
+        if user_id is not None and user_id not in allowed_ids:
+            return jsonify({"error": RECOVERY_VERIFY_FAIL_MSG}), 403
+        if user_id is None and len(allowed_ids) > 1:
+            return jsonify({"error": "Multiple accounts match. Select your account first."}), 400
+
+    conn = get_db()
+    if not village_exists(conn, birth_location_id):
+        return jsonify({"error": RECOVERY_VERIFY_FAIL_MSG}), 403
+
+    user = _recovery_resolve_user(
+        conn,
+        first_name=first_name,
+        last_name=last_name,
+        date_of_birth=dob,
+        user_id=user_id,
+        user_private_id=user_private_id,
+    )
+    if not user or not _recovery_birth_location_matches(user, birth_location_id):
+        return jsonify({"error": RECOVERY_VERIFY_FAIL_MSG}), 403
+
+    private_id = str(user["private_id"])
+    public_id = str(user["public_id"])
+
+    if purpose == "recovery_id":
+        identity_core.notify_user_ids(
+            email=str(user["email"] or "") or None,
+            phone=str(user["phone"] or "") or None,
+            private_id=private_id,
+            public_id=public_id,
+            first_name=str(user["first_name"]),
+        )
+        session.pop("recovery_search", None)
+        return jsonify(
+            {
+                "ok": True,
+                "private_id": private_id,
+                "public_id": public_id,
+                "notified": bool(user["email"] or user["phone"]),
+                "message": "Your Private ID is shown below."
+                + (
+                    " A courtesy copy was also sent to your registered email/phone."
+                    if user["email"] or user["phone"]
+                    else ""
+                ),
+            }
+        )
+
+    reset_token = secrets.token_urlsafe(32)
+    session["recovery_reset_password"] = {
+        "token": reset_token,
+        "user_id": int(user["id"]),
+        "user_private_id": private_id,
+        "verified_at": time.time(),
+    }
+    session.pop("recovery_search", None)
+    return jsonify(
+        {
+            "ok": True,
+            "verified": True,
+            "user_private_id": private_id,
+            "reset_token": reset_token,
+        }
+    )
+
+
+@app.post("/api/recovery/reset-password")
+def api_recovery_reset_password():
+    payload = request.get_json(silent=True) or {}
+    user_private_id = str(payload.get("user_private_id") or "").strip()
+    new_password = str(payload.get("new_password") or payload.get("password") or "")
+    confirm = str(payload.get("confirm_password") or "")
+    reset_token = str(payload.get("reset_token") or "").strip()
+
+    rec = session.get("recovery_reset_password")
+    if not rec:
+        return jsonify({"error": "Complete birth location verification first."}), 403
+    if time.time() - float(rec.get("verified_at") or 0) > RECOVERY_SESSION_TTL_SEC:
+        session.pop("recovery_reset_password", None)
+        return jsonify({"error": "Recovery session expired. Start again."}), 403
+    if reset_token and rec.get("token") != reset_token:
+        return jsonify({"error": RECOVERY_VERIFY_FAIL_MSG}), 403
+    if user_private_id and rec.get("user_private_id") != user_private_id:
+        return jsonify({"error": RECOVERY_VERIFY_FAIL_MSG}), 403
+
+    if len(new_password) < 9:
+        return jsonify({"error": "Password must be at least 9 characters."}), 400
+    ok_pw, pw_msg = validate_password_strength(new_password)
+    if not ok_pw:
+        return jsonify({"error": pw_msg}), 400
+    if new_password != confirm:
+        return jsonify({"error": "Passwords do not match."}), 400
+
+    conn = get_db()
+    user = conn.execute(
+        "SELECT private_id, public_id FROM users WHERE id = ? LIMIT 1",
+        (int(rec["user_id"]),),
+    ).fetchone()
+    if not user:
+        session.pop("recovery_reset_password", None)
+        return jsonify({"error": RECOVERY_VERIFY_FAIL_MSG}), 403
+
+    pw_hash = bcrypt.hashpw(new_password.encode("utf-8"), bcrypt.gensalt()).decode(
+        "ascii"
+    )
+    conn.execute(
+        "UPDATE users SET password_hash = ? WHERE id = ?",
+        (pw_hash, int(rec["user_id"])),
+    )
+    conn.commit()
+    session.pop("recovery_reset_password", None)
+    return jsonify(
+        {
+            "ok": True,
+            "private_id": str(user["private_id"]),
+            "public_id": str(user["public_id"]),
+            "message": "Please save these IDs in a safe place.",
+        }
+    )
+
+
+@app.get("/api/user/account-ids")
+@login_required
+def api_user_account_ids():
+    conn = get_db()
+    pid = str(g.current_user["private_id"])
+    accounts = identity_core.list_user_accounts(conn, pid)
+    return jsonify(
+        {
+            "accounts": accounts,
+            "primary_public_id": str(g.current_user["public_id"]),
+        }
+    )
+
+
+@app.post("/api/user/location-mode")
+@login_required
+def api_user_location_mode():
+    payload = request.get_json(silent=True) or {}
+    mode = str(payload.get("mode") or "").strip().lower()
+    if mode not in ("birth", "present"):
+        return jsonify({"error": "mode must be birth or present"}), 400
+    if not identity_core.can_toggle_location(g.current_user):
+        return jsonify({"error": "Location toggle not available for your profile"}), 403
+    session["location_mode"] = mode
+    conn = get_db()
+    hier, vid = dashboard_hierarchy_for_user(conn, g.current_user)
+    return jsonify(
+        {
+            "ok": True,
+            "location_mode": mode,
+            "default_village_id": vid,
+            "hierarchy": hier,
+        }
+    )
+
+
+def _normalize_login_private_id(raw: str) -> str | None:
+    """Accept 9-digit Private ID or the fixed admin login id ``H_U_ADMIN``."""
+    s = (raw or "").strip()
+    if not s:
+        return None
+    if s.upper() == ADMIN_PRIVATE_ID:
+        return ADMIN_PRIVATE_ID
+    if PRIVATE_ID_LOGIN_RE.match(s):
+        return s
+    return None
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -10480,21 +12889,20 @@ def login():
     if request.method == "GET":
         return render_template("login.html", error=None)
 
-    raw_pid = request.form.get("private_id") or ""
+    raw_pid = (request.form.get("private_id") or "").strip()
     password = request.form.get("password") or ""
-    pid_in = raw_pid.strip()
-    if not PRIVATE_ID_LOGIN_RE.match(pid_in):
+    canon = _normalize_login_private_id(raw_pid)
+    if not canon:
         return render_template(
             "login.html",
-            error="Enter a valid Private ID (3–190 characters: letters, digits, _ / . - |).",
+            error="Enter your 9-digit Private ID or H_U_ADMIN.",
         )
-    canon = pid_in
-    m_legacy = PRIVATE_ID_RE.match(raw_pid)
-    if m_legacy:
-        canon = m_legacy.group(1).upper()
 
     row = conn.execute(
-        "SELECT id, password_hash FROM users WHERE private_id = ? COLLATE NOCASE",
+        """
+        SELECT id, password_hash FROM users
+        WHERE private_id = ? COLLATE NOCASE
+        """,
         (canon,),
     ).fetchone()
     if not row:
@@ -10516,17 +12924,55 @@ def login():
     session["user_pk"] = int(row["id"])
     full_user = load_user(conn, int(row["id"]))
     _session_sync_admin_flag(full_user)
-    flash("You're signed in.", "success")
     dest = request.args.get("next") or ""
-    if (
-        dest.startswith("/")
-        and full_user
-        and user_has_full_dashboard(conn, full_user)
-    ):
+    if dest.startswith("/") and full_user:
         return redirect(dest)
-    if full_user and user_has_full_dashboard(conn, full_user):
-        return redirect(url_for("dashboard"))
-    return redirect(url_for("global_viewer"))
+    return redirect(url_for("dashboard"))
+
+
+@app.post("/api/login")
+def api_login():
+    """JSON login — accepts 9-digit Private ID or H_U_ADMIN."""
+    data = request.get_json(silent=True) or {}
+    raw_pid = str(data.get("private_id") or "").strip()
+    password = str(data.get("password") or "")
+    conn = get_db()
+
+    canon = _normalize_login_private_id(raw_pid)
+    if not canon:
+        return jsonify({"error": "Enter your 9-digit Private ID or H_U_ADMIN."}), 400
+
+    row = conn.execute(
+        """
+        SELECT id, password_hash, private_id, first_name, last_name, account_type
+        FROM users
+        WHERE private_id = ? COLLATE NOCASE
+        """,
+        (canon,),
+    ).fetchone()
+    if not row:
+        return jsonify({"error": "Invalid Private ID or password"}), 401
+
+    stored = row["password_hash"]
+    stored_b = stored.encode("utf-8") if isinstance(stored, str) else stored
+    if not bcrypt.checkpw(password.encode("utf-8"), stored_b):
+        return jsonify({"error": "Invalid Private ID or password"}), 401
+
+    session.clear()
+    session["user_pk"] = int(row["id"])
+    full_user = load_user(conn, int(row["id"]))
+    _session_sync_admin_flag(full_user)
+    return jsonify(
+        {
+            "success": True,
+            "ok": True,
+            "message": "Login successful",
+            "redirect": url_for("dashboard"),
+            "private_id": str(row["private_id"]),
+            "user_name": f'{row["first_name"]} {row["last_name"]}',
+            "account_type": str(row["account_type"] or "H_U"),
+        }
+    )
 
 
 @app.post("/logout")
@@ -10540,19 +12986,27 @@ def logout():
 def dashboard():
     conn = get_db()
     user_row = g.current_user
-    if not user_has_full_dashboard(conn, user_row):
-        return redirect(url_for("global_viewer"))
 
     display_name = f'{user_row["first_name"]} {user_row["last_name"]}'
-    cloc = user_row["current_location_id"]
-    if cloc:
-        current_hierarchy = current_location_hierarchy(conn, str(cloc))
-        default_vid = current_hierarchy[3]["id"] if len(current_hierarchy) > 3 else ""
+    preferred_lang = active_ui_language(conn, user_row)
+    current_hierarchy, default_vid = public_hierarchy_for_user(
+        conn, user_row, language_code=preferred_lang
+    )
+    language_choices = language_core.all_language_choices(conn)
+    loc_mode = "present"
+    can_toggle_loc = identity_core.can_toggle_location(user_row)
+    user_situation = identity_core.user_situation_type(user_row)
+    show_public_account = identity_core.user_show_public_account(user_row)
+    if user_situation == "C":
+        post_form_location_id = (
+            global_core.user_global_state_id(user_row)
+            or str(user_row["current_country_id"] or "").strip()
+        )
     else:
-        current_hierarchy = []
-        default_vid = ""
+        post_form_location_id = default_vid or ""
 
     birth_vid = user_row["birth_location_id"]
+    cloc = present_village_id(user_row) or effective_dashboard_village_id(conn, user_row)
     birth_location_label = (
         location_display_label(conn, str(birth_vid)) if birth_vid else None
     )
@@ -10595,6 +13049,24 @@ def dashboard():
     election_vote_eligible = _election_user_can_vote(user_row, active_zodiac)
 
     geo_displays = user_dashboard_geo_displays(conn, user_row)
+    geo_displays["user_current_location_id_display"] = cloc or geo_displays.get(
+        "user_current_location_id_display"
+    )
+    referral_stats = referral_core.get_referral_stats(conn, pid)
+    public_base = _public_base_url()
+    referral_reg_url = referral_core.build_registration_url(
+        public_base, referral_stats["referral_code"]
+    )
+    referral_qr = referral_core.generate_qr_base64(referral_reg_url)
+    referral_leaderboard = referral_core.get_leaderboard(conn, limit=10)
+    volunteer_status = referral_core.get_volunteer_status(conn, pid)
+    is_council = is_council_member(conn, user_row)
+    is_mentor = deceased_core.is_mentor_user(conn, user_row)
+    show_upgrade_panel = is_admin_user(user_row) or is_council
+    varna_core.migrate_varna_schema(conn)
+    varna_profile = varna_core.profile_for_user(conn, pid)
+    conn.commit()
+
     dash_client_config: dict[str, Any] = {
         "userHierarchy": [dict(item) for item in current_hierarchy],
         "villageStatsUrl": user_village_stats_url,
@@ -10606,6 +13078,15 @@ def dashboard():
         "userCountryName": geo_displays.get("user_country_name") or "",
         "userShowZoneTab": bool(geo_displays.get("user_show_zone_tab")),
         "isAdmin": is_admin_user(user_row),
+        "isCouncilMember": is_council,
+        "showUpgradePanel": show_upgrade_panel,
+        "canUpgradeRoles": sorted(UPGRADE_ACCOUNT_TYPES)
+        if is_admin_user(user_row)
+        else sorted(COUNCIL_UPGRADE_TYPES)
+        if is_council
+        else [],
+        "volunteerStatus": volunteer_status,
+        "razorpayKeyId": getattr(config, "RAZORPAY_KEY_ID", ""),
         "userPrivateId": str(user_row["private_id"] or ""),
         "electionNominationEligible": election_nomination_eligible,
         "electionVoteEligible": election_vote_eligible,
@@ -10614,6 +13095,26 @@ def dashboard():
         "userZoneId": geo_displays.get("user_zone_id") or "",
         "userZoneName": geo_displays.get("user_zone_name") or "",
         "userZoneCode": geo_displays.get("user_zone_code") or "",
+        "commerceEnabled": user_in_indian_village(conn, user_row),
+        "electionsEnabled": elections_are_enabled(),
+        "locationMode": loc_mode,
+        "canToggleLocation": can_toggle_loc,
+        "publicTimelinePresentOnly": True,
+        "userSituationType": user_situation,
+        "isGlobalUser": global_core.is_global_only_user(user_row),
+        "globalStateId": global_core.user_global_state_id(user_row) or "",
+        "postFormLocationId": post_form_location_id or "",
+        "birthLocationId": str(birth_vid or ""),
+        "presentLocationId": str(user_row["current_location_id"] or ""),
+        "preferredLanguage": preferred_lang,
+        "uiStrings": get_dashboard_ui_strings(preferred_lang),
+        "referralCode": referral_stats["referral_code"],
+        "referralCount": referral_stats["referral_count"],
+        "referralEarnings": referral_stats["referral_earnings"],
+        "referralRegistrationUrl": referral_reg_url,
+        "referralQrBase64": referral_qr,
+        "referralLeaderboard": referral_leaderboard,
+        "publicBaseUrl": public_base,
     }
 
     return render_template(
@@ -10632,9 +13133,25 @@ def dashboard():
         qoins_earned_total=qoins_earned_total,
         qoin_transactions_recent=qoin_transactions_recent,
         account_badges=_user_account_badges(user_row),
-        show_dashboard_post_form=bool(default_vid),
+        show_dashboard_post_form=bool(post_form_location_id),
+        post_form_location_id=post_form_location_id,
         dash_client_config=dash_client_config,
         quantum_punch_village_id=election_scheduler.TARGET_VILLAGE_ID,
+        location_mode=loc_mode,
+        can_toggle_location=can_toggle_loc,
+        user_situation_type=user_situation,
+        show_public_account=show_public_account,
+        preferred_language=preferred_lang,
+        language_choices=language_choices,
+        referral_stats=referral_stats,
+        referral_registration_url=referral_reg_url,
+        referral_qr_base64=referral_qr,
+        referral_leaderboard=referral_leaderboard,
+        volunteer_status=volunteer_status,
+        is_council_member=is_council,
+        is_mentor=is_mentor,
+        show_upgrade_panel=show_upgrade_panel,
+        varna_profile=varna_profile,
         **geo_displays,
     )
 
@@ -10663,16 +13180,8 @@ def admin_location_members(location_type: str, location_id: str):
 @app.route("/global-viewer")
 @login_required
 def global_viewer():
-    conn = get_db()
-    user_row = g.current_user
-    if user_has_full_dashboard(conn, user_row):
-        return redirect(url_for("dashboard"))
-    display_name = f'{user_row["first_name"]} {user_row["last_name"]}'
-    return render_template(
-        "global_viewer.html",
-        user=user_row,
-        display_name=display_name,
-    )
+    """Legacy route — all users now use the main dashboard."""
+    return redirect(url_for("dashboard"))
 
 
 @app.route("/calendar")
@@ -10752,6 +13261,69 @@ def api_calendar_user_birthdays():
         return jsonify({"birthday": None, "note": "Admin birthdays are hidden."})
     birthday = zodiac_calendar.get_user_birthday_payload(user_row)
     return jsonify({"birthday": birthday})
+
+
+def _user_village_id_row(user_row: sqlite3.Row) -> str:
+    return str(user_row["current_location_id"] or "").strip()
+
+
+def _is_village_council_member(
+    conn: sqlite3.Connection, private_id: str, village_id: str
+) -> bool:
+    admin_row = conn.execute(
+        "SELECT is_admin FROM users WHERE private_id = ? COLLATE NOCASE",
+        (private_id,),
+    ).fetchone()
+    if admin_row and int(admin_row["is_admin"] or 0):
+        return True
+    row = conn.execute(
+        """
+        SELECT 1 FROM village_council
+        WHERE TRIM(village_id) = TRIM(?)
+          AND (male_head_private_id = ? OR female_head_private_id = ?)
+        """,
+        (village_id, private_id, private_id),
+    ).fetchone()
+    return row is not None
+
+
+def _approved_business_for_user(
+    conn: sqlite3.Connection, private_id: str
+) -> sqlite3.Row | None:
+    return conn.execute(
+        """
+        SELECT * FROM businesses
+        WHERE owner_private_id = ? AND status = 'approved'
+        ORDER BY id DESC LIMIT 1
+        """,
+        (private_id,),
+    ).fetchone()
+
+
+import village_platform as _village_platform
+
+_village_platform.register(
+    app,
+    deps={
+        "login_required": login_required,
+        "get_db": get_db,
+        "user_in_indian_village": user_in_indian_village,
+        "user_village_id": _user_village_id_row,
+        "is_council_member": _is_village_council_member,
+        "approved_business_for_user": _approved_business_for_user,
+        "location_display_label": location_display_label,
+        "send_system_message": send_system_message,
+        "ensure_economic_account": identity_core.get_or_create_economic_account,
+    },
+)
+
+from varna_routes import register_varna_routes
+
+register_varna_routes(app, get_db, login_required, admin_required)
+
+from space_routes import register_space_routes
+
+register_space_routes(app, get_db, login_required, is_admin_user_fn=is_admin_user)
 
 
 if __name__ == "__main__":

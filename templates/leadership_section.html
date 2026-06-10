@@ -1,0 +1,30 @@
+{# Quantum Punch Council — 5 leadership slots per location #}
+<section
+  class="qb-panel qb-leadership-council mt-3"
+  id="qb-leadership-council-{{ panel_id }}"
+  data-leadership-panel="{{ panel_id }}"
+  aria-label="{{ 'leadership_council'|tr }}"
+>
+  <h4 class="h6 mt-0 mb-2 text-secondary text-uppercase small">{{ 'leadership_council'|tr }}</h4>
+  <p class="small text-muted mb-2" id="qb-leadership-subtitle-{{ panel_id }}">
+    {{ 'quantum_punch_council_sub'|tr }}
+  </p>
+  <div
+    class="qb-leadership-slots"
+    id="qb-leadership-slots-{{ panel_id }}"
+    role="list"
+    aria-label="{{ 'leadership_council'|tr }}"
+  >
+    {% for rank in range(1, 6) %}
+    <div class="qb-leadership-slot qb-leadership-slot--loading" role="listitem" data-slot-rank="{{ rank }}">
+      <span class="qb-leadership-slot-title">—</span>
+      <span class="qb-leadership-slot-holder text-muted">Loading…</span>
+      {% if show_appoint_buttons %}
+      <button type="button" class="qb-btn qb-btn-outline btn-sm qb-leadership-appoint-btn" hidden disabled>
+        {{ 'appoint'|tr }}
+      </button>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</section>

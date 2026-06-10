@@ -1,37 +1,102 @@
 {% extends "base.html" %}
 
-{% block title %}Register — Quantum Box{% endblock %}
+{% block title %}Register — Qumanity{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='register.css') }}?v=6" />
+{% endblock %}
+
+{# Registration is English-only — no language dropdown (dashboard only). #}
+{% block header_inner %}
+<div class="d-flex flex-wrap align-items-center justify-content-between w-100 gap-2">
+  <a
+    href="{{ url_for('index') }}"
+    class="qb-brand qb-brand-with-logo text-decoration-none"
+    aria-label="Qumanity home"
+  >
+    {% include "_brand_logo.html" %}
+  </a>
+  <div class="qb-nav-cluster flex-shrink-0 d-flex flex-wrap align-items-center gap-2 justify-content-end">
+    <nav class="qb-nav-actions">
+      <a href="{{ url_for('login') }}" class="qb-btn qb-btn-outline">Log in</a>
+    </nav>
+  </div>
+</div>
+{% endblock %}
 
 {% block body %}
-<section class="qb-hero mb-4">
-  <h1>Join Quantum Box</h1>
-  <p class="qb-lead">
-    Create your profile. Human User accounts require a one-time donation (₹1–₹500, cash or UPI) to activate after you submit this form.
-    You will receive a <strong>Private ID</strong> for login and a <strong>Public ID</strong> on your dashboard.
-  </p>
-</section>
-
-{% if new_private_id %}
-<div class="qb-alert qb-alert-success" role="alert">
-  <strong>Registration complete.</strong>
-  <div class="mt-2">
-    <span class="text-muted">Private ID (use to log in):</span>
-    <span class="font-monospace ms-1">{{ new_private_id }}</span>
-  </div>
-  <div class="mt-1">
-    <span class="text-muted">Public ID (shareable):</span>
-    <span class="font-monospace ms-1">{{ new_public_id }}</span>
-  </div>
-  <p class="mb-0 mt-2 small text-muted">
-    Save your Private ID — it cannot be recovered if lost.
+<div class="register-container">
+<div class="register-header">
+  <h1>Create Your Qumanity Account</h1>
+  <p>Join a conscious civilisation. Your journey begins here.</p>
+  <p class="small text-muted">
+    You will receive a <strong>Private ID</strong> for future logins and a
+    <strong>Public ID</strong> on your dashboard.
   </p>
 </div>
-<p>
-  <a class="qb-btn qb-btn-primary" href="{{ url_for('login') }}">Go to login</a>
-</p>
+
+{% if new_private_id %}
+<div class="qb-id-modal-backdrop" role="status">
+  <div class="qb-id-modal">
+    <h2 class="h5 mb-2">Registration complete</h2>
+    <p class="qb-id-modal-warning small mb-3">
+      Please save these IDs in a safe place. You will need them to log in.
+    </p>
+    <div class="qb-id-copy-row mb-3">
+      <div class="flex-grow-1">
+        <span class="small text-muted d-block">Private ID (9-digit)</span>
+        <span class="font-monospace" id="reg-inline-private-id">{{ new_private_id }}</span>
+      </div>
+      <button
+        type="button"
+        class="qb-btn qb-btn-outline btn-sm"
+        data-qb-copy-target="reg-inline-private-id"
+        data-qb-copy-feedback="reg-inline-copy-private"
+      >
+        Copy
+      </button>
+      <span class="qb-copy-feedback small text-success" id="reg-inline-copy-private" hidden>Copied!</span>
+    </div>
+    <div class="qb-id-copy-row mb-3">
+      <div class="flex-grow-1">
+        <span class="small text-muted d-block">Public ID (Account ID)</span>
+        <span class="font-monospace" id="reg-inline-public-id">{{ new_public_id }}</span>
+      </div>
+      <button
+        type="button"
+        class="qb-btn qb-btn-outline btn-sm"
+        data-qb-copy-target="reg-inline-public-id"
+        data-qb-copy-feedback="reg-inline-copy-public"
+      >
+        Copy
+      </button>
+      <span class="qb-copy-feedback small text-success" id="reg-inline-copy-public" hidden>Copied!</span>
+    </div>
+    <a class="qb-btn qb-btn-primary" href="{{ url_for('login') }}">✅ I have saved my IDs — Go to login</a>
+  </div>
+</div>
+<link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}" />
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll("[data-qb-copy-target]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var target = document.getElementById(btn.getAttribute("data-qb-copy-target"));
+        var feedback = document.getElementById(btn.getAttribute("data-qb-copy-feedback"));
+        var value = target ? (target.textContent || "").trim() : "";
+        if (!value || !navigator.clipboard) return;
+        navigator.clipboard.writeText(value).then(function () {
+          if (feedback) {
+            feedback.hidden = false;
+            window.setTimeout(function () { feedback.hidden = true; }, 1800);
+          }
+        });
+      });
+    });
+  });
+</script>
 {% else %}
 {% if errors %}
-<div class="qb-alert qb-alert-error">
+<div class="qb-alert qb-alert-error" id="register-error-alert" role="alert">
   {% for msg in errors %}
   <div>{{ msg }}</div>
   {% endfor %}
@@ -45,20 +110,41 @@
 </p>
 {% endif %}
 
+<div class="register-steps" id="register-steps" role="list" aria-label="Registration progress">
+  <div class="step active" data-step-indicator="1" role="listitem">
+    <span class="step-number">1</span>
+    <span class="step-label">Basic Info</span>
+  </div>
+  <div class="step" data-step-indicator="2" role="listitem">
+    <span class="step-number">2</span>
+    <span class="step-label">Birth Location</span>
+  </div>
+  <div class="step" data-step-indicator="3" role="listitem">
+    <span class="step-number">3</span>
+    <span class="step-label">Current Location</span>
+  </div>
+  <div class="step" data-step-indicator="4" role="listitem">
+    <span class="step-number">4</span>
+    <span class="step-label">Security</span>
+  </div>
+</div>
+
 <form
   method="post"
   action="{{ url_for('register') }}"
-  class="qb-form qb-form-wide qb-register-defer-india"
+  class="qb-form qb-form-wide qb-register-defer-india register-form"
   id="register-form"
   novalidate
 >
+  <div class="form-step" id="reg-step-1" data-step="1">
+  <h3 class="form-step-title">Basic Information</h3>
   <div class="row g-3">
     <div class="col-md-6">
-      <div class="qb-form-group mb-0">
-        <label for="first_name">First name</label>
+      <div class="qb-form-group mb-0{% if field_errors and field_errors.get('first_name') %} has-error{% endif %}">
+        <label for="first_name">First Name</label>
         <input
           type="text"
-          class="form-control qb-form-control"
+          class="form-control qb-form-control{% if field_errors and field_errors.get('first_name') %} qb-field-error{% endif %}"
           id="first_name"
           name="first_name"
           required
@@ -66,14 +152,17 @@
           value="{{ form.first_name or '' }}"
           autocomplete="given-name"
         />
+        {% if field_errors and field_errors.get('first_name') %}
+        <div class="form-text text-danger">{{ field_errors.first_name }}</div>
+        {% endif %}
       </div>
     </div>
     <div class="col-md-6">
-      <div class="qb-form-group mb-0">
-        <label for="last_name">Last name</label>
+      <div class="qb-form-group mb-0{% if field_errors and field_errors.get('last_name') %} has-error{% endif %}">
+        <label for="last_name">Last Name</label>
         <input
           type="text"
-          class="form-control qb-form-control"
+          class="form-control qb-form-control{% if field_errors and field_errors.get('last_name') %} qb-field-error{% endif %}"
           id="last_name"
           name="last_name"
           required
@@ -81,13 +170,21 @@
           value="{{ form.last_name or '' }}"
           autocomplete="family-name"
         />
+        {% if field_errors and field_errors.get('last_name') %}
+        <div class="form-text text-danger">{{ field_errors.last_name }}</div>
+        {% endif %}
       </div>
     </div>
   </div>
 
-  <div class="qb-form-group">
+  <div class="qb-form-group{% if field_errors and field_errors.get('gender') %} has-error{% endif %}">
     <label for="gender">Gender</label>
-    <select class="form-select qb-form-control" id="gender" name="gender" required>
+    <select
+      class="form-select qb-form-control{% if field_errors and field_errors.get('gender') %} qb-field-error{% endif %}"
+      id="gender"
+      name="gender"
+      required
+    >
       <option value="" disabled {% if not form.gender %}selected{% endif %}>
         Select…
       </option>
@@ -95,33 +192,42 @@
       <option value="{{ g }}" {% if form.gender == g %}selected{% endif %}>{{ g }}</option>
       {% endfor %}
     </select>
+    {% if field_errors and field_errors.get('gender') %}
+    <div class="form-text text-danger">{{ field_errors.gender }}</div>
+    {% endif %}
   </div>
 
   <div class="row g-3">
     <div class="col-md-6">
-      <div class="qb-form-group mb-0">
-        <label for="date_of_birth">Date of birth</label>
+      <div class="qb-form-group mb-0{% if field_errors and field_errors.get('date_of_birth') %} has-error{% endif %}">
+        <label for="date_of_birth">Date of Birth</label>
         <input
           type="date"
-          class="form-control qb-form-control"
+          class="form-control qb-form-control{% if field_errors and field_errors.get('date_of_birth') %} qb-field-error{% endif %}"
           id="date_of_birth"
           name="date_of_birth"
           required
           value="{{ form.date_of_birth or '' }}"
         />
+        {% if field_errors and field_errors.get('date_of_birth') %}
+        <div class="form-text text-danger">{{ field_errors.date_of_birth }}</div>
+        {% endif %}
       </div>
     </div>
     <div class="col-md-6">
-      <div class="qb-form-group mb-0">
-        <label for="birth_time">Birth time</label>
+      <div class="qb-form-group mb-0{% if field_errors and field_errors.get('birth_time') %} has-error{% endif %}">
+        <label for="birth_time">Birth Time (24-hour format)</label>
         <input
           type="time"
-          class="form-control qb-form-control"
+          class="form-control qb-form-control{% if field_errors and field_errors.get('birth_time') %} qb-field-error{% endif %}"
           id="birth_time"
           name="birth_time"
           required
           value="{{ form.birth_time or '' }}"
         />
+        {% if field_errors and field_errors.get('birth_time') %}
+        <div class="form-text text-danger">{{ field_errors.birth_time }}</div>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -141,18 +247,33 @@
     </div>
   </div>
 
-  <fieldset class="qb-fieldset mt-2">
-    <legend class="h6 text-secondary">Birth location</legend>
+  <div class="form-navigation">
+    <span></span>
+    <button type="button" class="btn-next qb-btn qb-btn-primary" data-next-step="2">Next →</button>
+  </div>
+  </div>
+
+  <div class="form-step" id="reg-step-2" data-step="2" hidden>
+  <h3 class="form-step-title">Birth Location</h3>
+  <p class="step-hint">This determines your birth chart and cannot be changed later.</p>
+
+  <fieldset class="qb-fieldset mt-2" id="birth-location-section">
+    <legend class="h6 text-secondary">Birth Location</legend>
     <p class="small text-muted mb-2">
       Choose continent and country first. Indian state → village appears only when
       country is India.
     </p>
     <input type="hidden" name="birth_location_id" id="birth_location_id" value="{{ form.birth_location_id or '' }}" />
+    <input type="hidden" name="birth_location_selected" id="birth_location_selected" value="{{ form.birth_location_selected or '0' }}" />
+    <input type="hidden" name="birth_state_id" id="birth_state_id" value="{{ form.birth_state_id or '' }}" />
+    <input type="hidden" name="birth_district_id" id="birth_district_id" value="{{ form.birth_district_id or '' }}" />
+    <input type="hidden" name="birth_tehsil_id" id="birth_tehsil_id" value="{{ form.birth_tehsil_id or '' }}" />
+    <div id="birth-location-selector" class="location-selector">
     <div class="row g-2">
-      <div class="col-md-6">
+      <div class="col-md-6{% if field_errors and field_errors.get('birth_continent_id') %} has-error{% endif %}">
         <label class="form-label small" for="birth_continent_id">Continent</label>
         <select
-          class="form-select qb-form-control"
+          class="form-select qb-form-control{% if field_errors and field_errors.get('birth_continent_id') %} qb-field-error{% endif %}"
           id="birth_continent_id"
           name="birth_continent_id"
           required
@@ -164,10 +285,10 @@
           {% endfor %}
         </select>
       </div>
-      <div class="col-md-6">
+      <div class="col-md-6{% if field_errors and field_errors.get('birth_country_id') %} has-error{% endif %}">
         <label class="form-label small" for="birth_country_id">Country</label>
         <select
-          class="form-select qb-form-control"
+          class="form-select qb-form-control{% if field_errors and field_errors.get('birth_country_id') %} qb-field-error{% endif %}"
           id="birth_country_id"
           name="birth_country_id"
           required
@@ -178,27 +299,51 @@
         </select>
       </div>
     </div>
+    <div id="birth_global_state_group" class="row g-2 mt-2" hidden>
+      <div class="col-md-6{% if field_errors and field_errors.get('birth_global_state_id') %} has-error{% endif %}">
+        <label class="form-label small" for="birth_global_state_search">State / Province</label>
+        <input
+          type="text"
+          class="form-control qb-form-control{% if field_errors and field_errors.get('birth_global_state_id') %} qb-field-error{% endif %}"
+          id="birth_global_state_search"
+          list="birth_global_state_list"
+          placeholder="Type or select state…"
+          autocomplete="off"
+          disabled
+        />
+        <datalist id="birth_global_state_list"></datalist>
+        <input type="hidden" id="birth_global_state_id" name="birth_global_state_id" value="{{ form.birth_global_state_id or '' }}" />
+        {% if field_errors and field_errors.get('birth_global_state_id') %}
+        <div class="form-text text-danger">{{ field_errors.birth_global_state_id }}</div>
+        {% endif %}
+      </div>
+    </div>
     <div id="birth_india_geo" class="row g-2 mt-2" hidden>
       <div class="col-md-6">
         <label class="form-label small" for="birth_state">State</label>
-        <select class="form-select qb-form-control" id="birth_state" data-chain="birth" disabled></select>
+        <input type="text" class="form-control qb-form-control{% if field_errors and field_errors.get('birth_village') %} qb-field-error{% endif %}" id="birth_state" list="birth_state_list" data-chain="birth" data-level="state" placeholder="Type or select state…" autocomplete="off" disabled />
+        <datalist id="birth_state_list"></datalist>
       </div>
       <div class="col-md-6">
         <label class="form-label small" for="birth_district">District</label>
-        <select class="form-select qb-form-control" id="birth_district" disabled></select>
+        <input type="text" class="form-control qb-form-control" id="birth_district" list="birth_district_list" data-chain="birth" data-level="district" placeholder="Type or select district…" autocomplete="off" disabled />
+        <datalist id="birth_district_list"></datalist>
       </div>
       <div class="col-md-6">
         <label class="form-label small" for="birth_tehsil">Tehsil</label>
-        <select class="form-select qb-form-control" id="birth_tehsil" disabled></select>
+        <input type="text" class="form-control qb-form-control" id="birth_tehsil" list="birth_tehsil_list" data-chain="birth" data-level="tehsil" placeholder="Type or select tehsil…" autocomplete="off" disabled />
+        <datalist id="birth_tehsil_list"></datalist>
       </div>
       <div class="col-md-6">
         <label class="form-label small" for="birth_village">Village</label>
-        <select class="form-select qb-form-control" id="birth_village" disabled></select>
+        <input type="text" class="form-control qb-form-control{% if field_errors and field_errors.get('birth_village') %} qb-field-error{% endif %}" id="birth_village" list="birth_village_list" data-chain="birth" data-level="village" placeholder="Type or select village…" autocomplete="off" disabled />
+        <datalist id="birth_village_list"></datalist>
+        {% if field_errors and field_errors.get('birth_village') %}
+        <div class="form-text text-danger">{{ field_errors.birth_village }}</div>
+        {% endif %}
       </div>
       <div class="col-md-6">
-        <label class="form-label small" for="birth_location_id_display"
-          >Birth Village ID</label
-        >
+        <label class="form-label small" for="birth_location_id_display">Birth Village ID</label>
         <input
           type="text"
           class="form-control qb-form-control"
@@ -209,20 +354,54 @@
         />
       </div>
     </div>
+    </div>
+    <div id="birth-location-display" class="selected-location-wrap" hidden>
+      <div class="selected-location-info">
+        <span class="selected-label">Birth Location Selected:</span>
+        <span id="birth-location-name" class="selected-value"></span>
+        <button type="button" id="edit-birth-location" class="qb-btn qb-btn-outline btn-sm edit-location-btn">Edit</button>
+      </div>
+    </div>
   </fieldset>
 
-  <fieldset class="qb-fieldset mt-3">
-    <legend class="h6 text-secondary">Current location</legend>
+  <fieldset class="qb-fieldset mt-3" id="mother-tongue-section" hidden>
+    <legend class="h6 text-secondary">Mother Tongue</legend>
+    <div class="qb-form-group mb-0">
+      <label for="mother_tongue_code">Select your mother tongue</label>
+      <select class="form-select qb-form-control" id="mother_tongue_code" name="mother_tongue_code">
+        <option value="">— Select language —</option>
+      </select>
+      <p class="small text-muted mb-0">This helps us serve you in your preferred language after login. It does not change this registration page.</p>
+    </div>
+  </fieldset>
+
+  <div class="form-navigation">
+    <button type="button" class="btn-prev qb-btn qb-btn-neutral" data-prev-step="1">← Back</button>
+    <button type="button" class="btn-next qb-btn qb-btn-primary" data-next-step="3">Next →</button>
+  </div>
+  </div>
+
+  <div class="form-step" id="reg-step-3" data-step="3" hidden>
+  <h3 class="form-step-title">Current Location</h3>
+  <p class="step-hint">This determines your council voting rights and local services.</p>
+
+  <fieldset class="qb-fieldset mt-3" id="current-location-section">
+    <legend class="h6 text-secondary">Current Location</legend>
     <p class="small text-muted mb-2">
       Independent from birth — used for participation geography. Indian detail
       only when country is India.
     </p>
     <input type="hidden" name="current_location_id" id="current_location_id" value="{{ form.current_location_id or '' }}" />
+    <input type="hidden" name="current_location_selected" id="current_location_selected" value="{{ form.current_location_selected or '0' }}" />
+    <input type="hidden" name="current_state_id" id="current_state_id" value="{{ form.current_state_id or '' }}" />
+    <input type="hidden" name="current_district_id" id="current_district_id" value="{{ form.current_district_id or '' }}" />
+    <input type="hidden" name="current_tehsil_id" id="current_tehsil_id" value="{{ form.current_tehsil_id or '' }}" />
+    <div id="current-location-selector" class="location-selector">
     <div class="row g-2">
-      <div class="col-md-6">
+      <div class="col-md-6{% if field_errors and field_errors.get('current_continent_id') %} has-error{% endif %}">
         <label class="form-label small" for="current_continent_id">Continent</label>
         <select
-          class="form-select qb-form-control"
+          class="form-select qb-form-control{% if field_errors and field_errors.get('current_continent_id') %} qb-field-error{% endif %}"
           id="current_continent_id"
           name="current_continent_id"
           required
@@ -234,10 +413,10 @@
           {% endfor %}
         </select>
       </div>
-      <div class="col-md-6">
+      <div class="col-md-6{% if field_errors and field_errors.get('current_country_id') %} has-error{% endif %}">
         <label class="form-label small" for="current_country_id">Country</label>
         <select
-          class="form-select qb-form-control"
+          class="form-select qb-form-control{% if field_errors and field_errors.get('current_country_id') %} qb-field-error{% endif %}"
           id="current_country_id"
           name="current_country_id"
           required
@@ -248,27 +427,51 @@
         </select>
       </div>
     </div>
+    <div id="current_global_state_group" class="row g-2 mt-2" hidden>
+      <div class="col-md-6{% if field_errors and field_errors.get('current_global_state_id') %} has-error{% endif %}">
+        <label class="form-label small" for="current_global_state_search">State / Province</label>
+        <input
+          type="text"
+          class="form-control qb-form-control{% if field_errors and field_errors.get('current_global_state_id') %} qb-field-error{% endif %}"
+          id="current_global_state_search"
+          list="current_global_state_list"
+          placeholder="Type or select state…"
+          autocomplete="off"
+          disabled
+        />
+        <datalist id="current_global_state_list"></datalist>
+        <input type="hidden" id="current_global_state_id" name="current_global_state_id" value="{{ form.current_global_state_id or '' }}" />
+        {% if field_errors and field_errors.get('current_global_state_id') %}
+        <div class="form-text text-danger">{{ field_errors.current_global_state_id }}</div>
+        {% endif %}
+      </div>
+    </div>
     <div id="current_india_geo" class="row g-2 mt-2" hidden>
       <div class="col-md-6">
         <label class="form-label small" for="current_state">State</label>
-        <select class="form-select qb-form-control" id="current_state" data-chain="current" disabled></select>
+        <input type="text" class="form-control qb-form-control{% if field_errors and field_errors.get('current_village') %} qb-field-error{% endif %}" id="current_state" list="current_state_list" data-chain="current" data-level="state" placeholder="Type or select state…" autocomplete="off" disabled />
+        <datalist id="current_state_list"></datalist>
       </div>
       <div class="col-md-6">
         <label class="form-label small" for="current_district">District</label>
-        <select class="form-select qb-form-control" id="current_district" disabled></select>
+        <input type="text" class="form-control qb-form-control" id="current_district" list="current_district_list" data-chain="current" data-level="district" placeholder="Type or select district…" autocomplete="off" disabled />
+        <datalist id="current_district_list"></datalist>
       </div>
       <div class="col-md-6">
         <label class="form-label small" for="current_tehsil">Tehsil</label>
-        <select class="form-select qb-form-control" id="current_tehsil" disabled></select>
+        <input type="text" class="form-control qb-form-control" id="current_tehsil" list="current_tehsil_list" data-chain="current" data-level="tehsil" placeholder="Type or select tehsil…" autocomplete="off" disabled />
+        <datalist id="current_tehsil_list"></datalist>
       </div>
       <div class="col-md-6">
         <label class="form-label small" for="current_village">Village</label>
-        <select class="form-select qb-form-control" id="current_village" disabled></select>
+        <input type="text" class="form-control qb-form-control{% if field_errors and field_errors.get('current_village') %} qb-field-error{% endif %}" id="current_village" list="current_village_list" data-chain="current" data-level="village" placeholder="Type or select village…" autocomplete="off" disabled />
+        <datalist id="current_village_list"></datalist>
+        {% if field_errors and field_errors.get('current_village') %}
+        <div class="form-text text-danger">{{ field_errors.current_village }}</div>
+        {% endif %}
       </div>
       <div class="col-md-6">
-        <label class="form-label small" for="current_location_id_display"
-          >Current Village ID</label
-        >
+        <label class="form-label small" for="current_location_id_display">Current Village ID</label>
         <input
           type="text"
           class="form-control qb-form-control"
@@ -279,54 +482,238 @@
         />
       </div>
     </div>
+    </div>
+    <div id="current-location-display" class="selected-location-wrap" hidden>
+      <div class="selected-location-info">
+        <span class="selected-label">Current Location Selected:</span>
+        <span id="current-location-name" class="selected-value"></span>
+        <button type="button" id="edit-current-location" class="qb-btn qb-btn-outline btn-sm edit-location-btn">Edit</button>
+      </div>
+    </div>
   </fieldset>
 
-  <div class="qb-form-group mt-3">
-    <label for="email">Email <span class="fw-normal opacity-75">(optional)</span></label>
+  <div class="form-navigation">
+    <button type="button" class="btn-prev qb-btn qb-btn-neutral" data-prev-step="2">← Back</button>
+    <button type="button" class="btn-next qb-btn qb-btn-primary" data-next-step="4">Next →</button>
+  </div>
+  </div>
+
+  <div class="form-step" id="reg-step-4" data-step="4" hidden>
+  <h3 class="form-step-title">Account Security</h3>
+
+  {# Single security section — hidden when the donation step is active so the
+     password fields never appear twice in the flow. #}
+  <div id="reg-security-fields" {% if show_donation_step %}hidden{% endif %}>
+  <div class="qb-form-group mt-3{% if field_errors and field_errors.get('email') %} has-error{% endif %}">
+    <label for="email">Email (Optional)</label>
     <input
       type="email"
-      class="form-control qb-form-control"
+      class="form-control qb-form-control{% if field_errors and field_errors.get('email') %} qb-field-error{% endif %}"
       id="email"
       name="email"
       maxlength="254"
       value="{{ form.email or '' }}"
       autocomplete="email"
+      placeholder="your@email.com"
     />
+    {% if field_errors and field_errors.get('email') %}
+    <div class="form-text text-danger">{{ field_errors.email }}</div>
+    {% endif %}
   </div>
 
-  <div class="qb-form-group">
+  <div class="qb-form-group{% if field_errors and field_errors.get('phone') %} has-error{% endif %}">
+    <label for="phone">Phone Number (Optional)</label>
+    <input
+      type="tel"
+      class="form-control qb-form-control{% if field_errors and field_errors.get('phone') %} qb-field-error{% endif %}"
+      id="phone"
+      name="phone"
+      value="{{ form.phone or '' }}"
+      autocomplete="tel"
+      placeholder="+91XXXXXXXXXX"
+    />
+    {% if field_errors and field_errors.get('phone') %}
+    <div class="form-text text-danger">{{ field_errors.phone }}</div>
+    {% endif %}
+  </div>
+
+  <div class="qb-form-group{% if field_errors and field_errors.get('referral_code') %} has-error{% endif %}">
+    <label for="referral_code">Referral Code (Optional)</label>
+    <input
+      type="text"
+      class="form-control qb-form-control font-monospace{% if field_errors and field_errors.get('referral_code') %} qb-field-error{% endif %}"
+      id="referral_code"
+      name="referral_code"
+      placeholder="Enter referral code if you have one"
+      maxlength="16"
+      value="{{ form.referral_code or '' }}"
+      autocomplete="off"
+      {% if ref_locked %}readonly aria-readonly="true"{% endif %}
+    />
+    {% if field_errors and field_errors.get('referral_code') %}
+    <div class="form-text text-danger">{{ field_errors.referral_code }}</div>
+    {% endif %}
+  </div>
+
+  <div class="qb-form-group{% if field_errors and field_errors.get('password') %} has-error{% endif %}">
     <label for="password">Password</label>
     <input
       type="password"
-      class="form-control qb-form-control"
+      class="form-control qb-form-control{% if field_errors and field_errors.get('password') %} qb-field-error{% endif %}"
       id="password"
       name="password"
       required
-      minlength="8"
+      minlength="9"
       autocomplete="new-password"
     />
+    <div class="password-requirements qb-password-requirements">
+      <small class="text-muted">Password must contain:</small>
+      <ul class="qb-password-req-list mb-0">
+        <li id="req-length" data-label="At least 9 characters">At least 9 characters</li>
+        <li id="req-upper" data-label="At least one capital letter (A–Z)">At least one capital letter (A–Z)</li>
+        <li id="req-lower" data-label="At least one small letter (a–z)">At least one small letter (a–z)</li>
+        <li id="req-number" data-label="At least one number (0–9)">At least one number (0–9)</li>
+        <li id="req-special" data-label="At least one special character (!@#$%^&*)">At least one special character (!@#$%^&*)</li>
+      </ul>
+    </div>
+    {% if field_errors and field_errors.get('password') %}
+    <div class="form-text text-danger">{{ field_errors.password }}</div>
+    {% endif %}
   </div>
 
-  <div class="qb-form-group">
-    <label for="confirm_password">Confirm password</label>
+  <div class="qb-form-group{% if field_errors and field_errors.get('confirm_password') %} has-error{% endif %}">
+    <label for="confirm_password">Confirm Password</label>
     <input
       type="password"
-      class="form-control qb-form-control"
+      class="form-control qb-form-control{% if field_errors and field_errors.get('confirm_password') %} qb-field-error{% endif %}"
       id="confirm_password"
       name="confirm_password"
       required
-      minlength="8"
+      minlength="9"
       autocomplete="new-password"
     />
+    <div id="password-match-message" class="form-text text-danger" hidden></div>
+    {% if field_errors and field_errors.get('confirm_password') %}
+    <div class="form-text text-danger">{{ field_errors.confirm_password }}</div>
+    {% endif %}
+  </div>
   </div>
 
-  <button type="submit" class="qb-btn qb-btn-primary" {% if not continents %}disabled{% endif %}>Register</button>
+  <section
+    class="qb-panel p-3 mb-3{% if not show_donation_step %} d-none{% endif %}"
+    id="reg-donation-section"
+    aria-labelledby="reg-donation-heading"
+  >
+    <h2 class="h6 mb-2" id="reg-donation-heading">💰 Donation (Optional)</h2>
+    <p class="small text-muted mb-2" id="reg-donation-intro">
+      Select donation amount (₹0–₹200). Location shares credit immediately; your wallet share credits after your first village election vote.
+    </p>
+    <p class="small text-info mb-2" id="reg-no-referral-notice" hidden>
+      You are registering without a referral code. 80% goes to below locations (credited immediately); 20% goes to your wallet after your first vote.
+      {% if not pending_registration %}₹0 donation generates a system Qoin worth ₹1.{% endif %}
+    </p>
+    <div class="donation-select-group qb-donation-select-group">
+      <label class="form-label small" for="donation-select">Donation Amount (₹)</label>
+      <select id="donation-select" class="form-select form-select-sm donation-dropdown qb-donation-dropdown" aria-describedby="reg-donation-intro">
+        <option value="" disabled selected>-- Select Amount --</option>
+        <option value="0">₹0 - No donation</option>
+        <option value="1">₹1</option>
+        <option value="2">₹2</option>
+        <option value="5">₹5</option>
+        <option value="10">₹10</option>
+        <option value="20">₹20</option>
+        <option value="50">₹50</option>
+        <option value="100">₹100</option>
+        <option value="200">₹200</option>
+      </select>
+    </div>
+    <div class="qb-panel qb-reg-distribution-preview p-2 mb-3" id="reg-distribution-preview" hidden>
+      <div id="reg-distribution-loading" class="qb-reg-preview-loading small text-muted" hidden>Calculating distribution…</div>
+      <div id="reg-distribution-error" class="qb-reg-preview-error small" hidden role="alert"></div>
+      <div id="reg-distribution-content">
+        <h3 class="h6 small text-secondary mb-2" id="reg-distribution-preview-title">Donation Distribution Preview</h3>
+        <p class="small text-muted mb-2" id="reg-distribution-preview-note" hidden></p>
+        <p class="small fw-medium mb-1" id="reg-distribution-locations-heading" hidden>80% to below locations (credited immediately):</p>
+        <ul class="list-unstyled small mb-2 qb-reg-location-list" id="reg-distribution-list"></ul>
+        <p class="small mb-0 qb-reg-user-share" id="reg-distribution-user-share" hidden></p>
+        <p class="small mb-0 mt-2"><strong>Total:</strong> <span id="reg-distribution-total">₹0</span></p>
+      </div>
+    </div>
+    <div id="reg-payment-methods" class="mb-2" hidden>
+      <h3 class="h6 small text-secondary mb-2">Select Payment Method</h3>
+      <div class="payment-option mb-2">
+        <label class="payment-label small">
+          <input type="radio" name="reg-donate-method" value="qr" class="reg-donate-method-radio" />
+          <span>📱 Scan QR Code</span>
+        </label>
+        <div id="reg-qr-placeholder" class="qr-placeholder mt-2" hidden>
+          <div class="qr-code-box">
+            <p class="small mb-2">Scan this QR code to pay</p>
+            <div class="qr-image-placeholder">[QR CODE WILL APPEAR HERE]</div>
+          </div>
+        </div>
+      </div>
+      <div class="payment-option mb-2">
+        <label class="payment-label small">
+          <input type="radio" name="reg-donate-method" value="cash" class="reg-donate-method-radio" />
+          <span>💵 Cash (via Referral)</span>
+        </label>
+        <div id="reg-donate-cash-fields" class="mt-2" hidden>
+          <label class="form-label small" for="reg-donate-referral-id">Referral ID</label>
+          <input type="text" class="form-control form-control-sm font-monospace" id="reg-donate-referral-id" placeholder="Enter Referral ID" autocomplete="off" />
+          <small class="text-muted">Enter the Referral ID of the volunteer who helped you</small>
+        </div>
+      </div>
+    </div>
+    <p class="small text-danger mb-2" id="reg-donation-error" hidden></p>
+    <button type="button" class="qb-btn qb-btn-primary" id="reg-donation-submit" {% if not show_donation_step %}disabled{% endif %}>
+      Submit Registration
+    </button>
+  </section>
+
+  <div class="form-navigation" {% if show_donation_step %}hidden{% endif %}>
+    <button type="button" class="btn-prev qb-btn qb-btn-neutral" data-prev-step="3">← Back</button>
+    <button type="submit" class="qb-btn qb-btn-primary btn-submit" id="submit-registration" {% if not continents %}disabled{% endif %}{% if show_donation_step %} hidden{% endif %}>
+      Submit Registration
+    </button>
+  </div>
+  </div>
 </form>
+
+<div class="register-footer">
+  <p>Already have an account? <a href="{{ url_for('login') }}">Sign in</a></p>
+</div>
 {% endif %}
+</div>
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='locations.js') }}" defer></script>
-<script src="{{ url_for('static', filename='register_geo.js') }}" defer></script>
-<script src="{{ url_for('static', filename='register.js') }}" defer></script>
+{% if not new_private_id %}
+<script>
+  window.QBRegisterShowDonation = {{ show_donation_step|default(false)|tojson }};
+  window.QBRegisterPending = {{ pending_registration|default(false)|tojson }};
+  window.QBRegisterRefLocked = {{ ref_locked|default(false)|tojson }};
+  window.QBRegisterFieldErrors = {{ (field_errors or {})|tojson }};
+  window.QBRegisterLanguageChoices = {{ (language_choices or [])|tojson }};
+  window.QBRegisterMotherTongueInitial = {{ (form.mother_tongue_code or '')|tojson }};
+  window.QBRegisterGeoRestore = {
+    birth: {
+      state_id: {{ (form.birth_state_id or '')|tojson }},
+      district_id: {{ (form.birth_district_id or '')|tojson }},
+      tehsil_id: {{ (form.birth_tehsil_id or '')|tojson }},
+      village_id: {{ (form.birth_location_id or '')|tojson }},
+      global_state_id: {{ (form.birth_global_state_id or '')|tojson }}
+    },
+    current: {
+      state_id: {{ (form.current_state_id or '')|tojson }},
+      district_id: {{ (form.current_district_id or '')|tojson }},
+      tehsil_id: {{ (form.current_tehsil_id or '')|tojson }},
+      village_id: {{ (form.current_location_id or '')|tojson }},
+      global_state_id: {{ (form.current_global_state_id or '')|tojson }}
+    }
+  };
+</script>
+<script src="{{ url_for('static', filename='register_geo.js') }}?v=6" defer></script>
+<script src="{{ url_for('static', filename='register.js') }}?v=12" defer></script>
+{% endif %}
 {% endblock %}

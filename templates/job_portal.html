@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block title %}Job Portal — Qumanity{% endblock %}
+
+{% block body_class %}qb-page-dashboard{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}" />
+{% endblock %}
+
+{% block header_inner %}
+<div class="d-flex flex-wrap align-items-center justify-content-between w-100 gap-2">
+  <a href="{{ url_for('dashboard') }}" class="qb-btn qb-btn-link">← Dashboard</a>
+  <h1 class="h5 mb-0">Job Portal</h1>
+  <span class="small text-muted">{{ village_label }}</span>
+</div>
+{% endblock %}
+
+{% block body %}
+<div class="row g-3">
+  <div class="col-lg-7">
+    <section class="qb-panel mb-3">
+      <h2 class="h6 text-secondary text-uppercase small">Open jobs</h2>
+      <div class="row g-2 mb-2">
+        <div class="col-md-4">
+          <select id="jp-filter-category" class="form-select form-select-sm">
+            <option value="">All categories</option>
+            {% for c in job_categories %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <select id="jp-filter-type" class="form-select form-select-sm">
+            <option value="">All types</option>
+            <option>Full-time</option>
+            <option>Part-time</option>
+            <option>Temporary</option>
+            <option>Contract</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <button type="button" class="qb-btn qb-btn-outline btn-sm w-100" id="jp-refresh-btn">Refresh</button>
+        </div>
+      </div>
+      <ul class="list-unstyled small mb-0" id="jp-jobs-list"></ul>
+      <p class="small text-muted mb-0" id="jp-jobs-empty" hidden>No open jobs.</p>
+    </section>
+
+    {% if can_post_jobs %}
+    <section class="qb-panel">
+      <h2 class="h6 text-secondary text-uppercase small">Post a job</h2>
+      <form id="jp-post-form" class="row g-2">
+        <div class="col-md-6"><input class="form-control form-control-sm" id="jp-title" placeholder="Job title" required /></div>
+        <div class="col-md-3">
+          <select class="form-select form-select-sm" id="jp-job-type">
+            <option>Full-time</option><option>Part-time</option><option>Temporary</option><option>Contract</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <select class="form-select form-select-sm" id="jp-category">
+            {% for c in job_categories %}<option>{{ c }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-12"><textarea class="form-control form-control-sm" id="jp-description" rows="2" placeholder="Description"></textarea></div>
+        <div class="col-12"><textarea class="form-control form-control-sm" id="jp-requirements" rows="2" placeholder="Requirements"></textarea></div>
+        <div class="col-md-3"><input class="form-control form-control-sm" id="jp-salary" type="number" min="1" placeholder="Salary (Qoins)" required /></div>
+        <div class="col-md-3">
+          <select class="form-select form-select-sm" id="jp-salary-period">
+            <option value="day">Per day</option><option value="week">Per week</option><option value="month" selected>Per month</option>
+          </select>
+        </div>
+        <div class="col-md-3"><input class="form-control form-control-sm" id="jp-openings" type="number" min="1" value="1" /></div>
+        <div class="col-md-3"><input class="form-control form-control-sm" id="jp-deadline" type="date" /></div>
+        <div class="col-12"><button type="submit" class="qb-btn qb-btn-primary btn-sm">Publish job</button></div>
+      </form>
+      <p class="small mt-2 mb-0" id="jp-post-flash" role="status"></p>
+    </section>
+    {% endif %}
+  </div>
+
+  <div class="col-lg-5">
+    <section class="qb-panel mb-3">
+      <h2 class="h6 text-secondary text-uppercase small">Job seeker profile</h2>
+      <form id="jp-profile-form">
+        <label class="form-label small">Skills (comma-separated)</label>
+        <input class="form-control form-control-sm mb-2" id="jp-skills" list="jp-skill-presets" />
+        <datalist id="jp-skill-presets">
+          {% for s in skill_presets %}<option value="{{ s }}"></option>{% endfor %}
+        </datalist>
+        <label class="form-label small">Availability</label>
+        <select class="form-select form-select-sm mb-2" id="jp-availability">
+          <option>Full-time</option><option>Part-time</option><option>Weekend only</option>
+        </select>
+        <label class="form-label small">Experience (JSON text — employer, role, duration)</label>
+        <textarea class="form-control form-control-sm mb-2" id="jp-experience" rows="2" placeholder='[{"employer":"Shop X","role":"Helper","duration":"2 years"}]'></textarea>
+        <label class="form-label small">Education (JSON text)</label>
+        <textarea class="form-control form-control-sm mb-2" id="jp-education" rows="2" placeholder='[{"qualification":"BA","institution":"DU","year":"2020"}]'></textarea>
+        <button type="submit" class="qb-btn qb-btn-outline btn-sm">Save profile</button>
+      </form>
+      <p class="small mt-2 mb-0" id="jp-profile-flash" role="status"></p>
+    </section>
+    <section class="qb-panel" id="jp-applicants-panel" hidden>
+      <h2 class="h6 text-secondary text-uppercase small">Applicants</h2>
+      <ul class="list-unstyled small mb-0" id="jp-applicants-list"></ul>
+    </section>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='job_portal.js') }}"></script>
+{% endblock %}

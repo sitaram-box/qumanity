@@ -6,7 +6,10 @@
   "use strict";
 
   async function fetchJson(url) {
-    const res = await fetch(url, { credentials: "same-origin" });
+    const lang = window.QBGeoLang || "";
+    const sep = url.indexOf("?") >= 0 ? "&" : "?";
+    const fullUrl = lang ? url + sep + "lang=" + encodeURIComponent(lang) : url;
+    const res = await fetch(fullUrl, { credentials: "same-origin" });
     if (!res.ok) {
       throw new Error("Request failed");
     }
@@ -27,6 +30,7 @@
       selectEl.appendChild(o);
     }
     selectEl.disabled = rows.length === 0;
+    selectEl.dispatchEvent(new CustomEvent("qb-options-updated"));
   }
 
   function clearChain(prefix, fromLevel) {
@@ -130,6 +134,10 @@
   window.QBInitIndianRegisterChains = initIndianChains;
 
   document.addEventListener("DOMContentLoaded", async function () {
+    if (document.getElementById("recovery-app")) {
+      await initIndianChain("recovery");
+      return;
+    }
     const form = document.getElementById("register-form");
     if (!form) return;
     if (form.classList.contains("qb-register-defer-india")) return;

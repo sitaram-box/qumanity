@@ -2,6 +2,10 @@
 
 {% block title %}Activate account — Donation{% endblock %}
 
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}" />
+{% endblock %}
+
 {% block body %}
 <section class="qb-hero mb-4">
   <h1>Activate your account</h1>
@@ -33,8 +37,8 @@
     >
   </fieldset>
   <div id="reg-donate-cash-fields" class="mb-2" hidden>
-    <label class="form-label small" for="reg-donate-agent-id">Agent Account ID (public ID)</label>
-    <input type="text" class="form-control form-control-sm" id="reg-donate-agent-id" placeholder="Agent public ID" autocomplete="off" />
+    <label class="form-label small" for="reg-donate-agent-id">Agent or Admin Account ID (public ID)</label>
+    <input type="text" class="form-control form-control-sm" id="reg-donate-agent-id" placeholder="Agent or Admin public ID" autocomplete="off" />
   </div>
   <div id="reg-donate-upi-fields" class="mb-2">
     <div class="qb-upi-qr-placeholder" role="img" aria-label="QR code placeholder">
@@ -52,16 +56,106 @@
   </p>
 </div>
 
+<div
+  class="qb-id-modal-backdrop"
+  id="reg-ids-modal-backdrop"
+  hidden
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="reg-ids-modal-title"
+>
+  <div class="qb-id-modal">
+    <h2 class="h5 mb-2" id="reg-ids-modal-title">Your account IDs</h2>
+    <p class="qb-id-modal-warning small mb-3">
+      Please save these IDs in a safe place. You will need them to log in.
+    </p>
+    <div class="qb-id-copy-row mb-3">
+      <div class="flex-grow-1">
+        <span class="small text-muted d-block">Private ID (User ID)</span>
+        <span class="font-monospace" id="reg-success-private-id"></span>
+      </div>
+      <button
+        type="button"
+        class="qb-btn qb-btn-outline btn-sm"
+        data-qb-copy-target="reg-success-private-id"
+        data-qb-copy-feedback="reg-copy-private-feedback"
+      >
+        Copy
+      </button>
+      <span class="qb-copy-feedback small text-success" id="reg-copy-private-feedback" hidden>Copied!</span>
+    </div>
+    <div class="qb-id-copy-row mb-4">
+      <div class="flex-grow-1">
+        <span class="small text-muted d-block">Public ID (Account ID)</span>
+        <span class="font-monospace" id="reg-success-public-id"></span>
+      </div>
+      <button
+        type="button"
+        class="qb-btn qb-btn-outline btn-sm"
+        data-qb-copy-target="reg-success-public-id"
+        data-qb-copy-feedback="reg-copy-public-feedback"
+      >
+        Copy
+      </button>
+      <span class="qb-copy-feedback small text-success" id="reg-copy-public-feedback" hidden>Copied!</span>
+    </div>
+    <button type="button" class="qb-btn qb-btn-primary w-100" id="reg-ids-modal-done">
+      I have saved my IDs
+    </button>
+  </div>
+</div>
+
 <script>
   (function () {
+    function qbCopyText(textValue, feedbackEl) {
+      var value = String(textValue || "");
+      function showCopied() {
+        if (!feedbackEl) return;
+        feedbackEl.textContent = "Copied!";
+        feedbackEl.hidden = false;
+        window.setTimeout(function () { feedbackEl.hidden = true; }, 1800);
+      }
+      if (!value) return;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(value).then(showCopied).catch(function () {
+          var ta = document.createElement("textarea");
+          ta.value = value;
+          document.body.appendChild(ta);
+          ta.select();
+          try { document.execCommand("copy"); showCopied(); } catch (_e) {}
+          document.body.removeChild(ta);
+        });
+      }
+    }
+    function bindCopyButtons(root) {
+      (root || document).querySelectorAll("[data-qb-copy-target]").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          var target = document.getElementById(btn.getAttribute("data-qb-copy-target"));
+          var feedback = document.getElementById(btn.getAttribute("data-qb-copy-feedback"));
+          qbCopyText(target ? (target.textContent || "").trim() : "", feedback);
+        });
+      });
+    }
+
     var selected = 0;
     var method = "upi";
     var upiDone = false;
+    var loginUrl = {{ url_for('login') | tojson }};
     var preview = document.getElementById("reg-donation-preview");
     var errEl = document.getElementById("reg-donation-error");
     var submitBtn = document.getElementById("reg-donation-submit");
     var cashFields = document.getElementById("reg-donate-cash-fields");
     var upiFields = document.getElementById("reg-donate-upi-fields");
+    var modalBackdrop = document.getElementById("reg-ids-modal-backdrop");
+
+    function showIdsModal(privateId, publicId) {
+      var privEl = document.getElementById("reg-success-private-id");
+      var pubEl = document.getElementById("reg-success-public-id");
+      if (privEl) privEl.textContent = privateId || "";
+      if (pubEl) pubEl.textContent = publicId || "";
+      if (modalBackdrop) modalBackdrop.hidden = false;
+      bindCopyButtons(modalBackdrop);
+    }
 
     function syncMethod() {
       var picked = document.querySelector('input[name="reg-donate-method"]:checked');
@@ -95,13 +189,21 @@
         if (errEl) errEl.hidden = true;
       });
     });
+
+    var doneBtn = document.getElementById("reg-ids-modal-done");
+    if (doneBtn) {
+      doneBtn.addEventListener("click", function () {
+        window.location.href = loginUrl;
+      });
+    }
+
     if (submitBtn) {
       submitBtn.addEventListener("click", function () {
         if (!selected) return;
         var agentId = ((document.getElementById("reg-donate-agent-id") || {}).value || "").trim();
         if (method === "cash" && !agentId) {
           if (errEl) {
-            errEl.textContent = "Agent Account ID is required for cash donations.";
+            errEl.textContent = "Agent or Admin Account ID is required for cash donations.";
             errEl.hidden = false;
           }
           return;
@@ -129,14 +231,7 @@
           })
           .then(function (x) {
             if (!x.ok) throw new Error((x.b && x.b.error) || "Donation failed");
-            alert(
-              "Account created.\nPrivate ID: " +
-                (x.b.private_id || "") +
-                "\nPublic ID: " +
-                (x.b.public_id || "") +
-                "\nSave your Private ID before closing."
-            );
-            window.location.href = x.b.redirect || "/dashboard";
+            showIdsModal(x.b.private_id || "", x.b.public_id || "");
           })
           .catch(function (err) {
             if (errEl) {

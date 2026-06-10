@@ -1,0 +1,1870 @@
+{
+  "version": 1,
+  "description": "Global states/provinces by ISO alpha-3 country code",
+  "states": {
+    "USA": [
+      {
+        "code": "AL",
+        "name": "Alabama",
+        "lat": 32.3182,
+        "lng": -86.9023
+      },
+      {
+        "code": "AK",
+        "name": "Alaska",
+        "lat": 64.2008,
+        "lng": -149.4937
+      },
+      {
+        "code": "AZ",
+        "name": "Arizona",
+        "lat": 34.0489,
+        "lng": -111.0937
+      },
+      {
+        "code": "AR",
+        "name": "Arkansas",
+        "lat": 35.201,
+        "lng": -91.8318
+      },
+      {
+        "code": "CA",
+        "name": "California",
+        "lat": 36.7783,
+        "lng": -119.4179
+      },
+      {
+        "code": "CO",
+        "name": "Colorado",
+        "lat": 39.5501,
+        "lng": -105.7821
+      },
+      {
+        "code": "CT",
+        "name": "Connecticut",
+        "lat": 41.6032,
+        "lng": -73.0877
+      },
+      {
+        "code": "DE",
+        "name": "Delaware",
+        "lat": 38.9108,
+        "lng": -75.5277
+      },
+      {
+        "code": "DC",
+        "name": "District of Columbia",
+        "lat": 38.9072,
+        "lng": -77.0369
+      },
+      {
+        "code": "FL",
+        "name": "Florida",
+        "lat": 27.6648,
+        "lng": -81.5158
+      },
+      {
+        "code": "GA",
+        "name": "Georgia",
+        "lat": 32.1656,
+        "lng": -82.9001
+      },
+      {
+        "code": "HI",
+        "name": "Hawaii",
+        "lat": 19.8968,
+        "lng": -155.5828
+      },
+      {
+        "code": "ID",
+        "name": "Idaho",
+        "lat": 44.0682,
+        "lng": -114.742
+      },
+      {
+        "code": "IL",
+        "name": "Illinois",
+        "lat": 40.6331,
+        "lng": -89.3985
+      },
+      {
+        "code": "IN",
+        "name": "Indiana",
+        "lat": 40.2672,
+        "lng": -86.1349
+      },
+      {
+        "code": "IA",
+        "name": "Iowa",
+        "lat": 41.878,
+        "lng": -93.0977
+      },
+      {
+        "code": "KS",
+        "name": "Kansas",
+        "lat": 39.0119,
+        "lng": -98.4842
+      },
+      {
+        "code": "KY",
+        "name": "Kentucky",
+        "lat": 37.8393,
+        "lng": -84.27
+      },
+      {
+        "code": "LA",
+        "name": "Louisiana",
+        "lat": 30.9843,
+        "lng": -91.9623
+      },
+      {
+        "code": "ME",
+        "name": "Maine",
+        "lat": 45.2538,
+        "lng": -69.4455
+      },
+      {
+        "code": "MD",
+        "name": "Maryland",
+        "lat": 39.0458,
+        "lng": -76.6413
+      },
+      {
+        "code": "MA",
+        "name": "Massachusetts",
+        "lat": 42.4072,
+        "lng": -71.3824
+      },
+      {
+        "code": "MI",
+        "name": "Michigan",
+        "lat": 44.3148,
+        "lng": -85.6024
+      },
+      {
+        "code": "MN",
+        "name": "Minnesota",
+        "lat": 46.7296,
+        "lng": -94.6859
+      },
+      {
+        "code": "MS",
+        "name": "Mississippi",
+        "lat": 32.3547,
+        "lng": -89.3985
+      },
+      {
+        "code": "MO",
+        "name": "Missouri",
+        "lat": 37.9643,
+        "lng": -91.8318
+      },
+      {
+        "code": "MT",
+        "name": "Montana",
+        "lat": 46.8797,
+        "lng": -110.3626
+      },
+      {
+        "code": "NE",
+        "name": "Nebraska",
+        "lat": 41.4925,
+        "lng": -99.9018
+      },
+      {
+        "code": "NV",
+        "name": "Nevada",
+        "lat": 38.8026,
+        "lng": -116.4194
+      },
+      {
+        "code": "NH",
+        "name": "New Hampshire",
+        "lat": 43.1939,
+        "lng": -71.5724
+      },
+      {
+        "code": "NJ",
+        "name": "New Jersey",
+        "lat": 40.0583,
+        "lng": -74.4057
+      },
+      {
+        "code": "NM",
+        "name": "New Mexico",
+        "lat": 34.5199,
+        "lng": -105.8701
+      },
+      {
+        "code": "NY",
+        "name": "New York",
+        "lat": 40.7128,
+        "lng": -74.006
+      },
+      {
+        "code": "NC",
+        "name": "North Carolina",
+        "lat": 35.7596,
+        "lng": -79.0193
+      },
+      {
+        "code": "ND",
+        "name": "North Dakota",
+        "lat": 47.5515,
+        "lng": -101.002
+      },
+      {
+        "code": "OH",
+        "name": "Ohio",
+        "lat": 40.4173,
+        "lng": -82.9071
+      },
+      {
+        "code": "OK",
+        "name": "Oklahoma",
+        "lat": 35.4676,
+        "lng": -97.5164
+      },
+      {
+        "code": "OR",
+        "name": "Oregon",
+        "lat": 44.0582,
+        "lng": -120.9519
+      },
+      {
+        "code": "PA",
+        "name": "Pennsylvania",
+        "lat": 41.2033,
+        "lng": -77.1945
+      },
+      {
+        "code": "RI",
+        "name": "Rhode Island",
+        "lat": 41.5801,
+        "lng": -71.4774
+      },
+      {
+        "code": "SC",
+        "name": "South Carolina",
+        "lat": 33.8361,
+        "lng": -81.1637
+      },
+      {
+        "code": "SD",
+        "name": "South Dakota",
+        "lat": 43.9695,
+        "lng": -99.9018
+      },
+      {
+        "code": "TN",
+        "name": "Tennessee",
+        "lat": 35.5175,
+        "lng": -86.5804
+      },
+      {
+        "code": "TX",
+        "name": "Texas",
+        "lat": 31.9686,
+        "lng": -99.9018
+      },
+      {
+        "code": "UT",
+        "name": "Utah",
+        "lat": 39.321,
+        "lng": -111.0937
+      },
+      {
+        "code": "VT",
+        "name": "Vermont",
+        "lat": 44.5588,
+        "lng": -72.5778
+      },
+      {
+        "code": "VA",
+        "name": "Virginia",
+        "lat": 37.4316,
+        "lng": -78.6569
+      },
+      {
+        "code": "WA",
+        "name": "Washington",
+        "lat": 47.7511,
+        "lng": -120.7401
+      },
+      {
+        "code": "WV",
+        "name": "West Virginia",
+        "lat": 38.5976,
+        "lng": -80.4549
+      },
+      {
+        "code": "WI",
+        "name": "Wisconsin",
+        "lat": 43.7844,
+        "lng": -88.7879
+      },
+      {
+        "code": "WY",
+        "name": "Wyoming",
+        "lat": 43.0759,
+        "lng": -107.2903
+      }
+    ],
+    "CAN": [
+      {
+        "code": "AB",
+        "name": "Alberta",
+        "lat": 53.9333,
+        "lng": -116.5765
+      },
+      {
+        "code": "BC",
+        "name": "British Columbia",
+        "lat": 53.7267,
+        "lng": -127.6476
+      },
+      {
+        "code": "MB",
+        "name": "Manitoba",
+        "lat": 53.7609,
+        "lng": -98.8139
+      },
+      {
+        "code": "NB",
+        "name": "New Brunswick",
+        "lat": 46.5653,
+        "lng": -66.4619
+      },
+      {
+        "code": "NL",
+        "name": "Newfoundland and Labrador",
+        "lat": 53.1355,
+        "lng": -57.6604
+      },
+      {
+        "code": "NS",
+        "name": "Nova Scotia",
+        "lat": 44.682,
+        "lng": -63.7443
+      },
+      {
+        "code": "ON",
+        "name": "Ontario",
+        "lat": 51.2538,
+        "lng": -85.3232
+      },
+      {
+        "code": "PE",
+        "name": "Prince Edward Island",
+        "lat": 46.5107,
+        "lng": -63.4168
+      },
+      {
+        "code": "QC",
+        "name": "Quebec",
+        "lat": 52.9399,
+        "lng": -73.5491
+      },
+      {
+        "code": "SK",
+        "name": "Saskatchewan",
+        "lat": 52.9399,
+        "lng": -106.4509
+      },
+      {
+        "code": "NT",
+        "name": "Northwest Territories",
+        "lat": 64.8255,
+        "lng": -124.8457
+      },
+      {
+        "code": "NU",
+        "name": "Nunavut",
+        "lat": 70.2998,
+        "lng": -83.1076
+      },
+      {
+        "code": "YT",
+        "name": "Yukon",
+        "lat": 64.2823,
+        "lng": -135.0
+      }
+    ],
+    "MEX": [
+      {
+        "code": "AGU",
+        "name": "Aguascalientes",
+        "lat": 21.8853,
+        "lng": -102.2916
+      },
+      {
+        "code": "BCN",
+        "name": "Baja California",
+        "lat": 30.8406,
+        "lng": -115.2838
+      },
+      {
+        "code": "BCS",
+        "name": "Baja California Sur",
+        "lat": 26.0444,
+        "lng": -111.6661
+      },
+      {
+        "code": "CAM",
+        "name": "Campeche",
+        "lat": 19.8301,
+        "lng": -90.5349
+      },
+      {
+        "code": "CHP",
+        "name": "Chiapas",
+        "lat": 16.7569,
+        "lng": -93.1292
+      },
+      {
+        "code": "CHH",
+        "name": "Chihuahua",
+        "lat": 28.633,
+        "lng": -106.0691
+      },
+      {
+        "code": "COA",
+        "name": "Coahuila",
+        "lat": 27.0587,
+        "lng": -101.7068
+      },
+      {
+        "code": "COL",
+        "name": "Colima",
+        "lat": 19.2452,
+        "lng": -103.7241
+      },
+      {
+        "code": "CMX",
+        "name": "Mexico City",
+        "lat": 19.4326,
+        "lng": -99.1332
+      },
+      {
+        "code": "DUR",
+        "name": "Durango",
+        "lat": 24.0277,
+        "lng": -104.6532
+      },
+      {
+        "code": "GUA",
+        "name": "Guanajuato",
+        "lat": 21.019,
+        "lng": -101.2574
+      },
+      {
+        "code": "GRO",
+        "name": "Guerrero",
+        "lat": 17.4392,
+        "lng": -99.5451
+      },
+      {
+        "code": "HID",
+        "name": "Hidalgo",
+        "lat": 20.0911,
+        "lng": -98.7624
+      },
+      {
+        "code": "JAL",
+        "name": "Jalisco",
+        "lat": 20.6595,
+        "lng": -103.3496
+      },
+      {
+        "code": "MEX",
+        "name": "México",
+        "lat": 19.4969,
+        "lng": -99.7233
+      },
+      {
+        "code": "MIC",
+        "name": "Michoacán",
+        "lat": 19.5665,
+        "lng": -101.7068
+      },
+      {
+        "code": "MOR",
+        "name": "Morelos",
+        "lat": 18.6813,
+        "lng": -99.1013
+      },
+      {
+        "code": "NAY",
+        "name": "Nayarit",
+        "lat": 21.7514,
+        "lng": -104.8455
+      },
+      {
+        "code": "NLE",
+        "name": "Nuevo León",
+        "lat": 25.5922,
+        "lng": -99.9962
+      },
+      {
+        "code": "OAX",
+        "name": "Oaxaca",
+        "lat": 17.0732,
+        "lng": -96.7266
+      },
+      {
+        "code": "PUE",
+        "name": "Puebla",
+        "lat": 19.0414,
+        "lng": -98.2063
+      },
+      {
+        "code": "QUE",
+        "name": "Querétaro",
+        "lat": 20.5888,
+        "lng": -100.3899
+      },
+      {
+        "code": "ROO",
+        "name": "Quintana Roo",
+        "lat": 19.1817,
+        "lng": -88.4791
+      },
+      {
+        "code": "SLP",
+        "name": "San Luis Potosí",
+        "lat": 22.1565,
+        "lng": -100.9855
+      },
+      {
+        "code": "SIN",
+        "name": "Sinaloa",
+        "lat": 25.1721,
+        "lng": -107.4795
+      },
+      {
+        "code": "SON",
+        "name": "Sonora",
+        "lat": 29.2972,
+        "lng": -110.3309
+      },
+      {
+        "code": "TAB",
+        "name": "Tabasco",
+        "lat": 17.8409,
+        "lng": -92.6189
+      },
+      {
+        "code": "TAM",
+        "name": "Tamaulipas",
+        "lat": 24.2669,
+        "lng": -98.8363
+      },
+      {
+        "code": "TLA",
+        "name": "Tlaxcala",
+        "lat": 19.3139,
+        "lng": -98.2404
+      },
+      {
+        "code": "VER",
+        "name": "Veracruz",
+        "lat": 19.1738,
+        "lng": -96.1342
+      },
+      {
+        "code": "YUC",
+        "name": "Yucatán",
+        "lat": 20.7099,
+        "lng": -89.0943
+      },
+      {
+        "code": "ZAC",
+        "name": "Zacatecas",
+        "lat": 22.7709,
+        "lng": -102.5832
+      }
+    ],
+    "BRA": [
+      {
+        "code": "AC",
+        "name": "Acre",
+        "lat": -9.0238,
+        "lng": -70.812
+      },
+      {
+        "code": "AL",
+        "name": "Alagoas",
+        "lat": -9.5713,
+        "lng": -36.782
+      },
+      {
+        "code": "AP",
+        "name": "Amapá",
+        "lat": 0.9019,
+        "lng": -52.003
+      },
+      {
+        "code": "AM",
+        "name": "Amazonas",
+        "lat": -3.4168,
+        "lng": -65.8561
+      },
+      {
+        "code": "BA",
+        "name": "Bahia",
+        "lat": -12.5797,
+        "lng": -41.7007
+      },
+      {
+        "code": "CE",
+        "name": "Ceará",
+        "lat": -5.4984,
+        "lng": -39.3206
+      },
+      {
+        "code": "DF",
+        "name": "Distrito Federal",
+        "lat": -15.7998,
+        "lng": -47.8645
+      },
+      {
+        "code": "ES",
+        "name": "Espírito Santo",
+        "lat": -19.1834,
+        "lng": -40.3089
+      },
+      {
+        "code": "GO",
+        "name": "Goiás",
+        "lat": -15.827,
+        "lng": -49.8362
+      },
+      {
+        "code": "MA",
+        "name": "Maranhão",
+        "lat": -4.9609,
+        "lng": -45.2744
+      },
+      {
+        "code": "MT",
+        "name": "Mato Grosso",
+        "lat": -12.6819,
+        "lng": -56.9211
+      },
+      {
+        "code": "MS",
+        "name": "Mato Grosso do Sul",
+        "lat": -20.7722,
+        "lng": -54.7852
+      },
+      {
+        "code": "MG",
+        "name": "Minas Gerais",
+        "lat": -18.5122,
+        "lng": -44.555
+      },
+      {
+        "code": "PA",
+        "name": "Pará",
+        "lat": -1.9981,
+        "lng": -54.9306
+      },
+      {
+        "code": "PB",
+        "name": "Paraíba",
+        "lat": -7.2399,
+        "lng": -36.7819
+      },
+      {
+        "code": "PR",
+        "name": "Paraná",
+        "lat": -25.2521,
+        "lng": -52.0215
+      },
+      {
+        "code": "PE",
+        "name": "Pernambuco",
+        "lat": -8.8137,
+        "lng": -36.9541
+      },
+      {
+        "code": "PI",
+        "name": "Piauí",
+        "lat": -7.7183,
+        "lng": -42.7289
+      },
+      {
+        "code": "RJ",
+        "name": "Rio de Janeiro",
+        "lat": -22.9068,
+        "lng": -43.1729
+      },
+      {
+        "code": "RN",
+        "name": "Rio Grande do Norte",
+        "lat": -5.4026,
+        "lng": -36.9541
+      },
+      {
+        "code": "RS",
+        "name": "Rio Grande do Sul",
+        "lat": -30.0346,
+        "lng": -51.2177
+      },
+      {
+        "code": "RO",
+        "name": "Rondônia",
+        "lat": -10.83,
+        "lng": -63.34
+      },
+      {
+        "code": "RR",
+        "name": "Roraima",
+        "lat": 2.7376,
+        "lng": -62.0751
+      },
+      {
+        "code": "SC",
+        "name": "Santa Catarina",
+        "lat": -27.2423,
+        "lng": -50.2189
+      },
+      {
+        "code": "SP",
+        "name": "São Paulo",
+        "lat": -23.5505,
+        "lng": -46.6333
+      },
+      {
+        "code": "SE",
+        "name": "Sergipe",
+        "lat": -10.5741,
+        "lng": -37.3857
+      },
+      {
+        "code": "TO",
+        "name": "Tocantins",
+        "lat": -10.1753,
+        "lng": -48.2982
+      }
+    ],
+    "ARG": [
+      {
+        "code": "BA",
+        "name": "Buenos Aires",
+        "lat": -36.6769,
+        "lng": -60.5588
+      },
+      {
+        "code": "CT",
+        "name": "Catamarca",
+        "lat": -28.4696,
+        "lng": -65.7795
+      },
+      {
+        "code": "CC",
+        "name": "Chaco",
+        "lat": -27.451,
+        "lng": -58.9867
+      },
+      {
+        "code": "CH",
+        "name": "Chubut",
+        "lat": -43.3002,
+        "lng": -65.1023
+      },
+      {
+        "code": "CB",
+        "name": "Córdoba",
+        "lat": -31.4201,
+        "lng": -64.1888
+      },
+      {
+        "code": "CR",
+        "name": "Corrientes",
+        "lat": -27.4692,
+        "lng": -58.8306
+      },
+      {
+        "code": "ER",
+        "name": "Entre Ríos",
+        "lat": -31.7333,
+        "lng": -60.5297
+      },
+      {
+        "code": "FO",
+        "name": "Formosa",
+        "lat": -26.1775,
+        "lng": -58.1781
+      },
+      {
+        "code": "JY",
+        "name": "Jujuy",
+        "lat": -24.1858,
+        "lng": -65.2995
+      },
+      {
+        "code": "LP",
+        "name": "La Pampa",
+        "lat": -36.6167,
+        "lng": -64.2833
+      },
+      {
+        "code": "LR",
+        "name": "La Rioja",
+        "lat": -29.4131,
+        "lng": -66.8558
+      },
+      {
+        "code": "MZ",
+        "name": "Mendoza",
+        "lat": -32.8895,
+        "lng": -68.8458
+      },
+      {
+        "code": "MI",
+        "name": "Misiones",
+        "lat": -27.3621,
+        "lng": -55.9009
+      },
+      {
+        "code": "NQ",
+        "name": "Neuquén",
+        "lat": -38.9516,
+        "lng": -68.0591
+      },
+      {
+        "code": "RN",
+        "name": "Río Negro",
+        "lat": -40.8135,
+        "lng": -63.0
+      },
+      {
+        "code": "SA",
+        "name": "Salta",
+        "lat": -24.7821,
+        "lng": -65.4232
+      },
+      {
+        "code": "SJ",
+        "name": "San Juan",
+        "lat": -31.5375,
+        "lng": -68.5364
+      },
+      {
+        "code": "SL",
+        "name": "San Luis",
+        "lat": -33.3017,
+        "lng": -66.3378
+      },
+      {
+        "code": "SC",
+        "name": "Santa Cruz",
+        "lat": -48.623,
+        "lng": -69.2168
+      },
+      {
+        "code": "SF",
+        "name": "Santa Fe",
+        "lat": -31.6107,
+        "lng": -60.6973
+      },
+      {
+        "code": "SE",
+        "name": "Santiago del Estero",
+        "lat": -27.7834,
+        "lng": -64.2642
+      },
+      {
+        "code": "TF",
+        "name": "Tierra del Fuego",
+        "lat": -54.8019,
+        "lng": -68.303
+      },
+      {
+        "code": "TM",
+        "name": "Tucumán",
+        "lat": -26.8083,
+        "lng": -65.2176
+      }
+    ],
+    "DEU": [
+      {
+        "code": "BW",
+        "name": "Baden-Württemberg",
+        "lat": 48.6616,
+        "lng": 9.3501
+      },
+      {
+        "code": "BY",
+        "name": "Bavaria",
+        "lat": 48.7904,
+        "lng": 11.4979
+      },
+      {
+        "code": "BE",
+        "name": "Berlin",
+        "lat": 52.52,
+        "lng": 13.405
+      },
+      {
+        "code": "BB",
+        "name": "Brandenburg",
+        "lat": 52.4125,
+        "lng": 12.5316
+      },
+      {
+        "code": "HB",
+        "name": "Bremen",
+        "lat": 53.0793,
+        "lng": 8.8017
+      },
+      {
+        "code": "HH",
+        "name": "Hamburg",
+        "lat": 53.5511,
+        "lng": 9.9937
+      },
+      {
+        "code": "HE",
+        "name": "Hesse",
+        "lat": 50.6521,
+        "lng": 9.1624
+      },
+      {
+        "code": "MV",
+        "name": "Mecklenburg-Vorpommern",
+        "lat": 53.6127,
+        "lng": 12.4296
+      },
+      {
+        "code": "NI",
+        "name": "Lower Saxony",
+        "lat": 52.6367,
+        "lng": 9.8451
+      },
+      {
+        "code": "NW",
+        "name": "North Rhine-Westphalia",
+        "lat": 51.4332,
+        "lng": 7.6616
+      },
+      {
+        "code": "RP",
+        "name": "Rhineland-Palatinate",
+        "lat": 49.9929,
+        "lng": 8.2473
+      },
+      {
+        "code": "SL",
+        "name": "Saarland",
+        "lat": 49.3964,
+        "lng": 7.023
+      },
+      {
+        "code": "SN",
+        "name": "Saxony",
+        "lat": 51.1045,
+        "lng": 13.2017
+      },
+      {
+        "code": "ST",
+        "name": "Saxony-Anhalt",
+        "lat": 51.9503,
+        "lng": 11.6923
+      },
+      {
+        "code": "SH",
+        "name": "Schleswig-Holstein",
+        "lat": 54.2194,
+        "lng": 9.6961
+      },
+      {
+        "code": "TH",
+        "name": "Thuringia",
+        "lat": 50.9848,
+        "lng": 11.0299
+      }
+    ],
+    "GBR": [
+      {
+        "code": "ENG",
+        "name": "England",
+        "lat": 52.3555,
+        "lng": -1.1743
+      },
+      {
+        "code": "SCT",
+        "name": "Scotland",
+        "lat": 56.4907,
+        "lng": -4.2026
+      },
+      {
+        "code": "WLS",
+        "name": "Wales",
+        "lat": 52.1307,
+        "lng": -3.7837
+      },
+      {
+        "code": "NIR",
+        "name": "Northern Ireland",
+        "lat": 54.7877,
+        "lng": -6.4923
+      }
+    ],
+    "FRA": [
+      {
+        "code": "IDF",
+        "name": "Île-de-France",
+        "lat": 48.8499,
+        "lng": 2.637
+      },
+      {
+        "code": "ARA",
+        "name": "Auvergne-Rhône-Alpes",
+        "lat": 45.4471,
+        "lng": 4.3853
+      },
+      {
+        "code": "NAQ",
+        "name": "Nouvelle-Aquitaine",
+        "lat": 45.7087,
+        "lng": 0.6268
+      },
+      {
+        "code": "OCC",
+        "name": "Occitanie",
+        "lat": 43.6047,
+        "lng": 1.4442
+      },
+      {
+        "code": "HDF",
+        "name": "Hauts-de-France",
+        "lat": 50.4801,
+        "lng": 2.7936
+      },
+      {
+        "code": "GES",
+        "name": "Grand Est",
+        "lat": 48.6998,
+        "lng": 6.1878
+      },
+      {
+        "code": "PDL",
+        "name": "Pays de la Loire",
+        "lat": 47.7633,
+        "lng": -0.3298
+      },
+      {
+        "code": "BRE",
+        "name": "Brittany",
+        "lat": 48.202,
+        "lng": -2.9326
+      },
+      {
+        "code": "NOR",
+        "name": "Normandy",
+        "lat": 49.1829,
+        "lng": -0.3707
+      },
+      {
+        "code": "CVL",
+        "name": "Centre-Val de Loire",
+        "lat": 47.7516,
+        "lng": 1.6751
+      },
+      {
+        "code": "BFC",
+        "name": "Bourgogne-Franche-Comté",
+        "lat": 47.2805,
+        "lng": 4.9994
+      },
+      {
+        "code": "PAC",
+        "name": "Provence-Alpes-Côte d'Azur",
+        "lat": 43.9352,
+        "lng": 6.0679
+      },
+      {
+        "code": "COR",
+        "name": "Corsica",
+        "lat": 42.0396,
+        "lng": 9.0129
+      }
+    ],
+    "ITA": [
+      {
+        "code": "LOM",
+        "name": "Lombardy",
+        "lat": 45.4791,
+        "lng": 9.8452
+      },
+      {
+        "code": "LAZ",
+        "name": "Lazio",
+        "lat": 41.8719,
+        "lng": 12.5674
+      },
+      {
+        "code": "CAM",
+        "name": "Campania",
+        "lat": 40.8518,
+        "lng": 14.2681
+      },
+      {
+        "code": "VEN",
+        "name": "Veneto",
+        "lat": 45.4415,
+        "lng": 12.3155
+      },
+      {
+        "code": "SIC",
+        "name": "Sicily",
+        "lat": 37.5999,
+        "lng": 14.0154
+      },
+      {
+        "code": "EMR",
+        "name": "Emilia-Romagna",
+        "lat": 44.5968,
+        "lng": 11.0066
+      },
+      {
+        "code": "PIE",
+        "name": "Piedmont",
+        "lat": 45.0522,
+        "lng": 7.6581
+      },
+      {
+        "code": "PUG",
+        "name": "Apulia",
+        "lat": 41.1258,
+        "lng": 16.862
+      },
+      {
+        "code": "TOS",
+        "name": "Tuscany",
+        "lat": 43.7711,
+        "lng": 11.2486
+      }
+    ],
+    "ARE": [
+      {
+        "code": "AZ",
+        "name": "Abu Dhabi",
+        "lat": 24.4539,
+        "lng": 54.3773
+      },
+      {
+        "code": "DU",
+        "name": "Dubai",
+        "lat": 25.2048,
+        "lng": 55.2708
+      },
+      {
+        "code": "SH",
+        "name": "Sharjah",
+        "lat": 25.3463,
+        "lng": 55.4209
+      },
+      {
+        "code": "AJ",
+        "name": "Ajman",
+        "lat": 25.4052,
+        "lng": 55.5136
+      },
+      {
+        "code": "UQ",
+        "name": "Umm Al Quwain",
+        "lat": 25.5647,
+        "lng": 55.5552
+      },
+      {
+        "code": "RK",
+        "name": "Ras Al Khaimah",
+        "lat": 25.6741,
+        "lng": 55.9804
+      },
+      {
+        "code": "FU",
+        "name": "Fujairah",
+        "lat": 25.1288,
+        "lng": 56.3265
+      }
+    ],
+    "AUS": [
+      {
+        "code": "NSW",
+        "name": "New South Wales",
+        "lat": -31.2532,
+        "lng": 146.9211
+      },
+      {
+        "code": "QLD",
+        "name": "Queensland",
+        "lat": -20.9176,
+        "lng": 142.7028
+      },
+      {
+        "code": "SA",
+        "name": "South Australia",
+        "lat": -30.0002,
+        "lng": 136.2092
+      },
+      {
+        "code": "TAS",
+        "name": "Tasmania",
+        "lat": -41.4545,
+        "lng": 145.9707
+      },
+      {
+        "code": "VIC",
+        "name": "Victoria",
+        "lat": -37.4713,
+        "lng": 144.7852
+      },
+      {
+        "code": "WA",
+        "name": "Western Australia",
+        "lat": -27.6728,
+        "lng": 121.6283
+      },
+      {
+        "code": "ACT",
+        "name": "Australian Capital Territory",
+        "lat": -35.4735,
+        "lng": 149.0124
+      },
+      {
+        "code": "NT",
+        "name": "Northern Territory",
+        "lat": -19.4914,
+        "lng": 132.551
+      }
+    ],
+    "ZAF": [
+      {
+        "code": "EC",
+        "name": "Eastern Cape",
+        "lat": -32.2968,
+        "lng": 26.4194
+      },
+      {
+        "code": "FS",
+        "name": "Free State",
+        "lat": -28.4541,
+        "lng": 26.7968
+      },
+      {
+        "code": "GP",
+        "name": "Gauteng",
+        "lat": -26.2708,
+        "lng": 28.1123
+      },
+      {
+        "code": "KZN",
+        "name": "KwaZulu-Natal",
+        "lat": -28.5306,
+        "lng": 30.8958
+      },
+      {
+        "code": "LP",
+        "name": "Limpopo",
+        "lat": -23.4013,
+        "lng": 29.4179
+      },
+      {
+        "code": "MP",
+        "name": "Mpumalanga",
+        "lat": -25.5653,
+        "lng": 30.5279
+      },
+      {
+        "code": "NW",
+        "name": "North West",
+        "lat": -26.6639,
+        "lng": 25.2837
+      },
+      {
+        "code": "NC",
+        "name": "Northern Cape",
+        "lat": -29.0467,
+        "lng": 21.8569
+      },
+      {
+        "code": "WC",
+        "name": "Western Cape",
+        "lat": -33.2278,
+        "lng": 21.8569
+      }
+    ],
+    "NGA": [
+      {
+        "code": "AB",
+        "name": "Abia",
+        "lat": 5.4527,
+        "lng": 7.5248
+      },
+      {
+        "code": "AD",
+        "name": "Adamawa",
+        "lat": 9.3265,
+        "lng": 12.3984
+      },
+      {
+        "code": "AK",
+        "name": "Akwa Ibom",
+        "lat": 5.037,
+        "lng": 7.9128
+      },
+      {
+        "code": "AN",
+        "name": "Anambra",
+        "lat": 6.2209,
+        "lng": 6.937
+      },
+      {
+        "code": "BA",
+        "name": "Bauchi",
+        "lat": 10.3158,
+        "lng": 9.8442
+      },
+      {
+        "code": "BY",
+        "name": "Bayelsa",
+        "lat": 4.7719,
+        "lng": 6.0699
+      },
+      {
+        "code": "BE",
+        "name": "Benue",
+        "lat": 7.3369,
+        "lng": 8.7404
+      },
+      {
+        "code": "BO",
+        "name": "Borno",
+        "lat": 11.8333,
+        "lng": 13.15
+      },
+      {
+        "code": "CR",
+        "name": "Cross River",
+        "lat": 5.8702,
+        "lng": 8.5988
+      },
+      {
+        "code": "DE",
+        "name": "Delta",
+        "lat": 5.532,
+        "lng": 5.898
+      },
+      {
+        "code": "EB",
+        "name": "Ebonyi",
+        "lat": 6.2649,
+        "lng": 8.0137
+      },
+      {
+        "code": "ED",
+        "name": "Edo",
+        "lat": 6.6342,
+        "lng": 5.9304
+      },
+      {
+        "code": "EK",
+        "name": "Ekiti",
+        "lat": 7.718,
+        "lng": 5.2209
+      },
+      {
+        "code": "EN",
+        "name": "Enugu",
+        "lat": 6.5244,
+        "lng": 7.5086
+      },
+      {
+        "code": "GO",
+        "name": "Gombe",
+        "lat": 10.2897,
+        "lng": 11.1673
+      },
+      {
+        "code": "IM",
+        "name": "Imo",
+        "lat": 5.572,
+        "lng": 7.0588
+      },
+      {
+        "code": "JI",
+        "name": "Jigawa",
+        "lat": 12.228,
+        "lng": 9.5616
+      },
+      {
+        "code": "KD",
+        "name": "Kaduna",
+        "lat": 10.5105,
+        "lng": 7.4165
+      },
+      {
+        "code": "KN",
+        "name": "Kano",
+        "lat": 11.9964,
+        "lng": 8.5167
+      },
+      {
+        "code": "KT",
+        "name": "Katsina",
+        "lat": 12.9855,
+        "lng": 7.6172
+      },
+      {
+        "code": "KE",
+        "name": "Kebbi",
+        "lat": 11.494,
+        "lng": 4.2333
+      },
+      {
+        "code": "KO",
+        "name": "Kogi",
+        "lat": 7.7337,
+        "lng": 6.6906
+      },
+      {
+        "code": "KW",
+        "name": "Kwara",
+        "lat": 8.9669,
+        "lng": 4.3874
+      },
+      {
+        "code": "LA",
+        "name": "Lagos",
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      {
+        "code": "NA",
+        "name": "Nasarawa",
+        "lat": 8.538,
+        "lng": 8.3229
+      },
+      {
+        "code": "NI",
+        "name": "Niger",
+        "lat": 9.9309,
+        "lng": 5.5985
+      },
+      {
+        "code": "OG",
+        "name": "Ogun",
+        "lat": 7.1607,
+        "lng": 3.3481
+      },
+      {
+        "code": "ON",
+        "name": "Ondo",
+        "lat": 7.2507,
+        "lng": 5.1992
+      },
+      {
+        "code": "OS",
+        "name": "Osun",
+        "lat": 7.5629,
+        "lng": 4.52
+      },
+      {
+        "code": "OY",
+        "name": "Oyo",
+        "lat": 7.3775,
+        "lng": 3.947
+      },
+      {
+        "code": "PL",
+        "name": "Plateau",
+        "lat": 9.2189,
+        "lng": 9.5179
+      },
+      {
+        "code": "RI",
+        "name": "Rivers",
+        "lat": 4.8156,
+        "lng": 7.0498
+      },
+      {
+        "code": "SO",
+        "name": "Sokoto",
+        "lat": 13.0533,
+        "lng": 5.3228
+      },
+      {
+        "code": "TA",
+        "name": "Taraba",
+        "lat": 7.9994,
+        "lng": 10.7739
+      },
+      {
+        "code": "YO",
+        "name": "Yobe",
+        "lat": 12.2942,
+        "lng": 11.439
+      },
+      {
+        "code": "ZA",
+        "name": "Zamfara",
+        "lat": 12.1704,
+        "lng": 6.6599
+      }
+    ],
+    "JPN": [
+      {
+        "code": "TKY",
+        "name": "Tokyo",
+        "lat": 35.6762,
+        "lng": 139.6503
+      },
+      {
+        "code": "OSA",
+        "name": "Osaka",
+        "lat": 34.6937,
+        "lng": 135.5023
+      },
+      {
+        "code": "KYT",
+        "name": "Kyoto",
+        "lat": 35.0116,
+        "lng": 135.7681
+      },
+      {
+        "code": "HKD",
+        "name": "Hokkaido",
+        "lat": 43.0618,
+        "lng": 141.3545
+      },
+      {
+        "code": "AIC",
+        "name": "Aichi",
+        "lat": 35.1802,
+        "lng": 136.9066
+      },
+      {
+        "code": "FUK",
+        "name": "Fukuoka",
+        "lat": 33.5904,
+        "lng": 130.4017
+      },
+      {
+        "code": "KAN",
+        "name": "Kanagawa",
+        "lat": 35.4478,
+        "lng": 139.6425
+      },
+      {
+        "code": "HYG",
+        "name": "Hyogo",
+        "lat": 34.6913,
+        "lng": 135.183
+      }
+    ],
+    "CHN": [
+      {
+        "code": "GD",
+        "name": "Guangdong",
+        "lat": 23.379,
+        "lng": 113.7633
+      },
+      {
+        "code": "JS",
+        "name": "Jiangsu",
+        "lat": 32.9711,
+        "lng": 119.455
+      },
+      {
+        "code": "SD",
+        "name": "Shandong",
+        "lat": 36.6683,
+        "lng": 117.0204
+      },
+      {
+        "code": "ZJ",
+        "name": "Zhejiang",
+        "lat": 29.1416,
+        "lng": 120.0985
+      },
+      {
+        "code": "SC",
+        "name": "Sichuan",
+        "lat": 30.6171,
+        "lng": 102.7103
+      },
+      {
+        "code": "HEN",
+        "name": "Henan",
+        "lat": 34.2904,
+        "lng": 113.3824
+      },
+      {
+        "code": "HB",
+        "name": "Hubei",
+        "lat": 30.9843,
+        "lng": 112.0153
+      },
+      {
+        "code": "BJ",
+        "name": "Beijing",
+        "lat": 39.9042,
+        "lng": 116.4074
+      },
+      {
+        "code": "SH",
+        "name": "Shanghai",
+        "lat": 31.2304,
+        "lng": 121.4737
+      }
+    ],
+    "KOR": [
+      {
+        "code": "SEO",
+        "name": "Seoul",
+        "lat": 37.5665,
+        "lng": 126.978
+      },
+      {
+        "code": "PUS",
+        "name": "Busan",
+        "lat": 35.1796,
+        "lng": 129.0756
+      },
+      {
+        "code": "ICN",
+        "name": "Incheon",
+        "lat": 37.4563,
+        "lng": 126.7052
+      },
+      {
+        "code": "DGU",
+        "name": "Daegu",
+        "lat": 35.8714,
+        "lng": 128.6014
+      },
+      {
+        "code": "GWJ",
+        "name": "Gwangju",
+        "lat": 35.1595,
+        "lng": 126.8526
+      }
+    ],
+    "IDN": [
+      {
+        "code": "JK",
+        "name": "Jakarta",
+        "lat": -6.2088,
+        "lng": 106.8456
+      },
+      {
+        "code": "JB",
+        "name": "West Java",
+        "lat": -6.9147,
+        "lng": 107.6098
+      },
+      {
+        "code": "JT",
+        "name": "Central Java",
+        "lat": -7.1509,
+        "lng": 110.1403
+      },
+      {
+        "code": "JI",
+        "name": "East Java",
+        "lat": -7.536,
+        "lng": 112.2384
+      },
+      {
+        "code": "BA",
+        "name": "Bali",
+        "lat": -8.4095,
+        "lng": 115.1889
+      }
+    ],
+    "PER": [
+      {
+        "code": "AMA",
+        "name": "Amazonas",
+        "lat": -5.1151,
+        "lng": -78.0316
+      },
+      {
+        "code": "ANC",
+        "name": "Áncash",
+        "lat": -9.5275,
+        "lng": -77.5283
+      },
+      {
+        "code": "LIM",
+        "name": "Lima",
+        "lat": -12.0464,
+        "lng": -77.0428
+      },
+      {
+        "code": "CUS",
+        "name": "Cusco",
+        "lat": -13.5319,
+        "lng": -71.9675
+      },
+      {
+        "code": "ARE",
+        "name": "Arequipa",
+        "lat": -16.409,
+        "lng": -71.5375
+      },
+      {
+        "code": "PIU",
+        "name": "Piura",
+        "lat": -5.1945,
+        "lng": -80.6328
+      }
+    ],
+    "EGY": [
+      {
+        "code": "C",
+        "name": "Cairo",
+        "lat": 30.0444,
+        "lng": 31.2357
+      },
+      {
+        "code": "ALX",
+        "name": "Alexandria",
+        "lat": 31.2001,
+        "lng": 29.9187
+      },
+      {
+        "code": "GZ",
+        "name": "Giza",
+        "lat": 30.0131,
+        "lng": 31.2089
+      },
+      {
+        "code": "PTS",
+        "name": "Port Said",
+        "lat": 31.2653,
+        "lng": 32.3019
+      },
+      {
+        "code": "SUZ",
+        "name": "Suez",
+        "lat": 29.9668,
+        "lng": 32.5498
+      }
+    ],
+    "KEN": [
+      {
+        "code": "30",
+        "name": "Nairobi",
+        "lat": -1.2921,
+        "lng": 36.8219
+      },
+      {
+        "code": "01",
+        "name": "Mombasa",
+        "lat": -4.0435,
+        "lng": 39.6682
+      },
+      {
+        "code": "17",
+        "name": "Kisumu",
+        "lat": -0.1022,
+        "lng": 34.7617
+      },
+      {
+        "code": "31",
+        "name": "Nakuru",
+        "lat": -0.3031,
+        "lng": 36.08
+      }
+    ],
+    "NZL": [
+      {
+        "code": "AUK",
+        "name": "Auckland",
+        "lat": -36.8485,
+        "lng": 174.7633
+      },
+      {
+        "code": "WGN",
+        "name": "Wellington",
+        "lat": -41.2865,
+        "lng": 174.7762
+      },
+      {
+        "code": "CAN",
+        "name": "Canterbury",
+        "lat": -43.5321,
+        "lng": 172.6362
+      },
+      {
+        "code": "OTA",
+        "name": "Otago",
+        "lat": -45.8788,
+        "lng": 170.5028
+      }
+    ],
+    "SAU": [
+      {
+        "code": "01",
+        "name": "Riyadh",
+        "lat": 24.7136,
+        "lng": 46.6753
+      },
+      {
+        "code": "02",
+        "name": "Makkah",
+        "lat": 21.4858,
+        "lng": 39.1925
+      },
+      {
+        "code": "03",
+        "name": "Madinah",
+        "lat": 24.5247,
+        "lng": 39.5692
+      },
+      {
+        "code": "04",
+        "name": "Eastern Province",
+        "lat": 26.3927,
+        "lng": 49.9777
+      }
+    ],
+    "ESP": [
+      {
+        "code": "MD",
+        "name": "Madrid",
+        "lat": 40.4168,
+        "lng": -3.7038
+      },
+      {
+        "code": "CT",
+        "name": "Catalonia",
+        "lat": 41.5912,
+        "lng": 1.5209
+      },
+      {
+        "code": "AN",
+        "name": "Andalusia",
+        "lat": 37.5443,
+        "lng": -4.7278
+      },
+      {
+        "code": "VC",
+        "name": "Valencia",
+        "lat": 39.484,
+        "lng": -0.7533
+      },
+      {
+        "code": "GA",
+        "name": "Galicia",
+        "lat": 42.5751,
+        "lng": -8.1339
+      }
+    ]
+  }
+}

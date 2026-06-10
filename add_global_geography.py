@@ -35,6 +35,16 @@ CONTINENTS: tuple[tuple[str, str], ...] = (
     ("AN", "Antarctica"),
 )
 
+PREFIX = "0.राम|"
+
+INDIA_ZONE_NAMES: dict[str, str] = {
+    "CS": "Central State (UT&North-East)",
+    "NS": "North India State",
+    "WS": "West India State",
+    "SS": "South India State",
+    "ES": "East India State",
+}
+
 
 def log(msg: str) -> None:
     print(msg, flush=True)
@@ -92,8 +102,84 @@ def load_country_rows() -> list[tuple[str, str, str]]:
 
 
 def column_exists(conn: sqlite3.Connection, table: str, col: str) -> bool:
+    if not table_exists(conn, table):
+        return False
     cur = conn.execute(f"PRAGMA table_info({table})")
     return col in {str(r[1]) for r in cur.fetchall()}
+
+
+def table_exists(conn: sqlite3.Connection, table: str) -> bool:
+    row = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
+        (table,),
+    ).fetchone()
+    return row is not None
+
+
+def row_count(conn: sqlite3.Connection, table: str) -> int:
+    if not table_exists(conn, table):
+        return 0
+    return int(conn.execute(f"SELECT COUNT(*) FROM [{table}]").fetchone()[0])
+
+
+def raw_path(full_id: str) -> str:
+    fid = (full_id or "").strip()
+    if fid.startswith(PREFIX):
+        return fid[len(PREFIX) :]
+    return fid
+
+
+def zone_full_id_from_state_raw(state_raw: str) -> str | None:
+    sr = (state_raw or "").strip()
+    if not sr.startswith("IND") or "/" not in sr:
+        return None
+    _country, rest = sr.split("/", 1)
+    if "." not in rest:
+        return None
+    zone_letters = "".join(ch for ch in rest.split(".", 1)[0] if ch.isalpha())
+    if not zone_letters:
+        return None
+    return PREFIX + f"IND.{zone_letters}"
+
+
+def ensure_zone_table(conn: sqlite3.Connection) -> None:
+    """Create ``zone`` and seed rows if the table is missing (required for country_id)."""
+    if not table_exists(conn, "zone"):
+        log("Creating table zone (if missing) …")
+        conn.execute(
+            """
+            CREATE TABLE zone (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL
+            )
+            """
+        )
+    if row_count(conn, "zone") > 0:
+        return
+
+    if table_exists(conn, "state") and row_count(conn, "state") > 0:
+        log("Seeding zone rows from state geography …")
+        seen: set[str] = set()
+        for (state_id,) in conn.execute("SELECT id FROM state"):
+            zid = zone_full_id_from_state_raw(raw_path(str(state_id)))
+            if not zid or zid in seen:
+                continue
+            code = raw_path(zid).replace("IND.", "", 1)
+            name = INDIA_ZONE_NAMES.get(code, f"Zone {code}")
+            conn.execute(
+                "INSERT OR IGNORE INTO zone (id, name) VALUES (?, ?)",
+                (zid, name),
+            )
+            seen.add(zid)
+        if row_count(conn, "zone") > 0:
+            return
+
+    log("Seeding default Indian zone rows …")
+    for code, name in INDIA_ZONE_NAMES.items():
+        conn.execute(
+            "INSERT OR IGNORE INTO zone (id, name) VALUES (?, ?)",
+            (PREFIX + f"IND.{code}", name),
+        )
 
 
 def main() -> int:
@@ -158,6 +244,8 @@ def main() -> int:
             """,
             country_rows,
         )
+
+        ensure_zone_table(conn)
 
         if not column_exists(conn, "zone", "country_id"):
             log("Adding zone.country_id (NOT NULL DEFAULT 'IND') …")

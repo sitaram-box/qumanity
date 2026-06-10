@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block title %}Village Marketplace — Qumanity{% endblock %}
+
+{% block body_class %}qb-page-dashboard{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}" />
+{% endblock %}
+
+{% block header_inner %}
+<div class="d-flex flex-wrap align-items-center justify-content-between w-100 gap-2">
+  <a href="{{ url_for('dashboard') }}" class="qb-btn qb-btn-link">← Dashboard</a>
+  <h1 class="h5 mb-0">Village Marketplace</h1>
+  <span class="small text-muted">{{ village_label }}</span>
+</div>
+{% endblock %}
+
+{% block body %}
+<section class="qb-panel mb-3">
+  <p class="small text-muted mb-2">Browse products and services in your village. Pay with Qoins (weekly settlement).</p>
+  <div class="row g-2 mb-3">
+    <div class="col-md-3">
+      <input type="search" id="mp-search" class="form-control form-control-sm" placeholder="Search keyword…" />
+    </div>
+    <div class="col-md-2">
+      <select id="mp-category" class="form-select form-select-sm">
+        <option value="">All categories</option>
+        {% for cat, subs in categories.items() %}
+        <option value="{{ cat }}">{{ cat }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2">
+      <input type="number" id="mp-min-price" class="form-control form-control-sm" placeholder="Min ₹" min="0" />
+    </div>
+    <div class="col-md-2">
+      <input type="number" id="mp-max-price" class="form-control form-control-sm" placeholder="Max ₹" min="0" />
+    </div>
+    <div class="col-md-2">
+      <select id="mp-min-rating" class="form-select form-select-sm">
+        <option value="">Any rating</option>
+        <option value="4">4+ stars</option>
+        <option value="3">3+ stars</option>
+      </select>
+    </div>
+    <div class="col-md-1">
+      <button type="button" class="qb-btn qb-btn-primary btn-sm w-100" id="mp-search-btn">Go</button>
+    </div>
+  </div>
+  <div class="form-check mb-2">
+    <input class="form-check-input" type="checkbox" id="mp-delivery-only" />
+    <label class="form-check-label small" for="mp-delivery-only">Delivery available only</label>
+  </div>
+</section>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <section class="qb-panel">
+      <h2 class="h6 text-secondary text-uppercase small">Listings</h2>
+      <ul class="list-unstyled small mb-0" id="mp-listings"></ul>
+      <p class="small text-muted mb-0" id="mp-listings-empty" hidden>No listings match your filters.</p>
+    </section>
+    <section class="qb-panel mt-3" id="mp-seller-panel" hidden>
+      <h2 class="h6 text-secondary text-uppercase small">Sell — new listing</h2>
+      <form id="mp-listing-form" enctype="multipart/form-data" class="row g-2">
+        <div class="col-md-6"><input class="form-control form-control-sm" name="title" placeholder="Title" required /></div>
+        <div class="col-md-3">
+          <select class="form-select form-select-sm" name="category" required>
+            {% for cat in categories.keys() %}<option>{{ cat }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3"><input class="form-control form-control-sm" name="subcategory" placeholder="Subcategory" /></div>
+        <div class="col-12"><textarea class="form-control form-control-sm" name="description" rows="2" placeholder="Description"></textarea></div>
+        <div class="col-md-3"><input class="form-control form-control-sm" name="price_rupees" type="number" min="1" placeholder="Price ₹" required /></div>
+        <div class="col-md-3"><input class="form-control form-control-sm" name="stock_qty" type="number" min="0" placeholder="Stock (optional)" /></div>
+        <div class="col-md-3">
+          <select class="form-select form-select-sm" name="listing_type">
+            <option value="product">Product</option>
+            <option value="service">Service</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="small"><input type="checkbox" name="delivery_available" value="1" /> Delivery</label>
+          <label class="small ms-2"><input type="checkbox" name="pickup_available" value="1" checked /> Pickup</label>
+        </div>
+        <div class="col-md-4"><input type="file" class="form-control form-control-sm" name="photo1" accept="image/*" /></div>
+        <div class="col-md-8"><button type="submit" class="qb-btn qb-btn-primary btn-sm">Publish listing</button></div>
+      </form>
+      <p class="small mt-2 mb-0" id="mp-listing-flash" role="status"></p>
+    </section>
+  </div>
+  <div class="col-lg-4">
+    <section class="qb-panel mb-3">
+      <h2 class="h6 text-secondary text-uppercase small">Cart</h2>
+      <ul class="list-unstyled small mb-2" id="mp-cart"></ul>
+      <p class="mb-1"><strong>Total:</strong> ₹<span id="mp-cart-total">0</span></p>
+      <select id="mp-delivery-mode" class="form-select form-select-sm mb-2">
+        <option value="pickup">Pickup</option>
+        <option value="delivery">Delivery</option>
+      </select>
+      <button type="button" class="qb-btn qb-btn-primary btn-sm w-100" id="mp-checkout-btn">Checkout</button>
+      <p class="small mt-2 mb-0" id="mp-cart-flash" role="status"></p>
+    </section>
+    <section class="qb-panel">
+      <h2 class="h6 text-secondary text-uppercase small">My orders</h2>
+      <ul class="list-unstyled small mb-0" id="mp-orders"></ul>
+    </section>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  window.MP_CONFIG = { villageId: {{ village_id|tojson }} };
+</script>
+<script src="{{ url_for('static', filename='marketplace.js') }}"></script>
+{% endblock %}

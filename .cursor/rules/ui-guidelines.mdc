@@ -1,0 +1,59 @@
+---
+description: UI/UX guidelines for Quantum Box — colours, typography, layout, components.
+globs:
+alwaysApply: true
+---
+
+# UI / UX Guidelines
+
+Use the CSS design tokens in `static/style.css` `:root`. Never hardcode hex
+values in templates or component CSS — reference the tokens below.
+
+## Colour palette (dark theme)
+
+| Role | Token | Value | On |
+| --- | --- | --- | --- |
+| Body background | `--qb-bg` | `#0F172A` | text `#FFFFFF` |
+| Card / panel | `--qb-surface` | `#1E293B` | text `#F8FAFC`, border `--qb-border` `#475569` |
+| Primary button | `--qb-primary` | `#F59E0B` (amber) | **black** text |
+| Secondary button | `--qb-secondary` | `#3B82F6` (blue) | white text |
+| Danger button | `--qb-danger` | `#EF4444` (red) | white text |
+| Success text | `--qb-success` | `#10B981` (green) | — |
+| Warning text | `--qb-warning` | `#FBBF24` (yellow) | dark text |
+
+- Buttons: `.qb-btn` + one of `.qb-btn-primary` / `.qb-btn-secondary` /
+  `.qb-btn-danger` / `.qb-btn-warning` / `.qb-btn-neutral` / `.qb-btn-link`.
+- Use `.qb-btn-neutral` (grey) for modal-close and back navigation — NOT
+  `.qb-btn-secondary`.
+- Maintain WCAG 2.1 AA contrast (≥ 4.5:1 for normal text). Light text on dark
+  surfaces; black text on amber; white text on blue/red.
+- Reduce clutter: avoid stacking borders + heavy shadows + background patterns
+  on the same element.
+
+## Typography
+
+- Font family: `Inter, system-ui, -apple-system, "DM Sans", sans-serif`.
+- Base font size: **16px** (set on `body`).
+- Weights: normal 400, medium 500, headings 600, bold 700.
+
+## Layout
+
+- Top bar (`.qb-navbar`): sticky, compact, items vertically aligned, responsive
+  wrap on small screens.
+- Sidebar: ~280px; collapsible (hamburger) on mobile.
+- Dashboard: grid of consistent-size cards.
+- Forms: stacked labels, inline validation under the field, searchable location
+  dropdowns.
+
+## Components & UX
+
+- **Notifications**: use `window.qbToast(message, type)` where `type` is
+  `success | error | warning | info`. Do **not** use `alert()`. Server flash
+  messages auto-mirror into toasts (`.qb-alert[data-qb-toast]`).
+- **Loading**: show `.qb-spinner`; disable submit buttons during submission via
+  `data-qb-submitting` on the `<form>` (handled by `static/toast.js`).
+- **Errors**: show user-friendly messages, never raw tracebacks.
+- **Accessibility**: keep the skip-to-content link, visible `:focus-visible`
+  rings, and `aria-live` regions for async updates.
+- **Navigation**: highlight the active sidebar item; show breadcrumbs for nested
+  geography (Dashboard › Public Account › Village).

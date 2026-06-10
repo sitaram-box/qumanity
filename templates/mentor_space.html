@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+
+{% block title %}Ākāśa (Space) — Qumanity{% endblock %}
+
+{% block body_class %}qb-page-dashboard qb-akasha-space{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}?v=9" />
+{% endblock %}
+
+{% block body %}
+<div class="container py-4 qb-dash-shell">
+  <nav aria-label="Breadcrumb" class="mb-3">
+    <ol class="breadcrumb mb-0 small">
+      <li class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+      <li class="breadcrumb-item active">Ākāśa (Space)</li>
+    </ol>
+  </nav>
+
+  <header class="mb-4">
+    <h1 class="h3 mb-1">Ākāśa — Space Archive</h1>
+    <p class="text-muted small mb-0">
+      Mentor-only access to Ancestors (deceased users) and Akashic Records (historical archive).
+      Space is the cosmic container — not a navigable element button.
+    </p>
+  </header>
+
+  {% if tab == 'denied' %}
+  <div class="qb-panel p-3">
+    <p class="mb-0 text-warning">You must be a Mentor to access Space internal sections.</p>
+  </div>
+  {% else %}
+
+  <ul class="nav nav-tabs mb-3" role="tablist">
+    <li class="nav-item">
+      <a
+        class="nav-link{% if tab == 'ancestors' %} active{% endif %}"
+        href="{{ url_for('space_ancestors_page') }}"
+        >Ancestors (Deceased Users)</a
+      >
+    </li>
+    <li class="nav-item">
+      <a
+        class="nav-link{% if tab == 'akashic' %} active{% endif %}"
+        href="{{ url_for('space_akashic_page') }}"
+        >Akashic Records</a
+      >
+    </li>
+  </ul>
+
+  {% if tab == 'ancestors' %}
+  <section class="qb-panel p-3 mb-3">
+    <form method="get" action="{{ url_for('space_ancestors_page') }}" class="row g-2 mb-3">
+      <div class="col-md-4">
+        <label class="form-label small" for="space-search">Search name or ID</label>
+        <input
+          type="search"
+          class="form-control form-control-sm"
+          id="space-search"
+          name="search"
+          value="{{ search }}"
+        />
+      </div>
+      <div class="col-md-4">
+        <label class="form-label small" for="space-location">Location ID</label>
+        <input
+          type="text"
+          class="form-control form-control-sm font-monospace"
+          id="space-location"
+          name="location_id"
+          value="{{ location_id }}"
+          placeholder="Village / district ID"
+        />
+      </div>
+      <div class="col-md-4 d-flex align-items-end">
+        <button type="submit" class="qb-btn qb-btn-primary btn-sm">Search</button>
+      </div>
+    </form>
+
+    {% if ancestors %}
+    <div class="table-responsive">
+      <table class="table table-sm table-dark align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Private ID</th>
+            <th>Date of death</th>
+            <th>Element</th>
+            <th>Wallet (₹)</th>
+            <th>Obituary</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for a in ancestors %}
+          <tr>
+            <td>{{ a.first_name }} {{ a.last_name }}</td>
+            <td class="font-monospace small">{{ a.original_private_id }}</td>
+            <td>{{ a.date_of_death }}</td>
+            <td>{{ a.element or '—' }}</td>
+            <td>
+              {{ a.final_wallet_balance or 0 }}
+              {% if a.wallet_transferred_to %}
+              <span class="text-muted small d-block">→ {{ a.wallet_transferred_to }}</span>
+              {% endif %}
+            </td>
+            <td class="small">{{ a.obituary or '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="text-muted small mb-0">No ancestors found for this search.</p>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  {% if tab == 'akashic' %}
+  <section class="qb-panel p-3 mb-3">
+    <form method="get" action="{{ url_for('space_akashic_page') }}" class="row g-2 mb-3">
+      <div class="col-md-3">
+        <label class="form-label small" for="ak-type">Record type</label>
+        <select class="form-select form-select-sm" id="ak-type" name="record_type">
+          <option value="">All</option>
+          {% for t in ['post', 'election', 'transaction', 'vote'] %}
+          <option value="{{ t }}"{% if record_type == t %} selected{% endif %}>{{ t }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small" for="ak-loc">Location ID</label>
+        <input
+          type="text"
+          class="form-control form-control-sm font-monospace"
+          id="ak-loc"
+          name="location_id"
+          value="{{ location_id }}"
+        />
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small" for="ak-from">From</label>
+        <input type="date" class="form-control form-control-sm" id="ak-from" name="date_from" value="{{ date_from }}" />
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small" for="ak-to">To</label>
+        <input type="date" class="form-control form-control-sm" id="ak-to" name="date_to" value="{{ date_to }}" />
+      </div>
+      <div class="col-md-2 d-flex align-items-end gap-1">
+        <button type="submit" class="qb-btn qb-btn-primary btn-sm">Filter</button>
+      </div>
+    </form>
+    <div class="d-flex flex-wrap gap-2 mb-3">
+      <a
+        class="qb-btn qb-btn-outline btn-sm text-decoration-none"
+        href="/api/mentor/akashic-records/export?format=json"
+        >Export JSON</a
+      >
+      <a
+        class="qb-btn qb-btn-outline btn-sm text-decoration-none"
+        href="/api/mentor/akashic-records/export?format=csv"
+        >Export CSV</a
+      >
+    </div>
+
+    {% if records %}
+    <div class="table-responsive">
+      <table class="table table-sm table-dark align-middle mb-0">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Type</th>
+            <th>User</th>
+            <th>Location</th>
+            <th>Archived</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in records %}
+          <tr>
+            <td>{{ r.id }}</td>
+            <td>{{ r.record_type }}</td>
+            <td class="font-monospace small">{{ r.user_private_id or '—' }}</td>
+            <td class="font-monospace small">{{ r.location_id or '—' }}</td>
+            <td class="small">{{ r.archived_at }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="text-muted small mb-0">No records match this filter.</p>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  {% endif %}
+</div>
+{% endblock %}

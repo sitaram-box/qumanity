@@ -1,9 +1,15 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ preferred_language or 'en' }}">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>{% block title %}Quantum Box{% endblock %}</title>
+    <title>{% block title %}Qumanity{% endblock %}</title>
+    <meta name="description" content="Qumanity — For Humanity, Harmony &amp; Peace. A sovereign digital governance and economic platform for India and the Earth." />
+    <meta property="og:title" content="Qumanity - India's Quantum Governance Platform" />
+    <meta property="og:description" content="Join the revolution. Earn Qoins by doing good deeds. Transparent governance for every village." />
+    <meta property="og:image" content="{{ url_for('static', filename='images/logo-qumanity.png', _external=True) }}" />
+    <meta property="og:url" content="{{ request.url }}" />
+    <meta name="twitter:card" content="summary_large_image" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -22,11 +28,12 @@
     />
     <link
       rel="stylesheet"
-      href="{{ url_for('static', filename='style.css') }}"
+      href="{{ url_for('static', filename='style.css') }}?v=9"
     />
     {% block head_extra %}{% endblock %}
   </head>
   <body class="{% block body_class %}{% endblock %}">
+    <a href="#qb-main-content" class="qb-skip-link">Skip to content</a>
     <header class="qb-navbar d-flex flex-column align-items-stretch">
       {% block header_inner %}
       <div
@@ -35,45 +42,39 @@
       <a
         href="{{ url_for('index') }}"
         class="qb-brand qb-brand-with-logo text-decoration-none"
-        aria-label="Quantum Box home"
+        aria-label="Qumanity home"
       >
         {% include "_brand_logo.html" %}
       </a>
       <div class="qb-nav-cluster flex-shrink-0 d-flex flex-wrap align-items-center gap-2 justify-content-end">
-        <a
-          href="{{ url_for('index') }}#about"
-          class="qb-nav-anchor text-decoration-none"
-          >About</a
-        >
         <nav class="qb-nav-actions">
         {% if session.get('user_pk') %}
         <a href="{{ url_for('dashboard') }}" class="qb-btn qb-btn-outline"
-          >Dashboard</a
+          >{{ 'dashboard'|tr }}</a
         >
-        <form method="post" action="{{ url_for('logout') }}" class="m-0">
-          <button type="submit" class="qb-btn qb-btn-link">Sign out</button>
-        </form>
         {% else %}
         <a href="{{ url_for('login') }}" class="qb-btn qb-btn-outline"
-          >Log in</a
+          >{{ 'login'|tr }}</a
         >
         <a href="{{ url_for('register') }}" class="qb-btn qb-btn-primary"
-          >Register</a
+          >{{ 'register'|tr }}</a
         >
         {% endif %}
         </nav>
+        {% include '_hamburger_menu.html' %}
       </div>
       </div>
       {% endblock %}
     </header>
 
-    <main class="qb-main container-fluid px-0 px-sm-3">
+    <main id="qb-main-content" class="qb-main container-fluid px-0 px-sm-3">
       {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
       <div class="mb-3">
         {% for category, message in messages %}
         <div
           class="qb-alert {% if category == 'error' %}qb-alert-error{% else %}qb-alert-success{% endif %}"
+          data-qb-toast
           role="status"
         >
           {{ message }}
@@ -86,14 +87,82 @@
     </main>
 
     <footer class="qb-footer">
-      Quantum Box — early prototype · Data for demonstration only
+      <p class="qb-footer-text mb-0">
+        Qumanity — An initiative by SITA Foundation | For conscious civilisation,
+        transparent governance, and collective peace.
+      </p>
     </footer>
+
+    {# Bottom scrolling ticker — Vinaya Patrika poems #}
+    <div
+      id="qb-marquee"
+      class="marquee-container"
+      data-lang="{{ preferred_language or 'en' }}"
+      role="region"
+      aria-label="{{ 'sita_ram'|tr }}"
+    >
+      <div class="marquee-left">
+        <div
+          id="qb-marquee-menu"
+          class="dropdown-menu-marquee"
+          role="menu"
+          data-weather-msg="{{ 'weather_coming_soon'|tr }}"
+          data-news-msg="{{ 'news_coming_soon'|tr }}"
+        >
+          <button type="button" class="active" data-marquee-action="vinaya" role="menuitem">
+            &#10003; {{ 'sita_ram'|tr }}
+          </button>
+          <button type="button" data-marquee-action="weather" role="menuitem">
+            {{ 'weather_update'|tr }}
+          </button>
+          <button type="button" data-marquee-action="news" role="menuitem">
+            {{ 'news_update'|tr }}
+          </button>
+        </div>
+        {# SITA + राम yellow button — clickable dropdown trigger #}
+        <button
+          type="button"
+          id="sitaRamButton"
+          class="sita-ram-button"
+          aria-haspopup="true"
+          aria-expanded="false"
+          aria-label="{{ 'sita_ram'|tr }}"
+        >
+          <span class="sita-text">SITA</span>
+          <span class="ram-circle">
+            <span class="ram-text">&#2352;&#2366;&#2350;</span>
+          </span>
+        </button>
+      </div>
+
+      <div class="marquee-scroll">
+        <div id="qb-marquee-text" class="marquee-text"></div>
+      </div>
+
+      <div class="marquee-right">
+        <button type="button" id="qb-marquee-prev" class="marquee-arrow" aria-label="Rewind within poem" title="Rewind">&#9194;</button>
+        <button type="button" id="qb-marquee-playpause" aria-label="Pause" title="Pause">&#10074;&#10074;</button>
+        <button type="button" id="qb-marquee-next" class="marquee-arrow" aria-label="Forward within poem" title="Forward">&#9193;</button>
+      </div>
+    </div>
+
+    <div id="qb-toast-container" class="qb-toast-container" aria-live="polite" aria-atomic="true"></div>
+
+    <div id="qb-translation-loader" class="qb-translation-loader" role="status" aria-live="assertive" hidden>
+      <div class="qb-translation-loader-box">
+        <span class="qb-spinner" aria-hidden="true"></span>
+        <span class="qb-translation-loader-text">{{ 'translating'|tr }}</span>
+      </div>
+    </div>
 
     <script
       src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
       integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
       crossorigin="anonymous"
     ></script>
+    <script src="{{ url_for('static', filename='toast.js') }}?v=1"></script>
+    <script src="{{ url_for('static', filename='i18n.js') }}?v=5"></script>
+    <script src="{{ url_for('static', filename='marquee.js') }}?v=9"></script>
     {% block scripts %}{% endblock %}
   </body>
 </html>

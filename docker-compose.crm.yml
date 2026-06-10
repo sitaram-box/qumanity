@@ -1,0 +1,108 @@
+# Full Qumanity + CRM stack (PostgreSQL, Redis, NocoBase CRM, Flask, Nginx).
+#
+# Usage:
+#   cp .env.example .env   # set JWT_SECRET, QUMANITY_WEBHOOK_SECRET
+#   docker compose -f docker-compose.crm.yml up -d --build
+#
+# Services:
+#   http://localhost        → Nginx (Flask / + CRM /crm)
+#   http://localhost:5000   → Flask direct
+#   http://localhost:3000   → NocoBase CRM direct
+
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: qumanity_postgres
+    environment:
+      POSTGRES_USER: qumanity
+      POSTGRES_PASSWORD: qumanity123
+      POSTGRES_DB: qumanity_crm
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - qumanity_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U qumanity -d qumanity_crm"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: qumanity_redis
+    ports:
+      - "6379:6379"
+    networks:
+      - qumanity_network
+
+  nocobase:
+    build: ./crm/qumanity-crm
+    container_name: qumanity_crm
+    environment:
+      DB_DIALECT: postgres
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: qumanity_crm
+      DB_USER: qumanity
+      DB_PASSWORD: qumanity123
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: ${JWT_SECRET:-change_me_in_production}
+      QUMANITY_API_URL: http://flask:5000/api
+      QUMANITY_WEBHOOK_SECRET: ${QUMANITY_WEBHOOK_SECRET:-change_me_webhook_secret}
+      APP_PORT: 3000
+      APP_KEY: ${NOCOBASE_APP_KEY:-qumanity-crm-dev-key}
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - qumanity_network
+
+  flask:
+    build: .
+    container_name: qumanity_flask
+    environment:
+      DATABASE_URL: postgresql://qumanity:qumanity123@postgres:5432/qumanity_crm
+      JWT_SECRET: ${JWT_SECRET:-change_me_in_production}
+      CRM_API_URL: http://nocobase:3000/api
+      QUMANITY_WEBHOOK_SECRET: ${QUMANITY_WEBHOOK_SECRET:-change_me_webhook_secret}
+      REDIS_URL: redis://redis:6379
+      FLASK_ENV: production
+    ports:
+      - "5000:5000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - qumanity_network
+    command: gunicorn --bind 0.0.0.0:5000 --workers 2 app:app
+
+  nginx:
+    image: nginx:alpine
+    container_name: qumanity_nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.crm.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - flask
+      - nocobase
+    networks:
+      - qumanity_network
+
+volumes:
+  postgres_data:
+
+networks:
+  qumanity_network:
+    driver: bridge

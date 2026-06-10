@@ -1,0 +1,52 @@
+@import "tailwindcss";
+
+@theme {
+  --color-saffron: #ff9933;
+  --color-saffron-dark: #e67e00;
+  --color-earth-green: #6b8e4e;
+  --color-earth-green-light: #a8c686;
+  --color-cream: #fff8f0;
+  --color-wheat: #f5e6c8;
+  --color-soil: #5c4033;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-cream text-soil antialiased;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.btn-primary {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl bg-saffron px-5 py-3 text-base font-semibold text-white shadow-md transition hover:bg-saffron-dark active:scale-[0.98] disabled:opacity-50;
+}
+
+.btn-secondary {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl border-2 border-earth-green bg-white px-5 py-3 text-base font-semibold text-earth-green transition hover:bg-earth-green-light/20 active:scale-[0.98];
+}
+
+.card {
+  @apply rounded-2xl border border-wheat bg-white p-4 shadow-sm;
+}
+
+.input {
+  @apply w-full rounded-xl border-2 border-wheat bg-white px-4 py-3 text-base outline-none focus:border-saffron;
+}
+
+.badge-verified {
+  @apply inline-flex items-center gap-1 rounded-full bg-earth-green/15 px-2 py-0.5 text-xs font-semibold text-earth-green;
+}
+
+.badge-available {
+  @apply inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700;
+}
+
+.section-title {
+  @apply text-2xl font-bold text-soil md:text-3xl;
+}
+
+.gradient-hero {
+  background: linear-gradient(135deg, #fff8f0 0%, #f5e6c8 40%, #a8c686 100%);
+}

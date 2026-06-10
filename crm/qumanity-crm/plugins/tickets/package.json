@@ -1,0 +1,10 @@
+{
+  "name": "@qumanity/plugin-tickets",
+  "version": "1.0.0",
+  "main": "dist/server/index.js",
+  "dependencies": {
+    "@nocobase/server": "1.x",
+    "axios": "^1.7.0",
+    "jsonwebtoken": "^9.0.2"
+  }
+}

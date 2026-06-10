@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Quantum Box — Explore{% endblock %}
+{% block title %}Qumanity — Explore{% endblock %}
 
 {% block body_class %}qb-page-home{% endblock %}
 
@@ -23,7 +23,7 @@
     <a
       href="{{ url_for('index') }}"
       class="qb-brand qb-brand-with-logo text-decoration-none qb-home-brand"
-      aria-label="Quantum Box home"
+      aria-label="Qumanity home"
     >
       {% include "_brand_logo.html" %}
     </a>
@@ -32,22 +32,16 @@
       <div class="qb-home-auth">
         {% if session.get('user_pk') %}
         <a href="{{ url_for('dashboard') }}" class="qb-btn qb-btn-outline qb-home-btn-auth"
-          >Dashboard</a
+          >{{ 'dashboard'|tr }}</a
         >
-        <form method="post" action="{{ url_for('logout') }}" class="m-0">
-          <button type="submit" class="qb-btn qb-btn-link qb-home-btn-signout">Sign out</button>
-        </form>
         {% else %}
-        <a href="{{ url_for('login') }}" class="qb-btn qb-btn-outline qb-home-btn-auth">Login</a>
+        <a href="{{ url_for('login') }}" class="qb-btn qb-btn-outline qb-home-btn-auth">{{ 'login'|tr }}</a>
         <a href="{{ url_for('register') }}" class="qb-btn qb-btn-primary qb-home-btn-auth"
-          >Register</a
+          >{{ 'register'|tr }}</a
         >
         {% endif %}
       </div>
-      <nav class="qb-home-text-links" aria-label="Site links">
-        <a href="{{ url_for('about') }}" class="qb-home-text-link">About</a>
-        <a href="{{ url_for('contact') }}" class="qb-home-text-link">Contact</a>
-      </nav>
+      {% include '_hamburger_menu.html' %}
       <div
         id="qb-advanced-timebox"
         class="qb-timebox qb-home-timebox"
@@ -87,20 +81,105 @@
 {% endblock %}
 
 {% block body %}
-<div class="qb-home-mega-hero">
-  <section class="qb-hero qb-home-welcome" aria-labelledby="hero-heading">
-    <div class="hero-section-inner">
-      <div class="hero-overlay">
-        <h1 id="hero-heading">Welcome to Quantum Box</h1>
-        <p class="qb-lead hero-overlay__lead">
-          A prototype for early testers. Register to receive a Private ID for sign-in and a Public ID on
-          your dashboard — then explore how participants are distributed across states (from current
-          location).
-        </p>
-      </div>
+<div class="homepage-hero" aria-labelledby="hero-heading">
+  <div class="hero-overlay-shade"></div>
+  <div class="hero-content">
+    <div class="hero-logo">
+      <img
+        src="{{ url_for('static', filename='images/logo-qumanity.png') }}"
+        alt="Qumanity logo"
+        width="96"
+        height="96"
+      />
     </div>
-  </section>
+    <h1 id="hero-heading" class="hero-title">Qumanity</h1>
+    <p class="hero-subtitle">Quantum Governance for a Conscious Civilisation</p>
+    <p class="hero-description">
+      A transparent, karma-based governance platform built on ancient Vedic wisdom and modern
+      quantum technology.
+    </p>
+    <div class="hero-buttons">
+      {% if session.get('user_pk') %}
+      <a href="{{ url_for('dashboard') }}" class="qb-btn qb-btn-primary btn-large">Open Dashboard</a>
+      {% else %}
+      <a href="{{ url_for('register') }}" class="qb-btn qb-btn-primary btn-large">Join the Movement</a>
+      {% endif %}
+      <a href="{{ url_for('about') }}" class="qb-btn qb-btn-secondary btn-large">Learn More</a>
+    </div>
+  </div>
+</div>
 
+<section class="pillars-section" aria-labelledby="pillars-heading">
+  <h2 id="pillars-heading">The Four Pillars of Qumanity</h2>
+  <div class="pillars-grid">
+    <div class="pillar-card">
+      <div class="pillar-icon" aria-hidden="true">🏛️</div>
+      <h3>Nested Governance</h3>
+      <p>
+        From Village to Earth, every community has a Quantum Punch Council with rotating,
+        merit-based leadership.
+      </p>
+    </div>
+    <div class="pillar-card">
+      <div class="pillar-icon" aria-hidden="true">🪙</div>
+      <h3>Karma Economy</h3>
+      <p>Earn Qoins through verified ethical actions. Every good deed builds your karma ledger.</p>
+    </div>
+    <div class="pillar-card">
+      <div class="pillar-icon" aria-hidden="true">📖</div>
+      <h3>Transparent Ledger</h3>
+      <p>All transactions, votes, and decisions are recorded on an immutable public ledger.</p>
+    </div>
+    <div class="pillar-card">
+      <div class="pillar-icon" aria-hidden="true">🕉️</div>
+      <h3>Conscious AI</h3>
+      <p>Artificial Aatmic Intelligence guides without controlling — technology that serves humanity.</p>
+    </div>
+  </div>
+</section>
+
+<section class="features-section" aria-labelledby="features-heading">
+  <h2 id="features-heading">What Makes Qumanity Different?</h2>
+  <div class="features-list">
+    <div class="feature-item">
+      <span class="feature-icon" aria-hidden="true">⚖️</span>
+      <span>Not based on birth or caste — only on your actions (Karma) and qualities (Guna)</span>
+    </div>
+    <div class="feature-item">
+      <span class="feature-icon" aria-hidden="true">🗳️</span>
+      <span>Monthly zodiac-based elections — fresh leadership every month</span>
+    </div>
+    <div class="feature-item">
+      <span class="feature-icon" aria-hidden="true">🔄</span>
+      <span>Weekly settlement of Qoins — no real-time transaction fees</span>
+    </div>
+    <div class="feature-item">
+      <span class="feature-icon" aria-hidden="true">🔍</span>
+      <span>Complete transparency — every citizen can audit any public transaction</span>
+    </div>
+    <div class="feature-item">
+      <span class="feature-icon" aria-hidden="true">🗣️</span>
+      <span>Multi-language support — use Qumanity in your mother tongue</span>
+    </div>
+  </div>
+</section>
+
+<section class="stats-section" aria-label="Qumanity in numbers">
+  <div class="stat-card">
+    <div class="stat-number">{{ total_users_earth }}</div>
+    <div class="stat-label">Human Members</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-number">{{ total_villages }}</div>
+    <div class="stat-label">Villages Connected</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-number">{{ total_qoins }}</div>
+    <div class="stat-label">Qoins in Circulation</div>
+  </div>
+</section>
+
+<div class="qb-home-mega-hero">
   <div class="qb-humans-band">
     <div class="qb-cards qb-cards-humans" aria-label="Total human beings by region">
     <div class="qb-card">
@@ -174,16 +253,16 @@
     </div>
   </div>
   <p class="text-muted small mt-3 mb-0 qb-home-mega-muted">
-    Explore the growing global community of Quantum Box.
+    Explore the growing global community of Qumanity.
   </p>
 </section>
 </div>
 
 <section id="about" class="qb-about mb-4">
-  <h2>About Quantum Box</h2>
+  <h2>About Qumanity</h2>
   <div class="qb-about-intro">
     <p>
-      Quantum Box is a public digital governance system designed to give every citizen a voice,
+      Qumanity is a public digital governance system designed to give every citizen a voice,
       every village transparency, and every community the power to participate in decisions that
       affect their lives.
     </p>
@@ -200,13 +279,13 @@
         <circle cx="12" cy="12" r="10" />
         <path d="M12 16v-4M12 8h.01" />
       </svg>
-      <span>Why Quantum Box Exists</span>
+      <span>Why Qumanity Exists</span>
     </h3>
     <p>
       Today, many citizens feel disconnected from governance. Public funds are hard to track.
       Raising issues is difficult. Decision-making feels distant.
     </p>
-    <p class="mb-0">Quantum Box exists to remove this gap between people and power.</p>
+    <p class="mb-0">Qumanity exists to remove this gap between people and power.</p>
   </div>
 
   <div class="qb-about-card">
@@ -217,7 +296,7 @@
       <span>How It Works</span>
     </h3>
     <ul>
-      <li>A public Quantum Box kiosk is placed in every village or locality.</li>
+      <li>A public Qumanity kiosk is placed in every village or locality.</li>
       <li>Every citizen receives a secure digital identity.</li>
       <li>Citizens can vote regularly, raise issues, and track public funds.</li>
       <li>Every action is recorded transparently.</li>
@@ -249,7 +328,7 @@
       <span>For Villages. For Citizens. For Transparency.</span>
     </h3>
     <p class="mb-0">
-      Quantum Box is designed so that a farmer, a teacher, a worker, or a student can walk to the
+      Qumanity is designed so that a farmer, a teacher, a worker, or a student can walk to the
       kiosk, speak their concern, and be heard at the right level of administration.
     </p>
   </div>
@@ -263,7 +342,7 @@
       <span>Built by SITA Foundation</span>
     </h3>
     <p class="mb-0">
-      Quantum Box is developed by SITA Foundation (Sekyor Intelligence Tantra), a research initiative
+      Qumanity is developed by SITA Foundation (Sekyor Intelligence Tantra), a research initiative
       working on ethical technology, transparent governance, and community-driven systems for the
       public good.
     </p>
@@ -272,7 +351,7 @@
   <hr class="qb-about-rule" />
 
   <p class="qb-about-closing">
-    Quantum Box invites every citizen to be a participant, not just a spectator, in the governance of
+    Qumanity invites every citizen to be a participant, not just a spectator, in the governance of
     their community.
   </p>
   <p class="qb-about-cta">
@@ -322,6 +401,17 @@
     <canvas id="landingStateChart" aria-label="Users per state chart"></canvas>
   </div>
 </div>
+
+<section class="cta-section" aria-labelledby="cta-heading">
+  <h2 id="cta-heading">Ready to Join the Conscious Revolution?</h2>
+  <p>Create your account today. It takes less than 5 minutes.</p>
+  {% if not session.get('user_pk') %}
+  <a href="{{ url_for('register') }}" class="qb-btn btn-large cta-register-btn">Register Now</a>
+  <p class="cta-note">Already have an account? <a href="{{ url_for('login') }}">Sign in</a></p>
+  {% else %}
+  <a href="{{ url_for('dashboard') }}" class="qb-btn btn-large cta-register-btn">Open Your Dashboard</a>
+  {% endif %}
+</section>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 <script id="landing-chart-json" type="application/json">{{ chart_states|tojson }}</script>

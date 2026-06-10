@@ -1,0 +1,43 @@
+{# Top-right hamburger menu — About, Contact, Language, Settings, Sign out. #}
+<div class="qb-hamburger-wrap">
+  <button
+    type="button"
+    class="hamburger qb-hamburger-btn"
+    id="qb-hamburger-btn"
+    aria-label="{{ 'menu'|tr }}"
+    aria-haspopup="true"
+    aria-expanded="false"
+    aria-controls="qb-hamburger-menu"
+  >
+    &#9776;
+  </button>
+  <div
+    class="dropdown-menu qb-hamburger-menu"
+    id="qb-hamburger-menu"
+    role="menu"
+    aria-label="{{ 'menu'|tr }}"
+  >
+    <a href="{{ url_for('about') }}" role="menuitem">{{ 'about'|tr }}</a>
+    <a href="{{ url_for('contact') }}" role="menuitem">{{ 'contact'|tr }}</a>
+    {% if is_council_member %}
+    <a href="{{ url_for('india_explorer') }}" role="menuitem">{{ 'india_explorer'|tr }}</a>
+    {% endif %}
+    {% if is_mentor %}
+    <div class="qb-hamburger-space" role="none">
+      <span class="qb-hamburger-lang-label">Ākāśa (Space)</span>
+      <a href="{{ url_for('space_ancestors_page') }}" role="menuitem">{{ 'ancestors'|tr }}</a>
+      <a href="{{ url_for('space_akashic_page') }}" role="menuitem">{{ 'akashic_records'|tr }}</a>
+    </div>
+    {% endif %}
+    <div class="qb-hamburger-lang" role="none">
+      <span class="qb-hamburger-lang-label">{{ 'language'|tr }}</span>
+      {% include '_language_dropdown.html' %}
+    </div>
+    <a href="{{ url_for('settings_page') }}" role="menuitem">{{ 'settings'|tr }}</a>
+    {% if session.get('user_pk') %}
+    <form method="post" action="{{ url_for('logout') }}" class="m-0" role="none">
+      <button type="submit" role="menuitem">{{ 'sign_out'|tr }}</button>
+    </form>
+    {% endif %}
+  </div>
+</div>

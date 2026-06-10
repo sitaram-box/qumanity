@@ -18,6 +18,9 @@ from typing import Callable
 # --- Target scope (prototype) ------------------------------------------------
 TARGET_VILLAGE_ID = "0.राम|IND/CS/DL.5.4.1E"
 
+# Elections paused until Gemini month and explicit owner instruction.
+ELECTIONS_ENABLED = False
+
 SendFn = Callable[[sqlite3.Connection, str, str, str], str]
 
 ELEMENT_BY_SIGN: dict[str, str] = {
@@ -372,6 +375,8 @@ def process_election_cycles(
     today: date | None = None,
 ) -> None:
     """Advance statuses, create missing cycles, send notices, close and tally."""
+    if not ELECTIONS_ENABLED:
+        return
     today = today or date.today()
     migrate_election_tables(conn)
     village_id = TARGET_VILLAGE_ID

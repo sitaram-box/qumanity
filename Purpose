@@ -1,0 +1,570 @@
+Script started on Sun Jun  7 06:44:26 2026
+[1m[7m%[27m[1m[0m                                                                                                                        ]7;file://Rohits-Mac-mini.local/Users/macmudgal/Desktop/quantum_box[0m[27m[24m[Jmacmudgal@Rohits-Mac-mini quantum_box % [K[?2004h[7mbash scripts/diagnose_nocobase.sh QRMANITY[27m[42D[27mb[27ma[27ms[27mh[27m [27ms[27mc[27mr[27mi[27mp[27mt[27ms[27m/[27md[27mi[27ma[27mg[27mn[27mo[27ms[27me[27m_[27mn[27mo[27mc[27mo[27mb[27ma[27ms[27me[27m.[27ms[27mh[27m [27mQ[27mR[27mM[27mA[27mN[27mI[27mT[27mY[?2004l
+============================================================
+ NocoBase Blank Screen Diagnostic
+ Target user: QRMANITY
+============================================================
+
+Container status:
+NAMES               STATUS                    PORTS
+qumanity_nocobase   Up 8 minutes              0.0.0.0:3000->3000/tcp, [::]:3000->3000/tcp
+qumanity_postgres   Up 36 minutes (healthy)   0.0.0.0:5432->5432/tcp, [::]:5432->5432/tcp
+
+All users:
+ id |  nickname   | username |       email        
+----+-------------+----------+--------------------
+  1 | Super Admin | nocobase | admin@nocobase.com
+  2 |             | QRMANITY | 
+(2 rows)
+
+
+All roles:
+ERROR:  column "id" does not exist
+LINE 1: SELECT id, name, title FROM roles ORDER BY id;
+               ^
+[1m[7m%[27m[1m[0m                                                                                                                        ]7;file://Rohits-Mac-mini.local/Users/macmudgal/Desktop/quantum_box[0m[27m[24m[Jmacmudgal@Rohits-Mac-mini quantum_box % [K[?2004h[7mbash scripts/fix_nocobase_admin.sh QRMANITY[27m[43D[27mb[27ma[27ms[27mh[27m [27ms[27mc[27mr[27mi[27mp[27mt[27ms[27m/[27mf[27mi[27mx[27m_[27mn[27mo[27mc[27mo[27mb[27ma[27ms[27me[27m_[27ma[27md[27mm[27mi[27mn[27m.[27ms[27mh[27m [27mQ[27mR[27mM[27mA[27mN[27mI[27mT[27mY[?2004l
+============================================================
+ Fixing NocoBase Admin Access — Blank Screen Issue
+ User: QRMANITY
+============================================================
+
+Step 1: Current users and role status
+ id |  nickname   | username |       email        | role_status 
+----+-------------+----------+--------------------+-------------
+  1 | Super Admin | nocobase | admin@nocobase.com | HAS ROLE
+  2 |             | QRMANITY |                    | HAS ROLE
+(2 rows)
+
+
+Step 2: Available roles
+ERROR:  column "id" does not exist
+LINE 1: SELECT id, name, title FROM roles ORDER BY id;
+               ^
+[1m[7m%[27m[1m[0m                                                                                                                        ]7;file://Rohits-Mac-mini.local/Users/macmudgal/Desktop/quantum_box[0m[27m[24m[Jmacmudgal@Rohits-Mac-mini quantum_box % [K[?2004h[7mbash scripts/diagnose_nocobase.sh QRMANITY[27m[42D[27mb[27ma[27ms[27mh[27m [27ms[27mc[27mr[27mi[27mp[27mt[27ms[27m/[27md[27mi[27ma[27mg[27mn[27mo[27ms[27me[27m_[27mn[27mo[27mc[27mo[27mb[27ma[27ms[27me[27m.[27ms[27mh[27m [27mQ[27mR[27mM[27mA[27mN[27mI[27mT[27mY[?2004l
+============================================================
+ NocoBase Blank Screen Diagnostic
+ Target user: QRMANITY
+============================================================
+
+Container status:
+NAMES               STATUS                    PORTS
+qumanity_nocobase   Up 8 minutes              0.0.0.0:3000->3000/tcp, [::]:3000->3000/tcp
+qumanity_postgres   Up 37 minutes (healthy)   0.0.0.0:5432->5432/tcp, [::]:5432->5432/tcp
+
+All users:
+ id |  nickname   | username |       email        
+----+-------------+----------+--------------------
+  1 | Super Admin | nocobase | admin@nocobase.com
+  2 |             | QRMANITY | 
+(2 rows)
+
+
+All roles:
+ERROR:  column "id" does not exist
+LINE 1: SELECT id, name, title FROM roles ORDER BY id;
+               ^
+[1m[7m%[27m[1m[0m                                                                                                                        ]7;file://Rohits-Mac-mini.local/Users/macmudgal/Desktop/quantum_box[0m[27m[24m[Jmacmudgal@Rohits-Mac-mini quantum_box % [K[?2004h[7mdocker compose -f docker-compose.nocobase.yml logs nocobase --tail=30[27m[69D[27md[27mo[27mc[27mk[27me[27mr[27m [27mc[27mo[27mm[27mp[27mo[27ms[27me[27m [27m-[27mf[27m [27md[27mo[27mc[27mk[27me[27mr[27m-[27mc[27mo[27mm[27mp[27mo[27ms[27me[27m.[27mn[27mo[27mc[27mo[27mb[27ma[27ms[27me[27m.[27my[27mm[27ml[27m [27ml[27mo[27mg[27ms[27m [27mn[27mo[27mc[27mo[27mb[27ma[27ms[27me[27m [27m-[27m-[27mt[27ma[27mi[27ml[27m=[27m3[27m0[?2004l
+[36mqumanity_nocobase  | [0m{"level":"info","message":"request GET /api/collections:list?paginate=false&appends%5B%5D=fields&appends%5B%5D=category&sort%5B%5D=sort&filter=%7B%7D","method":"GET","path":"/api/collections:list?paginate=false&appends%5B%5D=fields&appends%5B%5D=category&sort%5B%5D=sort&filter=%7B%7D","req":{"header":{"x-role":"member","x-hostname":"localhost","x-timezone":"+05:30","x-locale":"en-US","x-authenticator":"basic"}},"app":"main","reqId":"46f11898-0552-47f3-848c-788efaf1f81c","timestamp":"2026-06-07 01:13:01"}
+[36mqumanity_nocobase  | [0m{"level":"info","message":"response /api/collections:list?paginate=false&appends%5B%5D=fields&appends%5B%5D=category&sort%5B%5D=sort&filter=%7B%7D","method":"GET","path":"/api/collections:list?paginate=false&appends%5B%5D=fields&appends%5B%5D=category&sort%5B%5D=sort&filter=%7B%7D","res":{"status":200},"action":{"actionName":"list","resourceName":"collections","params":{"paginate":"false","appends":["fields","category"],"sort":["sort","key"],"filter":{},"resourceName":"collections","actionName":"list"}},"userId":2,"status":200,"cost":8,"app":"main","reqId":"46f11898-0552-47f3-848c-788efaf1f81c","bodySize":8651,"timestamp":"2026-06-07 01:13:01"}
+[36mqumanity_nocobase  | [0m{"level":"info","message":"request GET /api/roles:check","method":"GET","path":"/api/roles:check","req":{"header":{"x-role":"member","x-hostname":"localhost","x-timezone":"+05:30","x-locale":"en-US","x-authenticator":"basic"}},"app":"main","reqId":"cecf4cc0-108d-458d-8e06-48e92bb79145","timestamp":"2026-06-07 01:13:01"}
+[36mqumanity_nocobase  | [0m{"level":"info","message":"response /api/roles:check","method":"GET","path":"/api/roles:check","res":{"status":200},"action":{"actionName":"check","resourceName":"roles","params":{"resourceName":"roles","actionName":"check"}},"userId":2,"status":200,"cost":4,"app":"main","reqId":"cecf4cc0-108d-458d-8e06-48e92bb79145","bodySize":599,"timestamp":"2026-06-07 01:13:01"}
+[36mqumanity_nocobase  | [0m{"level":"info","message":"request GET /api/uiSchemas:getJsonSchema/nocobase-admin-menu","method":"GET","path":"/api/uiSchemas:getJsonSchema/nocobase-admin-menu","req":{"header":{"x-role":"member","x-hostname":"localhost","x-timezone":"+05:30","x-locale":"en-US","x-authenticator":"basic"}},"app":"main","reqId":"4da89b8e-95b6-4fe8-afd9-9ebc1f563f14","timestamp":"2026-06-07 01:13:01"}
+[36mqumanity_nocobase  | [0m{"level":"info","message":"response /api/uiSchemas:getJsonSchema/nocobase-admin-menu","method":"GET","path":"/api/uiSchemas:getJsonSchema/nocobase-admin-menu","res":{"status":200},"action":{"actionName":"getJsonSchema","resourceName":"uiSchemas","params":{"filterByTk":"nocobase-admin-menu","resourceName":"uiSchemas","resourceIndex":"nocobase-admin-menu","actionName":"getJsonSchema"}},"userId":2,"status":200,"cost":2,"app":"main","reqId":"4da89b8e-95b6-4fe8-afd9-9ebc1f563f14","bodySize":294,"timestamp":"2026-06-07 01:13:01"}
+[36mqumanity_nocobase  | [0m{"level":"info","message":"request POST /api/auth:signOut","method":"POST","path":"/api/auth:signOut","req":{"header":{"x-role":"member","x-hostname":"localhost","x-timezone":"+05:30","x-locale":"en-US","x-authenticator":"basic"}},"app":"main","reqId":"daf5b7fa-745d-4019-89b1-0594550dfaf6","timestamp":"2026-06-07 01:13:05"}
+[36mqumanity_nocobase  | [0m{"level":"info","message":"response /api/auth:signOut","method":"POST","path":"/api/auth:signOut","res":{"status":200},"action":{"actionName":"signOut","resourceName":"auth","params":{"resourceName":"auth","actionName":"signOut"}},"userId":2,"status":200,"cost":25,"app":"main","reqId":"daf5b7fa-745d-4019-89b1-0594550dfaf6","bodySize":2,"timestamp":"2026-06-07 01:13:05"}
+[36mqumanity_nocobase  | [0m{"level":"info","message":"request POST /api/authenticators:publicList","method":"POST","path":"/api/authenticators:publicList","req":{"header":{"x-hostname":"localhost","x-timezone":"+05:30","x-locale":"en-US"}},"app":"main","reqId":"ff3f51b8-e159-4c5c-be5a-1efb3f6aea2b","timestamp":"2026-06-07 01:13:05"}
+[36mqumanity_nocobase  | [0m{"level":"info","message":"response /api/authenticators:publicList","method":"POST","path":"/api/authenticators:publicList","res":{"status":200},"action":{"actionName":"publicList","resourceName":"authenticators","params":{"resourceName":"authenticators","actionName":"publicList"}},"status":200,"cost":6,"app":"main","reqId":"ff3f51b8-e159-4c5c-be5a-1efb3f6aea2b","bodySize":173,"timestamp":"2026-06-07 01:13:05"}
+[36mqumanity_nocobase  | [0m{"level":"info","message":"request POST /api/auth:signIn","method":"POST","path":"/api/auth:signIn","req":{"header":{"x-hostname":"localhost","x-timezone":"+05:30","x-locale":"en-US","x-authenticator":"basic"}},"app":"main","reqId":"b188669c-f19c-413f-aad2-0ade9bc4dbe9","timestamp":"2026-06-07 01:13:06"}
+[36mqumanity_nocobase  | [0m{"level":"info","message":"response /api/auth:signIn","method":"POST","path":"/api/auth:signIn","res":{"status":200},"action":{"actionName":"signIn","resourceName":"auth","params":{"resourceName":"auth","actionName":"signIn","values":{"account":"QRMANITY","password":"P@y#umans123"}}},"status":200,"cost":52,"app":"main","reqId":"b188669c-f19c-413f-aad2-0ade9bc4dbe9","bodySize":395,"timestamp":"2026-06-07 01:13:06"}
+[36mqumanity_nocobase  | [0m{"level":"info","message":"request GET /api/auth:check","method":"GET","path":"/api/auth:check","req":{"header":{"x-hostname":"localhost","x-timezone":"+05:30","x-locale":"en-US","x-authenticator":"basic"}},"app":"main","reqId":"d5a5633b-0ee1-4b57-a920-6dab38412536","timestamp":"2026-06-07 01:13:06"}
+[36mqumanity_nocobase  | [0m{"level":"info","message":"response /api/auth:check","method":"GET","path":"/api/auth:check","res":{"status":200},"action":{"actionName":"check","resourceName":"auth","params":{"resourceName":"auth","actionName":"check"}},"userId":2,"status":200,"cost":5,"app":"main","reqId":"d5a5633b-0ee1-4b57-a920-6dab38412536","bodySize":841,"timestamp":"2026-06-07 01:13:06"}
+[36mqumanity_nocobase  | [0m{"level":"info","message":"request GET /api/systemSettings:get/1?appends=logo","method":"GET","path":"/api/systemSettings:get/1?appends=logo","req":{"header":{"x-hostname":"localhost","x-timezone":"+05:30","x-locale":"en-US","x-authenticator":"basic"}},"app":"main","reqId":"37031a83-9162-4301-b18b-4ee555a77cdd","timestamp":"2026-06-07 01:13:06"}
+[36mqumanity_nocobase  | [0m{"level":"info","message":"response /api/systemSettings:get/1?appends=logo","method":"GET","path":"/api/systemSettings:get/1?appends=logo","res":{"status":200},"action":{"actionName":"get","resourceName":"systemSettings","params":{"filterByTk":"1","appends":["logo"],"resourceName":"systemSettings","resourceIndex":"1","actionName":"get"}},"userId":2,"status":200,"cost":3,"app":"main","reqId":"37031a83-9162-4301-b18b-4ee555a77cdd","bodySize":665,"timestamp":"2026-06-07 01:13:06"}
+[36mqumanity_nocobase  | [0m{"level":"info","message":"request GET /api/app:getInfo","method":"GET","path":"/api/app:getInfo","req":{"header":{"x-hostname":"localhost","x-timezone":"+05:30","x-locale":"en-US","x-authenticator":"basic"}},"app":"main","reqId":"1df7e4fd-30bc-47a9-87f1-2c5994716b05","timestamp":"2026-06-07 01:13:06"}
+[36mqumanity_nocobase  | [0m{"level":"info","message":"response /api/app:getInfo","method":"GET","path":"/api/app:getInfo","res":{"status":200},"action":{"actionName":"getInfo","resourceName":"app","params":{"resourceName":"app","actionName":"getInfo"}},"userId":2,"status":200,"cost":3,"app":"main","reqId":"1df7e4fd-30bc-47a9-87f1-2c5994716b05","bodySize":115,"timestamp":"2026-06-07 01:13:06"}
+[36mqumanity_nocobase  | [0m{"level":"info","message":"request GET /api/uiSchemaTemplates:list?paginate=false","method":"GET","path":"/api/uiSchemaTemplates:list?paginate=false","req":{"header":{"x-hostname":"localhost","x-timezone":"+05:30","x-locale":"en-US","x-authenticator":"basic"}},"app":"main","reqId":"2d15a202-2ca9-4737-b75a-241b9c7821a4","timestamp":"2026-06-07 01:13:06"}
+[36mqumanity_nocobase  | [0m{"level":"info","message":"response /api/uiSchemaTemplates:list?paginate=false","method":"GET","path":"/api/uiSchemaTemplates:list?paginate=false","res":{"status":200},"action":{"actionName":"list","resourceName":"uiSchemaTemplates","params":{"paginate":"false","resourceName":"uiSchemaTemplates","actionName":"list"}},"userId":2,"status":200,"cost":1,"app":"main","reqId":"2d15a202-2ca9-4737-b75a-241b9c7821a4","bodySize":11,"timestamp":"2026-06-07 01:13:06"}
+[36mqumanity_nocobase  | [0m{"level":"info","message":"request POST /api/dataSources:listEnabled?paginate=false&appends%5B%5D=collections","method":"POST","path":"/api/dataSources:listEnabled?paginate=false&appends%5B%5D=collections","req":{"header":{"x-hostname":"localhost","x-timezone":"+05:30","x-locale":"en-US","x-authenticator":"basic"}},"app":"main","reqId":"a4e15ba1-2725-44df-8246-5f9a540c04ac","timestamp":"2026-06-07 01:13:06"}
+[36mqumanity_nocobase  | [0m{"level":"info","message":"request GET /api/collectionCategories:list?paginate=false&sort%5B%5D=sort","method":"GET","path":"/api/collectionCategories:list?paginate=false&sort%5B%5D=sort","req":{"header":{"x-hostname":"localhost","x-timezone":"+05:30","x-locale":"en-US","x-authenticator":"basic"}},"app":"main","reqId":"1c7b979d-316c-4f66-abdd-44be0c40bfca","timestamp":"2026-06-07 01:13:06"}
+[36mqumanity_nocobase  | [0m{"level":"info","message":"response /api/dataSources:listEnabled?paginate=false&appends%5B%5D=collections","method":"POST","path":"/api/dataSources:listEnabled?paginate=false&appends%5B%5D=collections","res":{"status":200},"action":{"actionName":"listEnabled","resourceName":"dataSources","params":{"paginate":"false","appends":["collections"],"resourceName":"dataSources","actionName":"listEnabled"}},"userId":2,"status":200,"cost":5,"app":"main","reqId":"a4e15ba1-2725-44df-8246-5f9a540c04ac","bodySize":11,"timestamp":"2026-06-07 01:13:06"}
+[36mqumanity_nocobase  | [0m{"level":"info","message":"response /api/collectionCategories:list?paginate=false&sort%5B%5D=sort","method":"GET","path":"/api/collectionCategories:list?paginate=false&sort%5B%5D=sort","res":{"status":200},"action":{"actionName":"list","resourceName":"collectionCategories","params":{"paginate":"false","sort":["sort","id"],"resourceName":"collectionCategories","actionName":"list"}},"userId":2,"status":200,"cost":4,"app":"main","reqId":"1c7b979d-316c-4f66-abdd-44be0c40bfca","bodySize":11,"timestamp":"2026-06-07 01:13:06"}
+[36mqumanity_nocobase  | [0m{"level":"info","message":"request GET /api/collections:list?paginate=false&appends%5B%5D=fields&appends%5B%5D=category&sort%5B%5D=sort&filter=%7B%7D","method":"GET","path":"/api/collections:list?paginate=false&appends%5B%5D=fields&appends%5B%5D=category&sort%5B%5D=sort&filter=%7B%7D","req":{"header":{"x-hostname":"localhost","x-timezone":"+05:30","x-locale":"en-US","x-authenticator":"basic"}},"app":"main","reqId":"0044d09e-0150-457e-89f4-27b6e327482a","timestamp":"2026-06-07 01:13:06"}
+[36mqumanity_nocobase  | [0m{"level":"info","message":"response /api/collections:list?paginate=false&appends%5B%5D=fields&appends%5B%5D=category&sort%5B%5D=sort&filter=%7B%7D","method":"GET","path":"/api/collections:list?paginate=false&appends%5B%5D=fields&appends%5B%5D=category&sort%5B%5D=sort&filter=%7B%7D","res":{"status":200},"action":{"actionName":"list","resourceName":"collections","params":{"paginate":"false","appends":["fields","category"],"sort":["sort","key"],"filter":{},"resourceName":"collections","actionName":"list"}},"userId":2,"status":200,"cost":4,"app":"main","reqId":"0044d09e-0150-457e-89f4-27b6e327482a","bodySize":8651,"timestamp":"2026-06-07 01:13:06"}
+[36mqumanity_nocobase  | [0m{"level":"info","message":"request GET /api/roles:check","method":"GET","path":"/api/roles:check","req":{"header":{"x-hostname":"localhost","x-timezone":"+05:30","x-locale":"en-US","x-authenticator":"basic"}},"app":"main","reqId":"0cdf5ba9-9bb0-4f29-8341-63e6529ab76e","timestamp":"2026-06-07 01:13:06"}
+[36mqumanity_nocobase  | [0m{"level":"info","message":"response /api/roles:check","method":"GET","path":"/api/roles:check","res":{"status":200},"action":{"actionName":"check","resourceName":"roles","params":{"resourceName":"roles","actionName":"check"}},"userId":2,"status":200,"cost":3,"app":"main","reqId":"0cdf5ba9-9bb0-4f29-8341-63e6529ab76e","bodySize":599,"timestamp":"2026-06-07 01:13:06"}
+[36mqumanity_nocobase  | [0m{"level":"info","message":"request GET /api/uiSchemas:getJsonSchema/nocobase-admin-menu","method":"GET","path":"/api/uiSchemas:getJsonSchema/nocobase-admin-menu","req":{"header":{"x-role":"member","x-hostname":"localhost","x-timezone":"+05:30","x-locale":"en-US","x-authenticator":"basic"}},"app":"main","reqId":"2c4d799f-4a58-47bd-8dc2-7d950c15c743","timestamp":"2026-06-07 01:13:06"}
+[36mqumanity_nocobase  | [0m{"level":"info","message":"response /api/uiSchemas:getJsonSchema/nocobase-admin-menu","method":"GET","path":"/api/uiSchemas:getJsonSchema/nocobase-admin-menu","res":{"status":200},"action":{"actionName":"getJsonSchema","resourceName":"uiSchemas","params":{"filterByTk":"nocobase-admin-menu","resourceName":"uiSchemas","resourceIndex":"nocobase-admin-menu","actionName":"getJsonSchema"}},"userId":2,"status":200,"cost":1,"app":"main","reqId":"2c4d799f-4a58-47bd-8dc2-7d950c15c743","bodySize":294,"timestamp":"2026-06-07 01:13:06"}
+[1m[7m%[27m[1m[0m                                                                                                                        ]7;file://Rohits-Mac-mini.local/Users/macmudgal/Desktop/quantum_box[0m[27m[24m[Jmacmudgal@Rohits-Mac-mini quantum_box % [K[?2004h[7mcd /Users/macmudgal/Desktop/quantum_box[27m
+[K
+[7m# Stop and remove everything[27m[K
+[7mdocker compose -f docker-compose.nocobase.yml down -v[27m[K
+[K
+[7m# Remove volumes completely[27m[K
+[7mdocker volume rm quantum_box_postgres_data quantum_box_nocobase_data 2>/dev/null[27m[K
+[K
+[7m# Pull fresh image[27m[K
+[7mdocker pull nocobase/nocobase:main[27m[K[9A[6C[27mc[27md[27m [27m/[27mU[27ms[27me[27mr[27ms[27m/[27mm[27ma[27mc[27mm[27mu[27md[27mg[27ma[27ml[27m/[27mD[27me[27ms[27mk[27mt[27mo[27mp[27m/[27mq[27mu[27ma[27mn[27mt[27mu[27mm[27m_[27mb[27mo[27mx[2B[27m#[27m [27mS[27mt[27mo[27mp[27m [27ma[27mn[27md[27m [27mr[27me[27mm[27mo[27mv[27me[27m [27me[27mv[27me[27mr[27my[27mt[27mh[27mi[27mn[27mg[1B[27md[27mo[27mc[27mk[27me[27mr[27m [27mc[27mo[27mm[27mp[27mo[27ms[27me[27m [27m-[27mf[27m [27md[27mo[27mc[27mk[27me[27mr[27m-[27mc[27mo[27mm[27mp[27mo[27ms[27me[27m.[27mn[27mo[27mc[27mo[27mb[27ma[27ms[27me[27m.[27my[27mm[27ml[27m [27md[27mo[27mw[27mn[27m [27m-[27mv[2B[27m#[27m [27mR[27me[27mm[27mo[27mv[27me[27m [27mv[27mo[27ml[27mu[27mm[27me[27ms[27m [27mc[27mo[27mm[27mp[27ml[27me[27mt[27me[27ml[27my[1B[27md[27mo[27mc[27mk[27me[27mr[27m [27mv[27mo[27ml[27mu[27mm[27me[27m [27mr[27mm[27m [27mq[27mu[27ma[27mn[27mt[27mu[27mm[27m_[27mb[27mo[27mx[27m_[27mp[27mo[27ms[27mt[27mg[27mr[27me[27ms[27m_[27md[27ma[27mt[27ma[27m [27mq[27mu[27ma[27mn[27mt[27mu[27mm[27m_[27mb[27mo[27mx[27m_[27mn[27mo[27mc[27mo[27mb[27ma[27ms[27me[27m_[27md[27ma[27mt[27ma[27m [27m2[27m>[27m/[27md[27me[27mv[27m/[27mn[27mu[27ml[27ml[2B[27m#[27m [27mP[27mu[27ml[27ml[27m [27mf[27mr[27me[27ms[27mh[27m [27mi[27mm[27ma[27mg[27me[1B[27md[27mo[27mc[27mk[27me[27mr[27m [27mp[27mu[27ml[27ml[27m [27mn[27mo[27mc[27mo[27mb[27ma[27ms[27me[27m/[27mn[27mo[27mc[27mo[27mb[27ma[27ms[27me[27m:[27mm[27ma[27mi[27mn[?2004l
+zsh: command not found: #
+[?25l[0G[+] down 0/1
+ [33m⠋[0m Container qumanity_nocobase Stopping                                                                             [34m0.1s[0m
+[?25h[?25l[2A[0G[+] down 0/1
+ [33m⠙[0m Container qumanity_nocobase Stopping                                                                             [34m0.2s[0m
+[?25h[?25l[2A[0G[+] down 0/1
+ [33m⠹[0m Container qumanity_nocobase Stopping                                                                             [34m0.3s[0m
+[?25h[?25l[2A[0G[+] down 0/1
+ [33m⠸[0m Container qumanity_nocobase Stopping                                                                             [34m0.4s[0m
+[?25h[?25l[2A[0G[+] down 0/1
+ [33m⠼[0m Container qumanity_nocobase Stopping                                                                             [34m0.5s[0m
+[?25h[?25l[2A[0G[+] down 0/1
+ [33m⠴[0m Container qumanity_nocobase Stopping                                                                             [34m0.6s[0m
+[?25h[?25l[2A[0G[+] down 0/1
+ [33m⠦[0m Container qumanity_nocobase Stopping                                                                             [34m0.7s[0m
+[?25h[?25l[2A[0G[+] down 0/1
+ [33m⠧[0m Container qumanity_nocobase Stopping                                                                             [34m0.8s[0m
+[?25h[?25l[2A[0G[+] down 0/1
+ [33m⠇[0m Container qumanity_nocobase Stopping                                                                             [34m0.9s[0m
+[?25h[?25l[2A[0G[+] down 0/1
+ [33m⠏[0m Container qumanity_nocobase Stopping                                                                             [34m1.0s[0m
+[?25h[?25l[2A[0G[+] down 0/1
+ [33m⠋[0m Container qumanity_nocobase Stopping                                                                             [34m1.1s[0m
+[?25h[?25l[2A[0G[+] down 0/1
+ [33m⠙[0m Container qumanity_nocobase Stopping                                                                             [34m1.2s[0m
+[?25h[?25l[2A[0G[+] down 0/1
+ [33m⠹[0m Container qumanity_nocobase Removing                                                                             [34m1.3s[0m
+[?25h[?25l[2A[0G[+] down 0/1
+ [33m⠸[0m Container qumanity_nocobase Removing                                                                             [34m1.4s[0m
+[?25h[?25l[2A[0G[+] down 0/1
+ [33m⠼[0m Container qumanity_nocobase Removing                                                                             [34m1.5s[0m
+[?25h[?25l[2A[0G[+] down 1/2
+ [32m✔[0m Container qumanity_nocobase [32mRemoved[0m                                                                              [34m1.5s[0m
+ [33m⠋[0m Container qumanity_postgres Stopping                                                                             [34m0.1s[0m
+[?25h[?25l[3A[0G[+] down 1/2
+ [32m✔[0m Container qumanity_nocobase [32mRemoved[0m                                                                              [34m1.5s[0m
+ [33m⠙[0m Container qumanity_postgres Stopping                                                                             [34m0.2s[0m
+[?25h[?25l[3A[0G[+] down 4/5
+ [32m✔[0m Container qumanity_nocobase          [32mRemoved[0m                                                                     [34m1.5s[0m
+ [32m✔[0m Container qumanity_postgres          [32mRemoved[0m                                                                     [34m0.2s[0m
+ [33m⠋[0m Network quantum_box_qumanity_network Removing                                                                    [34m0.1s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mRemoved[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mRemoved[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] down 4/5
+ [32m✔[0m Container qumanity_nocobase          [32mRemoved[0m                                                                     [34m1.5s[0m
+ [32m✔[0m Container qumanity_postgres          [32mRemoved[0m                                                                     [34m0.2s[0m
+ [33m⠙[0m Network quantum_box_qumanity_network Removing                                                                    [34m0.2s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mRemoved[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mRemoved[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] down 5/5
+ [32m✔[0m Container qumanity_nocobase          [32mRemoved[0m                                                                     [34m1.5s[0m
+ [32m✔[0m Container qumanity_postgres          [32mRemoved[0m                                                                     [34m0.2s[0m
+ [32m✔[0m Network quantum_box_qumanity_network [32mRemoved[0m                                                                     [34m0.2s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mRemoved[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mRemoved[0m                                                                     [34m0.0s[0m
+[?25hzsh: command not found: #
+zsh: command not found: #
+main: Pulling from nocobase/nocobase
+Digest: sha256:c630fb45c37525c61830446246dd126c3aa2b7b1ebba2eb7c6fbb819831e1960
+Status: Image is up to date for nocobase/nocobase:main
+docker.io/nocobase/nocobase:main
+
+[1mWhat's next:[0m
+    View a summary of image vulnerabilities and recommendations → [36mdocker scout quickview nocobase/nocobase:main[0m
+[1m[7m%[27m[1m[0m                                                                                                                        ]7;file://Rohits-Mac-mini.local/Users/macmudgal/Desktop/quantum_box[0m[27m[24m[Jmacmudgal@Rohits-Mac-mini quantum_box % [K[?2004h[7m# Start fresh[27m
+[7mdocker compose -f docker-compose.nocobase.yml up -d[27m[K
+[K
+[7m# Wait for initialization (30 seconds)[27m[K
+[7msleep 30[27m[K
+[K
+[7m# Check logs for errors[27m[K
+[7mdocker compose -f docker-compose.nocobase.yml logs --tail=20[27m[K[7A[20D[27m#[27m [27mS[27mt[27ma[27mr[27mt[27m [27mf[27mr[27me[27ms[27mh[1B[27md[27mo[27mc[27mk[27me[27mr[27m [27mc[27mo[27mm[27mp[27mo[27ms[27me[27m [27m-[27mf[27m [27md[27mo[27mc[27mk[27me[27mr[27m-[27mc[27mo[27mm[27mp[27mo[27ms[27me[27m.[27mn[27mo[27mc[27mo[27mb[27ma[27ms[27me[27m.[27my[27mm[27ml[27m [27mu[27mp[27m [27m-[27md[2B[27m#[27m [27mW[27ma[27mi[27mt[27m [27mf[27mo[27mr[27m [27mi[27mn[27mi[27mt[27mi[27ma[27ml[27mi[27mz[27ma[27mt[27mi[27mo[27mn[27m [27m([27m3[27m0[27m [27ms[27me[27mc[27mo[27mn[27md[27ms[27m)[1B[27ms[27ml[27me[27me[27mp[27m [27m3[27m0[2B[27m#[27m [27mC[27mh[27me[27mc[27mk[27m [27ml[27mo[27mg[27ms[27m [27mf[27mo[27mr[27m [27me[27mr[27mr[27mo[27mr[27ms[1B[27md[27mo[27mc[27mk[27me[27mr[27m [27mc[27mo[27mm[27mp[27mo[27ms[27me[27m [27m-[27mf[27m [27md[27mo[27mc[27mk[27me[27mr[27m-[27mc[27mo[27mm[27mp[27mo[27ms[27me[27m.[27mn[27mo[27mc[27mo[27mb[27ma[27ms[27me[27m.[27my[27mm[27ml[27m [27ml[27mo[27mg[27ms[27m [27m-[27m-[27mt[27ma[27mi[27ml[27m=[27m2[27m0[?2004l
+zsh: command not found: #
+[?25l[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Container qumanity_postgres          [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠋[0m Container qumanity_nocobase          Creating                                                                    [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠙[0m Container qumanity_postgres          Waiting                                                                     [34m0.1s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠹[0m Container qumanity_postgres          Waiting                                                                     [34m0.2s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠸[0m Container qumanity_postgres          Waiting                                                                     [34m0.3s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠼[0m Container qumanity_postgres          Waiting                                                                     [34m0.4s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠴[0m Container qumanity_postgres          Waiting                                                                     [34m0.5s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠦[0m Container qumanity_postgres          Waiting                                                                     [34m0.6s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠧[0m Container qumanity_postgres          Waiting                                                                     [34m0.7s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠇[0m Container qumanity_postgres          Waiting                                                                     [34m0.8s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠏[0m Container qumanity_postgres          Waiting                                                                     [34m0.9s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠋[0m Container qumanity_postgres          Waiting                                                                     [34m1.0s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠙[0m Container qumanity_postgres          Waiting                                                                     [34m1.1s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠹[0m Container qumanity_postgres          Waiting                                                                     [34m1.2s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠸[0m Container qumanity_postgres          Waiting                                                                     [34m1.3s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠼[0m Container qumanity_postgres          Waiting                                                                     [34m1.4s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠴[0m Container qumanity_postgres          Waiting                                                                     [34m1.5s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠦[0m Container qumanity_postgres          Waiting                                                                     [34m1.6s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠧[0m Container qumanity_postgres          Waiting                                                                     [34m1.7s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠇[0m Container qumanity_postgres          Waiting                                                                     [34m1.8s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠏[0m Container qumanity_postgres          Waiting                                                                     [34m1.9s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠋[0m Container qumanity_postgres          Waiting                                                                     [34m2.0s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠙[0m Container qumanity_postgres          Waiting                                                                     [34m2.1s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠹[0m Container qumanity_postgres          Waiting                                                                     [34m2.2s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠸[0m Container qumanity_postgres          Waiting                                                                     [34m2.3s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠼[0m Container qumanity_postgres          Waiting                                                                     [34m2.4s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠴[0m Container qumanity_postgres          Waiting                                                                     [34m2.5s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠦[0m Container qumanity_postgres          Waiting                                                                     [34m2.6s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠧[0m Container qumanity_postgres          Waiting                                                                     [34m2.7s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠇[0m Container qumanity_postgres          Waiting                                                                     [34m2.8s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠏[0m Container qumanity_postgres          Waiting                                                                     [34m2.9s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠋[0m Container qumanity_postgres          Waiting                                                                     [34m3.0s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠙[0m Container qumanity_postgres          Waiting                                                                     [34m3.1s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠹[0m Container qumanity_postgres          Waiting                                                                     [34m3.2s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠸[0m Container qumanity_postgres          Waiting                                                                     [34m3.3s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠼[0m Container qumanity_postgres          Waiting                                                                     [34m3.4s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠴[0m Container qumanity_postgres          Waiting                                                                     [34m3.5s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠦[0m Container qumanity_postgres          Waiting                                                                     [34m3.6s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠧[0m Container qumanity_postgres          Waiting                                                                     [34m3.7s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠇[0m Container qumanity_postgres          Waiting                                                                     [34m3.8s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠏[0m Container qumanity_postgres          Waiting                                                                     [34m3.9s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠋[0m Container qumanity_postgres          Waiting                                                                     [34m4.0s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠙[0m Container qumanity_postgres          Waiting                                                                     [34m4.1s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠹[0m Container qumanity_postgres          Waiting                                                                     [34m4.2s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠸[0m Container qumanity_postgres          Waiting                                                                     [34m4.3s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠼[0m Container qumanity_postgres          Waiting                                                                     [34m4.4s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠴[0m Container qumanity_postgres          Waiting                                                                     [34m4.5s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠦[0m Container qumanity_postgres          Waiting                                                                     [34m4.6s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠧[0m Container qumanity_postgres          Waiting                                                                     [34m4.7s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠇[0m Container qumanity_postgres          Waiting                                                                     [34m4.8s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠏[0m Container qumanity_postgres          Waiting                                                                     [34m4.9s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠋[0m Container qumanity_postgres          Waiting                                                                     [34m5.0s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠙[0m Container qumanity_postgres          Waiting                                                                     [34m5.1s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠹[0m Container qumanity_postgres          Waiting                                                                     [34m5.2s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠸[0m Container qumanity_postgres          Waiting                                                                     [34m5.3s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠼[0m Container qumanity_postgres          Waiting                                                                     [34m5.4s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠴[0m Container qumanity_postgres          Waiting                                                                     [34m5.5s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 4/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [33m⠦[0m Container qumanity_postgres          Waiting                                                                     [34m5.6s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mCreated[0m                                                                     [34m0.0s[0m
+[?25h[?25l[6A[0G[+] up 5/5
+ [32m✔[0m Network quantum_box_qumanity_network [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_nocobase_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Volume quantum_box_postgres_data     [32mCreated[0m                                                                     [34m0.0s[0m
+ [32m✔[0m Container qumanity_postgres          [32mHealthy[0m                                                                     [34m5.6s[0m
+ [32m✔[0m Container qumanity_nocobase          [32mStarted[0m                                                                     [34m5.7s[0m
+[?25hzsh: unknown file attribute: 3
+zsh: command not found: #
+[36mqumanity_postgres  | [0m/usr/local/bin/docker-entrypoint.sh: ignoring /docker-entrypoint-initdb.d/*
+[36mqumanity_postgres  | [0m
+[36mqumanity_postgres  | [0mwaiting for server to shut down....2026-06-07 01:28:47.637 UTC [48] LOG:  received fast shutdown request
+[36mqumanity_postgres  | [0m2026-06-07 01:28:47.638 UTC [48] LOG:  aborting any active transactions
+[36mqumanity_postgres  | [0m2026-06-07 01:28:47.638 UTC [48] LOG:  background worker "logical replication launcher" (PID 54) exited with exit code 1
+[36mqumanity_postgres  | [0m2026-06-07 01:28:47.638 UTC [49] LOG:  shutting down
+[36mqumanity_postgres  | [0m2026-06-07 01:28:47.639 UTC [49] LOG:  checkpoint starting: shutdown immediate
+[33mqumanity_nocobase  | [0m{"level":"info","message":"app.reload()","meta":{},"module":"application","submodule":"","method":"load","app":"main","reqId":"9ede5a9c-99a9-4be9-8877-71d3093bcbdd","dataSourceKey":"main","timestamp":"2026-06-07 01:28:56"}
+[33mqumanity_nocobase  | [0m{"level":"info","message":"write roles to ACL","meta":{},"module":"acl","submodule":"","method":"writeRolesToACL","app":"main","reqId":"9ede5a9c-99a9-4be9-8877-71d3093bcbdd","dataSourceKey":"main","timestamp":"2026-06-07 01:28:57"}
+[33mqumanity_nocobase  | [0m{"level":"info","message":"app has been started","meta":{},"module":"application","submodule":"","method":"","app":"main","reqId":"9ede5a9c-99a9-4be9-8877-71d3093bcbdd","dataSourceKey":"main","timestamp":"2026-06-07 01:28:57"}
+[33mqumanity_nocobase  | [0mnew client connected uu5nivVZudrAtM0fc-dEf
+[33mqumanity_nocobase  | [0mclient tags: app#main
+[33mqumanity_nocobase  | [0mclient disconnected uu5nivVZudrAtM0fc-dEf
+[33mqumanity_nocobase  | [0m{"level":"info","message":"request GET /api/app:getLang?locale=en-US","method":"GET","path":"/api/app:getLang?locale=en-US","req":{"header":{"x-role":"member","x-hostname":"localhost","x-timezone":"+05:30","x-locale":"en-US","x-authenticator":"basic"}},"app":"main","reqId":"9f0dd2f9-a981-48dd-88ea-d580579a2cd3","timestamp":"2026-06-07 01:29:17"}
+[33mqumanity_nocobase  | [0mnew client connected 7gDULw0xGonioE16UEY3U
+[33mqumanity_nocobase  | [0mclient tags: app#main
+[33mqumanity_nocobase  | [0m{"level":"info","message":"response /api/app:getLang?locale=en-US","method":"GET","path":"/api/app:getLang?locale=en-US","res":{"status":200},"action":{"actionName":"getLang","resourceName":"app","params":{"locale":"en-US","resourceName":"app","actionName":"getLang"}},"status":200,"cost":27,"app":"main","reqId":"9f0dd2f9-a981-48dd-88ea-d580579a2cd3","bodySize":141062,"timestamp":"2026-06-07 01:29:17"}
+[33mqumanity_nocobase  | [0m{"level":"info","message":"request GET /api/pm:listEnabled","method":"GET","path":"/api/pm:listEnabled","req":{"header":{"x-role":"member","x-hostname":"localhost","x-timezone":"+05:30","x-locale":"en-US","x-authenticator":"basic"}},"app":"main","reqId":"5343b3a4-de85-43e6-85bc-5582d0d04b4e","timestamp":"2026-06-07 01:29:17"}
+[33mqumanity_nocobase  | [0m{"level":"info","message":"response /api/pm:listEnabled","method":"GET","path":"/api/pm:listEnabled","res":{"status":200},"action":{"actionName":"listEnabled","resourceName":"pm","params":{"resourceName":"pm","actionName":"listEnabled"}},"status":200,"cost":5,"app":"main","reqId":"5343b3a4-de85-43e6-85bc-5582d0d04b4e","bodySize":13658,"timestamp":"2026-06-07 01:29:17"}
+[33mqumanity_nocobase  | [0m{"level":"info","message":"request GET /api/auth:check","method":"GET","path":"/api/auth:check","req":{"header":{"x-role":"member","x-hostname":"localhost","x-timezone":"+05:30","x-locale":"en-US","x-authenticator":"basic"}},"app":"main","reqId":"aa26f9f4-53a4-435d-a129-625c4f5416be","timestamp":"2026-06-07 01:29:17"}
+[33mqumanity_nocobase  | [0m{"level":"info","message":"response /api/auth:check","method":"GET","path":"/api/auth:check","res":{"status":200},"action":{"actionName":"check","resourceName":"auth","params":{"resourceName":"auth","actionName":"check"}},"status":200,"cost":1,"app":"main","reqId":"aa26f9f4-53a4-435d-a129-625c4f5416be","bodySize":11,"timestamp":"2026-06-07 01:29:17"}
+[33mqumanity_nocobase  | [0m{"level":"info","message":"request GET /api/systemSettings:get/1?appends=logo","method":"GET","path":"/api/systemSettings:get/1?appends=logo","req":{"header":{"x-role":"member","x-hostname":"localhost","x-timezone":"+05:30","x-locale":"en-US","x-authenticator":"basic"}},"app":"main","reqId":"211cb9eb-37d5-4743-bc36-d07350326810","timestamp":"2026-06-07 01:29:17"}
+[33mqumanity_nocobase  | [0m{"level":"info","message":"response /api/systemSettings:get/1?appends=logo","method":"GET","path":"/api/systemSettings:get/1?appends=logo","res":{"status":200},"action":{"actionName":"get","resourceName":"systemSettings","params":{"filterByTk":"1","appends":["logo"],"resourceName":"systemSettings","resourceIndex":"1","actionName":"get"}},"status":200,"cost":4,"app":"main","reqId":"211cb9eb-37d5-4743-bc36-d07350326810","bodySize":665,"timestamp":"2026-06-07 01:29:17"}
+[33mqumanity_nocobase  | [0m{"level":"info","message":"request GET /api/app:getInfo","method":"GET","path":"/api/app:getInfo","req":{"header":{"x-role":"member","x-hostname":"localhost","x-timezone":"+05:30","x-locale":"en-US","x-authenticator":"basic"}},"app":"main","reqId":"95f0ceec-51a1-4025-9e3e-c4d793fa9d61","timestamp":"2026-06-07 01:29:17"}
+[33mqumanity_nocobase  | [0m{"level":"info","message":"response /api/app:getInfo","method":"GET","path":"/api/app:getInfo","res":{"status":200},"action":{"actionName":"getInfo","resourceName":"app","params":{"resourceName":"app","actionName":"getInfo"}},"status":200,"cost":2,"app":"main","reqId":"95f0ceec-51a1-4025-9e3e-c4d793fa9d61","bodySize":115,"timestamp":"2026-06-07 01:29:17"}
+[33mqumanity_nocobase  | [0m{"level":"info","message":"request POST /api/authenticators:publicList","method":"POST","path":"/api/authenticators:publicList","req":{"header":{"x-role":"member","x-hostname":"localhost","x-timezone":"+05:30","x-locale":"en-US","x-authenticator":"basic"}},"app":"main","reqId":"5f9ab72f-93ed-4b48-abd9-baec91b6c366","timestamp":"2026-06-07 01:29:17"}
+[33mqumanity_nocobase  | [0m{"level":"info","message":"response /api/authenticators:publicList","method":"POST","path":"/api/authenticators:publicList","res":{"status":200},"action":{"actionName":"publicList","resourceName":"authenticators","params":{"resourceName":"authenticators","actionName":"publicList"}},"status":200,"cost":7,"app":"main","reqId":"5f9ab72f-93ed-4b48-abd9-baec91b6c366","bodySize":173,"timestamp":"2026-06-07 01:29:17"}
+[36mqumanity_postgres  | [0m2026-06-07 01:28:47.652 UTC [49] LOG:  checkpoint complete: wrote 922 buffers (5.6%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.004 s, sync=0.009 s, total=0.014 s; sync files=301, longest=0.003 s, average=0.001 s; distance=4239 kB, estimate=4239 kB
+[36mqumanity_postgres  | [0m2026-06-07 01:28:47.654 UTC [48] LOG:  database system is shut down
+[36mqumanity_postgres  | [0m done
+[36mqumanity_postgres  | [0mserver stopped
+[36mqumanity_postgres  | [0m
+[36mqumanity_postgres  | [0mPostgreSQL init process complete; ready for start up.
+[36mqumanity_postgres  | [0m
+[36mqumanity_postgres  | [0m2026-06-07 01:28:47.751 UTC [1] LOG:  starting PostgreSQL 15.18 (Debian 15.18-1.pgdg13+1) on aarch64-unknown-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+[36mqumanity_postgres  | [0m2026-06-07 01:28:47.751 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+[36mqumanity_postgres  | [0m2026-06-07 01:28:47.751 UTC [1] LOG:  listening on IPv6 address "::", port 5432
+[36mqumanity_postgres  | [0m2026-06-07 01:28:47.752 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+[36mqumanity_postgres  | [0m2026-06-07 01:28:47.753 UTC [64] LOG:  database system was shut down at 2026-06-07 01:28:47 UTC
+[36mqumanity_postgres  | [0m2026-06-07 01:28:47.755 UTC [1] LOG:  database system is ready to accept connections
+[1m[7m%[27m[1m[0m                                                                                                                        ]7;file://Rohits-Mac-mini.local/Users/macmudgal/Desktop/quantum_box[0m[27m[24m[Jmacmudgal@Rohits-Mac-mini quantum_box % [K[?2004h

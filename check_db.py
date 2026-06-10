@@ -1,89 +1,118 @@
 #!/usr/bin/env python3
-"""
-Quick SQLite sanity check for indiaq.db: list tables and PRAGMA columns.
+"""Database connectivity diagnostic for Qumanity.
 
-Usage (from project root):
-  python3 check_db.py
-  python3 check_db.py /path/to/other.db
+Mirrors the path-resolution logic in app.py (including .env loading and the
+SQLite slash convention) so the path it reports is exactly the one the app will
+use. Read-only: it never creates or modifies the database.
+
+Run:
+    cd /Users/macmudgal/Desktop/quantum_box
+    python3 check_db.py
 """
 
 from __future__ import annotations
 
+import os
 import sqlite3
-import sys
 from pathlib import Path
+from urllib.parse import unquote
 
 BASE_DIR = Path(__file__).resolve().parent
-DEFAULT_DB = BASE_DIR / "indiaq.db"
+
+
+def _load_env() -> None:
+    """Load .env exactly like config.py does (no error if dotenv is missing)."""
+    try:
+        from dotenv import load_dotenv
+    except ImportError:
+        print("   (python-dotenv not installed; reading OS environment only)")
+        return
+    env_path = BASE_DIR / ".env"
+    load_dotenv(dotenv_path=env_path if env_path.is_file() else None)
+
+
+def resolve_sqlite_path(base_dir: Path) -> Path:
+    """Same logic as app._resolve_sqlite_path."""
+    default = base_dir / "indiaq.db"
+    url = (os.environ.get("DATABASE_URL") or "").strip()
+    if not url or url.startswith("postgres"):
+        return default
+    if url.startswith("sqlite:"):
+        raw = unquote(url[len("sqlite://"):])
+        if raw.startswith("//"):
+            candidate = Path(raw[1:])
+        else:
+            candidate = Path(raw.lstrip("/"))
+    else:
+        candidate = Path(url)
+    text = str(candidate).strip()
+    if not text or text == ".":
+        return default
+    if not candidate.is_absolute():
+        candidate = base_dir / candidate
+    return candidate
 
 
 def main() -> None:
-    db_path = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else DEFAULT_DB
-    print(f"Database path: {db_path}")
-    if not db_path.is_file():
-        print("ERROR: file does not exist.")
-        sys.exit(2)
+    print("=== Qumanity — Database Diagnostic ===\n")
 
+    print(f"Current directory: {os.getcwd()}")
+    print(f"Script directory:  {BASE_DIR}")
+
+    print("\n--- Environment ---")
+    _load_env()
+    print(f"DATABASE_URL: {os.environ.get('DATABASE_URL', '(not set)')}")
+
+    db_path = resolve_sqlite_path(BASE_DIR)
+    print(f"\nResolved DB path the app will use: {db_path}")
+    print(f"   Absolute: {db_path.is_absolute()}")
+
+    if db_path.exists():
+        size = db_path.stat().st_size
+        print(f"   [OK] File exists ({size} bytes)")
+        print(f"   Readable: {os.access(db_path, os.R_OK)}")
+        print(f"   Writable: {os.access(db_path, os.W_OK)}")
+    else:
+        print("   [WARN] File does NOT exist at the resolved path.")
+        also = BASE_DIR / "indiaq.db"
+        if also.exists() and also != db_path:
+            print(f"   But a database DOES exist at: {also}")
+            print("   -> Your DATABASE_URL is pointing somewhere else.")
+
+    parent = db_path.parent
+    print(f"\n--- Parent directory: {parent} ---")
+    print(f"   Exists:     {parent.exists()}")
+    print(f"   Readable:   {os.access(parent, os.R_OK)}")
+    print(f"   Writable:   {os.access(parent, os.W_OK)}")
+    print(f"   Executable: {os.access(parent, os.X_OK)}")
+
+    print("\n--- WAL / SHM sidecar files ---")
+    for suffix in ("-wal", "-shm"):
+        sidecar = Path(str(db_path) + suffix)
+        print(f"   {sidecar.name}: {'present' if sidecar.exists() else 'absent'}")
+
+    print("\n--- SQLite connection test (read-only) ---")
     try:
         conn = sqlite3.connect(str(db_path))
-        conn.row_factory = sqlite3.Row
-    except sqlite3.Error as e:
-        print(f"ERROR: could not open database: {e}")
-        sys.exit(3)
-
-    try:
-        tables = conn.execute(
-            """
-            SELECT name, type, sql
-            FROM sqlite_master
-            WHERE type IN ('table', 'view')
-            ORDER BY type, name
-            """
+        cur = conn.cursor()
+        version = cur.execute("SELECT sqlite_version();").fetchone()[0]
+        print(f"   [OK] Connected. SQLite version: {version}")
+        tables = cur.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
         ).fetchall()
-
-        print(f"\nFound {len(tables)} table(s)/view(s).\n")
-        for row in tables:
-            name = row["name"]
-            typ = row["type"]
-            print(f"=== {typ}: {name} ===")
-            if row["sql"]:
-                for line in str(row["sql"]).strip().splitlines():
-                    print(f"  {line}")
-            cols = conn.execute(f'PRAGMA table_info("{name}")').fetchall()
-            if cols:
-                print("  Columns:")
-                for c in cols:
-                    cid, cname, ctype, notnull, dflt, pk = (
-                        c["cid"],
-                        c["name"],
-                        c["type"],
-                        c["notnull"],
-                        c["dflt"],
-                        c["pk"],
-                    )
-                    extra = []
-                    if pk:
-                        extra.append("PK")
-                    if notnull:
-                        extra.append("NOT NULL")
-                    if dflt is not None:
-                        extra.append(f"DEFAULT={dflt!r}")
-                    suf = f" ({', '.join(extra)})" if extra else ""
-                    print(f"    - {cname}: {ctype}{suf}")
-            print()
-
-        # lightweight integrity hint (does not fix DB)
-        quick = conn.execute("PRAGMA quick_check").fetchone()
-        if quick:
-            print("PRAGMA quick_check:", quick[0])
-
-    except sqlite3.Error as e:
-        print(f"ERROR while reading schema: {e}")
-        sys.exit(4)
-    finally:
+        names = [t[0] for t in tables]
+        print(f"   Tables found: {len(names)}")
+        for key in ("users", "state", "district", "tehsil", "village"):
+            print(f"      {key:<10} {'present' if key in names else 'MISSING'}")
         conn.close()
+    except Exception as exc:  # noqa: BLE001 - diagnostic wants the raw message
+        print(f"   [FAIL] {type(exc).__name__}: {exc}")
+        print("   Tip: if DATABASE_URL uses three slashes (sqlite:///indiaq.db)")
+        print("        it is now treated as RELATIVE to the project root.")
+        print("        For an absolute path use four slashes:")
+        print("        sqlite:////Users/macmudgal/Desktop/quantum_box/indiaq.db")
 
-    print("Done.")
+    print("\n=== Diagnostic complete ===")
 
 
 if __name__ == "__main__":

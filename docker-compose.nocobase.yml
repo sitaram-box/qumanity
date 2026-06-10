@@ -1,0 +1,86 @@
+# NocoBase CRM + PostgreSQL (self-contained Docker stack)
+#
+# Usage:
+#   cd /Users/macmudgal/Desktop/quantum_box
+#   export JWT_SECRET=your_super_secret_jwt_key_change_this
+#   docker compose -f docker-compose.nocobase.yml up -d
+#   docker compose -f docker-compose.nocobase.yml logs -f nocobase
+#
+# CRM UI: http://localhost:3000
+# (NocoBase listens on port 80 inside the container; mapped to host 3000.)
+#
+# If port 5432 is already used by Homebrew PostgreSQL, either:
+#   brew services stop postgresql@15
+#   OR set POSTGRES_HOST_PORT=5433 in .env (DB_PORT stays 5432 inside the network)
+#
+# Fresh start (wipes DB volume):
+#   docker compose -f docker-compose.nocobase.yml down -v
+#   docker compose -f docker-compose.nocobase.yml up -d
+#
+# Diagnostic:
+#   bash scripts/diagnose_crm.sh
+
+services:
+  postgres:
+    # Keep postgres:15 while the Docker volume was initialized on PG 15.
+    # Upgrading to 16 requires `docker compose ... down -v` (wipes CRM DB) or a pg_upgrade.
+    image: postgres:15
+    container_name: qumanity_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: qumanity_crm
+    ports:
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - qumanity_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d qumanity_crm"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  nocobase:
+    image: nocobase/nocobase:latest-full
+    container_name: qumanity_nocobase
+    environment:
+      # Node app listens on 13000; bundled nginx proxies :80 → :13000
+      APP_PORT: 13000
+      APP_HOST: 0.0.0.0
+      APP_KEY: ${NOCOBASE_APP_KEY:-qumanity-nocobase-dev-key-change-me}
+      DB_DIALECT: postgres
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: qumanity_crm
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_LOGGING: info
+      INIT_APP_LANG: en-US
+      TZ: Asia/Kolkata
+      JWT_SECRET: ${JWT_SECRET:-your_super_secret_jwt_key_change_this}
+      QUMANITY_API_URL: ${QUMANITY_API_URL:-http://host.docker.internal:5000/api}
+      QUMANITY_WEBHOOK_SECRET: ${QUMANITY_WEBHOOK_SECRET:-your_webhook_secret_here}
+    ports:
+      - "${NOCOBASE_HOST_PORT:-3000}:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - nocobase_data:/app/nocobase/storage
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - qumanity_network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  nocobase_data:
+
+networks:
+  qumanity_network:
+    driver: bridge

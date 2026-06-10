@@ -1,0 +1,43 @@
+---
+description: Qoin economy rules, denomination logic, and weekly settlement.
+globs: 
+alwaysApply: true
+---
+
+# Qoin Economy Rules
+
+## Denominations
+Only these rupee values: [2000, 500, 200, 100, 50, 20, 10, 5, 2, 1]
+
+## Greedy Algorithm
+```python
+def min_qoins_for_amount(amount):
+    qoins = []
+    remaining = amount
+    for denom in [2000, 500, 200, 100, 50, 20, 10, 5, 2, 1]:
+        while remaining >= denom:
+            qoins.append(denom)
+            remaining -= denom
+    return qoins
+Qoin Economy & Weekly Settlement
+File: .cursor/rules/qoin-economy.mdc
+Run this in Terminal:
+```bashcd /Users/macmudgal/Desktop/quantum_box/.cursor/rules
+cat > qoin-economy.mdc << 'EOF'---description: Qoin denominations, karma issuance, weekly settlement, nested wallets.globs: alwaysApply: true---
+# Qoin Economy Rules
+## Fixed DenominationsQoins can only hold ONE of these rupee values:`[2000, 500, 200, 100, 50, 20, 10, 5, 2, 1]`
+**No single Qoin can hold any other value** (e.g., no ₹7 Qoin, no ₹300 Qoin).
+## Greedy Algorithm```pythondef min_qoins_for_amount(amount):    qoins = []    remaining = amount    for denom in [2000, 500, 200, 100, 50, 20, 10, 5, 2, 1]:        while remaining >= denom:            qoins.append(denom)            remaining -= denom    return qoins```
+Weekly Settlement (NOT real‑time)
+· Transactions recorded in pending_transactions during the week.· Sunday 23:59 – process_weekly_settlement() runs:  · Calculate net rupee amount owed to/from each user.  · Convert net amounts into Qoins (using greedy algorithm).  · Transfer Qoins from payer to payee.  · Generate weekly_statements for users with activity.
+Karma Issuance (Minting Qoins)
+Action Rupee ValuePlant a tree (verified) ₹10Teach 1 hour ₹20Serve on Village Council (per day) ₹50Report verified issue ₹5
+Karma transactions are recorded as pending_transactions with transaction_type='karma'.
+Nested Wallets (Village → Nation)
+Every administrative level has its own wallet:
+Level owner_type owner_id exampleVillage village village IDTehsil tehsil tehsil IDDistrict district district IDState state state IDNation nation IND
+Donation Layer
+· Commercial transactions: 100% to seller· Donations: 50% ethical return to donor + 50% split across levels (20% each: village → tehsil → district → state → nation)
+Statements
+· Every user with any transaction or karma earning receives a weekly statement.· Available in Private Account → "Transaction Statement".· Shows: opening balance, each transaction (description, amount in ₹, Qoins used), closing balance.  EOF
+echo " qoin-economy.mdc created"

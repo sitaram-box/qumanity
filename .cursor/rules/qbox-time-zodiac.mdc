@@ -1,0 +1,8 @@
+Solar month calendar, lunar data, festival display, birthday markers.globs: alwaysApply: true---
+# Calendar Rules
+## Solar Months (Aries to Pisces)- Calendar year starts with **Aries** (mid‑April), ends with **Pisces** (mid‑April).- **NOT** January–December.- Title displays **Vikram Samvat 2083** (not Gregorian year).
+## Element Colours| Element | Colour | Months ||---------|--------|--------|| Fire | Light Red (#FF6F61) | Aries, Leo, Sagittarius || Earth | Light Green (#B0E57C) | Taurus, Virgo, Capricorn || Air | Silver (#C0C0C0) | Gemini, Libra, Aquarius || Water | Light Blue (#79E0EE) | Cancer, Scorpio, Pisces |
+## Lunar Data (from `lunar_events_2026` table)- Purnima (Full Moon) – mark on calendar- Amavasya (New Moon) – mark on calendar- Ekadashi dates – mark on calendar
+## Festivals- Major Indian festivals (Holi, Diwali, Navratri, etc.) pre‑populated in `festivals_2026` table.- Display festival name on the date.
+## User Birthdays- Fetch from `users.date_of_birth`.- Display a cake icon on the user’s birthday in their own calendar view.- Birthday not visible to other users.
+## Calendar Button- Located in the time box (right of Gregorian/Indian toggles).- Opens `/calendar` page (modal or new page).- Calendar page shows:  - 4x3 grid of solar months (each month card coloured by element)  - Inside each month: key events, Purnima/Amavasya dates, festivals  - User’s birthday marker (if applicable)

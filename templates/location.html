@@ -2,6 +2,12 @@
 
 {% block title %}{{ location_name }} — Geography stats{% endblock %}
 
+{% block body_class %}qb-akasha-space{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}?v=11" />
+{% endblock %}
+
 {% block body %}
 <div class="qb-location-page-grid">
   <div class="qb-location-page-main">
@@ -56,6 +62,11 @@
         <span class="text-muted">(₹{{ village_wallet_rupees }})</span>
       </p>
       {% endif %}
+      {% if session.get('user_pk') %}
+      <button type="button" class="qb-btn qb-btn-primary btn-sm mt-2" id="qb-location-donate-open">
+        Donate to this Location
+      </button>
+      {% endif %}
     </section>
 
     {% include "_location_breakdowns.html" %}
@@ -104,4 +115,65 @@
     {% endif %}
   </aside>
 </div>
+
+{# Current planetary positions in element boxes (Ākāśa container) #}
+<div
+  class="qb-element-row qb-location-element-row"
+  id="qb-location-element-row"
+  role="group"
+  aria-label="Current planetary positions by element"
+>
+  <button type="button" class="qb-element-btn qb-element-btn--fire" data-element="Fire" disabled>
+    FIRE
+    <div class="planet-symbols qb-planet-symbols" data-element="Fire" aria-hidden="true"></div>
+  </button>
+  <button type="button" class="qb-element-btn qb-element-btn--earth" data-element="Earth" disabled>
+    EARTH
+    <div class="planet-symbols qb-planet-symbols" data-element="Earth" aria-hidden="true"></div>
+  </button>
+  <button type="button" class="qb-element-btn qb-element-btn--air" data-element="Air" disabled>
+    AIR
+    <div class="planet-symbols qb-planet-symbols" data-element="Air" aria-hidden="true"></div>
+  </button>
+  <button type="button" class="qb-element-btn qb-element-btn--water" data-element="Water" disabled>
+    WATER
+    <div class="planet-symbols qb-planet-symbols" data-element="Water" aria-hidden="true"></div>
+  </button>
+</div>
+
+<div class="qb-modal-backdrop" id="qb-location-donate-modal" hidden>
+  <div class="qb-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="qb-location-donate-title">
+    <div class="qb-modal-head">
+      <h2 class="h5 mb-0" id="qb-location-donate-title">💰 Donate to {{ location_name }}</h2>
+      <button type="button" class="qb-modal-close" id="qb-location-donate-close" aria-label="Close">×</button>
+    </div>
+    <label class="form-label small" for="qb-location-donate-amount">Donation Amount (₹1 – ₹200)</label>
+    <input type="number" min="1" max="200" step="1" class="form-control form-control-sm mb-2" id="qb-location-donate-amount" value="10" />
+    <div class="qb-panel p-2 mb-2" id="qb-location-donate-preview" hidden>
+      <h3 class="h6 small text-secondary mb-2">Distribution Preview</h3>
+      <ul class="list-unstyled small mb-0" id="qb-location-donate-preview-list"></ul>
+    </div>
+    <fieldset class="mb-2">
+      <legend class="form-label small mb-1">Payment method</legend>
+      <label class="me-2 small"><input type="radio" name="loc-donate-method" value="card" checked /> Card</label>
+      <label class="me-2 small"><input type="radio" name="loc-donate-method" value="upi" /> UPI</label>
+      <label class="small"><input type="radio" name="loc-donate-method" value="netbanking" /> Net Banking</label>
+    </fieldset>
+    <p class="small text-danger mb-2" id="qb-location-donate-error" hidden></p>
+    <button type="button" class="qb-btn qb-btn-primary btn-sm" id="qb-location-donate-submit">Donate</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script>
+  window.QBLocationDonate = {
+    scope: {{ scope|tojson }},
+    locationId: {{ location_id|tojson }},
+    locationName: {{ location_name|tojson }}
+  };
+</script>
+<script src="{{ url_for('static', filename='location.js') }}?v=2"></script>
+<script src="{{ url_for('static', filename='planetary.js') }}?v=8"></script>
 {% endblock %}

@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+
+{% block title %}Account recovery — Qumanity{% endblock %}
+
+{% block body %}
+<section class="qb-hero mb-4">
+  <h1>Recover account</h1>
+  <p class="qb-lead">
+    Verify your identity using your registered name, date of birth, and birth location.
+    If you cannot remember your birth location, contact your Village Council for manual assistance.
+  </p>
+</section>
+
+<div class="qb-panel p-3" style="max-width: 40rem" id="recovery-app">
+  <div id="recovery-step-purpose">
+    <p class="mb-3 text-secondary">What do you need help with?</p>
+    <div class="d-flex flex-wrap gap-2 mb-2">
+      <button type="button" class="qb-btn qb-btn-outline" data-purpose="recovery_id">
+        I forgot my Private ID
+      </button>
+      <button type="button" class="qb-btn qb-btn-outline" data-purpose="reset_password">
+        I forgot my Password
+      </button>
+    </div>
+  </div>
+
+  <div id="recovery-step-identity" hidden>
+    <p class="small text-muted mb-3" id="recovery-purpose-label"></p>
+    <form id="recovery-identity-form" class="qb-form">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <div class="qb-form-group mb-0">
+            <label for="recovery-first-name">First name</label>
+            <input
+              type="text"
+              class="form-control qb-form-control"
+              id="recovery-first-name"
+              required
+              maxlength="120"
+              autocomplete="given-name"
+            />
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="qb-form-group mb-0">
+            <label for="recovery-last-name">Last name</label>
+            <input
+              type="text"
+              class="form-control qb-form-control"
+              id="recovery-last-name"
+              required
+              maxlength="120"
+              autocomplete="family-name"
+            />
+          </div>
+        </div>
+      </div>
+      <div class="qb-form-group">
+        <label for="recovery-dob">Date of birth</label>
+        <input type="date" class="form-control qb-form-control" id="recovery-dob" required />
+      </div>
+      <button type="submit" class="qb-btn qb-btn-primary">Continue</button>
+      <button type="button" class="qb-btn qb-btn-outline ms-2" id="recovery-back-purpose">Back</button>
+    </form>
+  </div>
+
+  <div id="recovery-step-select-user" hidden>
+    <p class="mb-2">Multiple accounts match your name and date of birth. Select yours:</p>
+    <div id="recovery-candidate-list" class="mb-3"></div>
+    <button type="button" class="qb-btn qb-btn-primary" id="recovery-select-user-continue" disabled>
+      Continue
+    </button>
+    <button type="button" class="qb-btn qb-btn-outline ms-2" id="recovery-back-identity">Back</button>
+  </div>
+
+  <div id="recovery-step-location" hidden>
+    <fieldset class="qb-fieldset">
+      <legend class="h6 text-secondary">Birth location</legend>
+      <p class="small text-muted mb-2">
+        Select the same birth location you entered during registration
+        (State → District → Tehsil → Village).
+      </p>
+      <input type="hidden" id="recovery_location_id" name="birth_location_id" value="" />
+      <div class="row g-2">
+        <div class="col-md-6">
+          <label class="form-label small" for="recovery_state">State</label>
+          <select class="form-select qb-form-control" id="recovery_state" disabled></select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small" for="recovery_district">District</label>
+          <select class="form-select qb-form-control" id="recovery_district" disabled></select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small" for="recovery_tehsil">Tehsil</label>
+          <select class="form-select qb-form-control" id="recovery_tehsil" disabled></select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small" for="recovery_village">Village</label>
+          <select class="form-select qb-form-control" id="recovery_village" disabled></select>
+        </div>
+      </div>
+    </fieldset>
+    <button type="button" class="qb-btn qb-btn-primary mt-3" id="recovery-verify-location">
+      Verify &amp; continue
+    </button>
+    <button type="button" class="qb-btn qb-btn-outline ms-2 mt-3" id="recovery-back-location">
+      Back
+    </button>
+  </div>
+
+  <div id="recovery-step-id-result" hidden>
+    <div class="qb-alert qb-alert-success" role="status">
+      <p class="mb-2" id="recovery-id-message"></p>
+      <div>
+        <span class="text-muted">Private ID:</span>
+        <span class="font-monospace ms-1" id="recovery-result-private-id"></span>
+      </div>
+      <div>
+        <span class="text-muted">Public ID:</span>
+        <span class="font-monospace ms-1" id="recovery-result-public-id"></span>
+      </div>
+    </div>
+    <a class="qb-btn qb-btn-primary mt-3" href="{{ url_for('login') }}">Go to login</a>
+  </div>
+
+  <div id="recovery-step-password" hidden>
+    <div class="qb-form-group">
+      <label for="recovery-new-password">New password</label>
+      <input
+        type="password"
+        class="form-control qb-form-control"
+        id="recovery-new-password"
+        minlength="9"
+        autocomplete="new-password"
+      />
+    </div>
+    <div class="qb-form-group">
+      <label for="recovery-confirm-password">Confirm password</label>
+      <input
+        type="password"
+        class="form-control qb-form-control"
+        id="recovery-confirm-password"
+        minlength="9"
+        autocomplete="new-password"
+      />
+    </div>
+    <button type="button" class="qb-btn qb-btn-primary" id="recovery-reset-submit">
+      Update password
+    </button>
+  </div>
+
+  <div id="recovery-step-password-done" hidden>
+    <div class="qb-alert qb-alert-success" role="status">
+      <p class="mb-2" id="recovery-password-done-message"></p>
+      <div>
+        <span class="text-muted">Private ID:</span>
+        <span class="font-monospace ms-1" id="recovery-done-private-id"></span>
+      </div>
+      <div class="mt-1">
+        <span class="text-muted">Public ID:</span>
+        <span class="font-monospace ms-1" id="recovery-done-public-id"></span>
+      </div>
+    </div>
+    <a class="qb-btn qb-btn-primary mt-3" href="{{ url_for('login') }}">Go to login</a>
+  </div>
+
+  <p class="small text-danger mb-0 mt-3" id="recovery-error" hidden role="alert"></p>
+  <p class="mt-3 mb-0 small"><a href="{{ url_for('login') }}">← Back to login</a></p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='locations.js') }}" defer></script>
+<script src="{{ url_for('static', filename='recovery.js') }}" defer></script>
+{% endblock %}

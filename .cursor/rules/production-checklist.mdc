@@ -1,0 +1,45 @@
+---
+description: Production deployment checklist and requirements for Quantum Box.
+globs:
+alwaysApply: false
+---
+
+# Production Deployment Checklist
+
+See `DEPLOYMENT.md` for full, platform-specific steps.
+
+## Configuration (config.py)
+
+- All settings come from `config.py` (env-driven, loads `.env` via
+  python-dotenv). Do not scatter `os.environ.get` across the codebase.
+- `config.validate()` / `config.log_warnings()` run at startup and warn about
+  insecure production settings.
+
+## Pre-deployment
+
+- [ ] `FLASK_ENV=production`
+- [ ] Strong `SECRET_KEY` set (not the `dev` default)
+- [ ] `QOIN_WALLET_ENCRYPTION_KEY` set
+- [ ] `DATABASE_URL` configured (PostgreSQL recommended over SQLite)
+- [ ] Email service configured (`MAIL_*`) if recovery/notifications are used
+- [ ] `SESSION_COOKIE_SECURE=true` when served over HTTPS
+- [ ] No secrets committed (`.env` is git-ignored; `.env.example` is the template)
+
+## Deployment
+
+- [ ] Push to GitHub
+- [ ] Deploy to Render / Railway / Fly.io
+- [ ] Set environment variables in the cloud dashboard
+- [ ] Mount a persistent volume at `/data` if using SQLite
+- [ ] Run database migrations (`python init_db.py`, seed scripts)
+- [ ] Docker `HEALTHCHECK` on `/` reports healthy
+
+## Post-deployment smoke test
+
+- [ ] `/` returns 200
+- [ ] Registration → auto-login → dashboard
+- [ ] Login / logout
+- [ ] Wallet balance renders; test transaction settles (weekly settlement logic)
+- [ ] Post escalation timer behaves
+- [ ] Language switching localizes UI strings and location names
+- [ ] Logs show no `SECRET_KEY=dev` (or other) config warnings

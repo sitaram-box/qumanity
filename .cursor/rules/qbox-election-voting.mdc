@@ -1,0 +1,9 @@
+Zodiac-based election cycles, nomination, voting eligibility, council formation.globs: alwaysApply: true---
+# Election Rules (Quantum Punch)
+## Zodiac Cycle- Elections are held **monthly**, aligned with the Sun's entry into each zodiac sign.- Month order: Aries → Taurus → Gemini → Cancer → Leo → Virgo → Libra → Scorpio → Sagittarius → Capricorn → Aquarius → Pisces
+## Positions Elected- Each month, **2 council members** are elected: 1 Male Head + 1 Female Head for that zodiac sign.- Annual total: 24 council members (12 Male + 12 Female).
+## Nomination Eligibility- **Age group**: Yuvak (25–49 years)- **Sun sign**: Must match current zodiac cycle- **Gender**: Male or Female- **Village**: Must be resident of the target village
+## Voting Eligibility- Based on **element group**, not specific sign:  - Taurus, Virgo, Capricorn → **Earth** element can vote  - Gemini, Libra, Aquarius → **Air** element can vote  - Cancer, Scorpio, Pisces → **Water** element can vote  - Aries, Leo, Sagittarius → **Fire** element can vote- **Age**: Minimum 13 years (Balak can vote if age ≥ 13)- **All genders** can vote (Male, Female, Other)
+## Admin Nomination Management- Admin sees "Manage Nominations" button in Private Account.- Can **Approve** (candidate added to voting ballot) – sends notification to candidate.- Can **Reject** (requires reason) – sends message + notification to candidate.- Approved nominations appear in voting screen for eligible voters.
+## Voting Window- **Week 2 & 3** of each zodiac month (approximately 23rd to 5th of next month).- Eligible voters see list of candidates (separated by gender).- Each voter can vote once per gender (one vote for male candidate, one for female candidate).
+## Results- After voting closes, winner is candidate with highest votes (tie broken by higher karma index).- Winners announced on Village page.- Council dashboard updated.- Winners receive notification and inbox message.

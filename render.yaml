@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: quantum-box
+    runtime: docker
+    plan: free
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: QOIN_WALLET_ENCRYPTION_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        value: sqlite:////data/indiaq.db
+    disk:
+      name: quantum-data
+      mountPath: /data
+      sizeGB: 1
+
+# Optional: add a Render Postgres database when the app supports PostgreSQL.
+# databases:
+#   - name: quantum-db
+#     plan: free

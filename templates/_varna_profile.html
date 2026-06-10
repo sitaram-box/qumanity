@@ -1,0 +1,120 @@
+{# Dharma Profile — Guna + Karma Varna (equal categories, not birth-based) #}
+<section class="qb-panel mb-3 varna-profile-card" id="qb-varna-profile" aria-labelledby="qb-varna-heading">
+  <div class="varna-header">
+    <div>
+      <h3 class="h6 mb-1" id="qb-varna-heading">Your Dharma Profile</h3>
+      <p class="small text-muted mb-0">Based on verified actions (Karma), not birth or Jaati</p>
+    </div>
+    <span class="varna-last-updated small text-muted" id="qb-varna-updated">
+      {% if varna_profile and varna_profile.last_updated %}
+      Updated: {{ varna_profile.last_updated }}
+      {% else %}
+      Not yet calculated
+      {% endif %}
+    </span>
+  </div>
+
+  <div class="varna-primary mt-3" id="qb-varna-badges">
+    {% set pc = (varna_profile.primary_category or '') if varna_profile else '' %}
+    {% if pc %}
+      {% if pc == 'sarvanga' %}
+      <span class="category-badge sarvanga">SARVANGA</span>
+      {% elif '-' in pc %}
+        {% for part in pc.split('-') %}
+        <span class="category-badge {{ part.strip() }}">{{ part.strip()|upper }}</span>
+        {% endfor %}
+      {% else %}
+      <span class="category-badge {{ pc }}">{{ pc|upper }}</span>
+      {% endif %}
+      {% if varna_profile.secondary_category %}
+      <span class="category-badge secondary {{ varna_profile.secondary_category }}">{{ varna_profile.secondary_category|upper }}</span>
+      {% endif %}
+      <span class="category-type">{{ (varna_profile.category_type or '')|replace('_', ' ') }}</span>
+    {% else %}
+      <span class="category-type">Complete verified actions to reveal your profile</span>
+    {% endif %}
+  </div>
+
+  <div class="varna-scores mt-3" id="qb-varna-scores">
+    {% set scores = varna_profile.scores if varna_profile else {'vidya':0,'raksha':0,'artha':0,'seva':0} %}
+    {% for key, label in [('vidya','Vidya (Wisdom)'), ('raksha','Raksha (Protection)'), ('artha','Artha (Commerce)'), ('seva','Seva (Service)')] %}
+    <div class="score-bar">
+      <div class="score-label {{ key }}">{{ label }}</div>
+      <div class="progress-bar" role="progressbar" aria-valuenow="{{ scores[key]|default(0)|round|int }}" aria-valuemin="0" aria-valuemax="100">
+        <div class="progress {{ key }}" style="width: {{ scores[key]|default(0)|round|int }}%"></div>
+      </div>
+      <div class="score-value">{{ scores[key]|default(0)|round|int }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="varna-insight mt-3">
+    <h4 class="h6 mb-2">Based on Your Actions</h4>
+    <ul class="mb-0" id="qb-varna-breakdown">
+      {% if varna_profile and varna_profile.score_breakdown %}
+        {% for item in varna_profile.score_breakdown %}
+        <li>{{ item.description }}: <strong>{{ item.count }}</strong> ({{ item.points }} points)</li>
+        {% endfor %}
+      {% else %}
+        <li class="text-muted">Teach, serve, trade, or contribute to your community to build your profile.</li>
+      {% endif %}
+    </ul>
+  </div>
+
+  <div class="varna-actions mt-3">
+    <button type="button" class="qb-btn qb-btn-neutral btn-sm" id="qb-varna-history-btn">View History</button>
+    <button type="button" class="qb-btn qb-btn-neutral btn-sm" id="qb-varna-appeal-btn">Appeal Classification</button>
+    <button type="button" class="qb-btn qb-btn-primary btn-sm" id="qb-varna-roles-btn">Eligible Roles</button>
+  </div>
+</section>
+
+{# Appeal modal #}
+<div class="modal fade" id="qb-varna-appeal-modal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content qb-panel">
+      <div class="modal-header border-secondary">
+        <h5 class="modal-title">Appeal Classification</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted">Council reviews appeals based on verified Karma — never birth or Jaati.</p>
+        <label class="form-label" for="qb-varna-appeal-reason">Reason</label>
+        <textarea class="form-control mb-2" id="qb-varna-appeal-reason" rows="3"></textarea>
+        <label class="form-label" for="qb-varna-appeal-evidence">Evidence (optional)</label>
+        <textarea class="form-control" id="qb-varna-appeal-evidence" rows="2"></textarea>
+      </div>
+      <div class="modal-footer border-secondary">
+        <button type="button" class="qb-btn qb-btn-neutral btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="qb-btn qb-btn-primary btn-sm" id="qb-varna-appeal-submit">Submit Appeal</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="qb-varna-history-modal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content qb-panel">
+      <div class="modal-header border-secondary">
+        <h5 class="modal-title">Category History</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <ul class="list-unstyled small mb-0" id="qb-varna-history-list"></ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="qb-varna-roles-modal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content qb-panel">
+      <div class="modal-header border-secondary">
+        <h5 class="modal-title">Eligible Council Roles</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <ul class="mb-0" id="qb-varna-roles-list"></ul>
+      </div>
+    </div>
+  </div>
+</div>

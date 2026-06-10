@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'india_explorer'|tr }} — Qumanity{% endblock %}
+
+{% block body_class %}qb-page-india-explorer{% endblock %}
+
+{% block head_extra %}
+<link
+  rel="stylesheet"
+  href="{{ url_for('static', filename='india_explorer.css') }}?v=1"
+/>
+{% endblock %}
+
+{% block body %}
+<div class="qb-ie-shell" id="qb-ie-shell">
+  <div class="qb-ie-head">
+    <a href="{{ url_for('dashboard') }}" class="qb-btn qb-btn-neutral btn-sm qb-ie-back">
+      &#8592; {{ 'back_to_dashboard'|tr }}
+    </a>
+    <h1 class="qb-ie-title h4 mb-0">{{ 'india_explorer'|tr }}</h1>
+  </div>
+
+  <div class="qb-ie-toolbar">
+    <input
+      type="search"
+      id="qb-ie-search"
+      class="qb-ie-search"
+      placeholder="{{ 'search_location'|tr }}"
+      autocomplete="off"
+      aria-label="{{ 'search_location'|tr }}"
+    />
+  </div>
+
+  <nav class="qb-ie-breadcrumb" id="qb-ie-breadcrumb" aria-label="Breadcrumb">
+    <span class="qb-ie-crumb is-root" data-geo-id="IND">India</span>
+  </nav>
+
+  <div class="qb-ie-tree-wrap">
+    <div class="qb-ie-tree" id="qb-ie-tree" aria-label="India geography tree"></div>
+    <p class="qb-ie-empty small" id="qb-ie-empty" hidden>No locations match your search.</p>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='india_explorer.js') }}?v=1"></script>
+{% endblock %}

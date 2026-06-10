@@ -1,0 +1,7 @@
+Post lifecycle, escalation schedule, score reset, freeze/history logic.globs: alwaysApply: true---
+# Post Escalation Rules
+## Schedule (Days from creation)| Level | Days | Next Level (if score > 0) ||-------|------|---------------------------|| Personal | 1–7 | Village || Village | 8–14 | Tehsil || Tehsil | 15–21 | District || District | 22–28 | State || State | 29–35 | Country || Country | 36–42 | Continent || Continent | 43–49 | Earth || Earth | 50–56 | (final – archive) |
+## Score Rules- When a post escalates to the next level, `total_score` resets to **0**.- The original post (with final score) is saved in the **Freeze tab** of that level.- If `total_score <= 0` at the end of any level:  - The post does NOT escalate.  - The post is moved to the author's **Private Account → "Previous Posts"** (archived).  - It is removed from all public boards.
+## Voting- Users can vote on posts (+1 / 0 / -1) only while post is in **Live** tab.- Each user can vote only once per post.- Authors cannot vote on their own posts.- After voting, buttons are disabled; user sees total score and "You have voted".
+## Freeze Tab- Posts that have successfully escalated (score > 0) are stored in the Freeze tab of that level.- Freeze posts are read‑only – no voting, no progress line.- Display final score, date range when it was live.
+## Progress Line- Show for Live posts only.- Start date = `level_start_time`- End date = `level_start_time + (days_for_this_level)`- Needle moves each day based on current date.

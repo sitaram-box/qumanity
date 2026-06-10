@@ -1,0 +1,14 @@
+{# Language selector — options from context processor (language_options, preferred_language) #}
+<label class="visually-hidden" for="language-dropdown">{{ 'language'|tr }}</label>
+<select
+  id="language-dropdown"
+  class="form-select form-select-sm qb-language-dropdown"
+  aria-label="{{ 'language'|tr }}"
+  data-preferred="{{ preferred_language or 'en' }}"
+>
+  {% for opt in language_options or [{'code': 'en', 'label': 'English'}] %}
+  <option value="{{ opt.code }}" {% if opt.code == (preferred_language or 'en') %}selected{% endif %}>
+    {{ opt.label }}
+  </option>
+  {% endfor %}
+</select>

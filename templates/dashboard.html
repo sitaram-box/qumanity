@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 
-{% block title %}Dashboard — Quantum Box{% endblock %}
+{% block title %}Dashboard — Qumanity{% endblock %}
+
+{% block body_class %}qb-page-dashboard qb-akasha-space{% endblock %}
 
 {% block head_extra %}
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -11,7 +13,7 @@
 />
 <link
   rel="stylesheet"
-  href="{{ url_for('static', filename='dashboard.css') }}"
+  href="{{ url_for('static', filename='dashboard.css') }}?v=16"
 />
 {% endblock %}
 
@@ -20,7 +22,7 @@
   <a
     href="{{ url_for('index') }}"
     class="qb-brand qb-brand-with-logo text-decoration-none"
-    aria-label="Quantum Box home"
+    aria-label="Qumanity home"
   >
     {% include "_brand_logo.html" %}
   </a>
@@ -80,76 +82,79 @@
         <p class="small text-muted mb-0" id="qb-notification-empty">No pending requests.</p>
       </div>
     </div>
-    <form method="post" action="{{ url_for('logout') }}" class="m-0">
-      <button type="submit" class="qb-btn qb-btn-outline">Sign out</button>
-    </form>
+    {% include '_hamburger_menu.html' %}
   </div>
 </div>
 {% endblock %}
 
 {% block body %}
-<div class="qb-dash-shell" id="qb-dash-shell">
+{# ROW 2 — main account navigation (full viewport width, below top bar) #}
+<nav
+  class="main-nav-row qb-dash-nav qb-dash-topnav"
+  id="qb-main-nav-row"
+  aria-label="Primary account navigation"
+>
+  <button type="button" class="main-nav-button qb-dash-nav-btn qb-dash-nav-btn--global" data-dash-tab="global" data-tab="global">{{ 'global_account'|tr|upper }}</button>
+  {% if show_public_account %}
+  <button type="button" class="main-nav-button qb-dash-nav-btn qb-dash-nav-btn--public is-active active" data-dash-tab="public" data-tab="public">{{ 'public_account'|tr|upper }}</button>
+  {% endif %}
+  <button type="button" class="main-nav-button qb-dash-nav-btn qb-dash-nav-btn--personal" data-dash-tab="personal" data-tab="personal">{{ 'personal_account'|tr|upper }}</button>
+  <button type="button" class="main-nav-button qb-dash-nav-btn qb-dash-nav-btn--private{% if not show_public_account %} is-active active{% endif %}" data-dash-tab="private" data-tab="private">{{ 'private_account'|tr|upper }}</button>
+</nav>
+
+<div class="dashboard-wrapper qb-dash-shell" id="qb-dash-shell">
   <script type="application/json" id="qb-dash-config-json">
     {{ dash_client_config | tojson }}
   </script>
+
+  {# ROW 4 — element bar (fixed, just above the marquee). Visual highlight only. #}
+  <div
+    class="qb-element-row"
+    id="qb-element-row"
+    data-user-element="{{ user.element }}"
+    data-user-private-id="{{ user.private_id }}"
+    role="group"
+    aria-label="Element selector with dynamic planetary placements"
+  >
+    <button type="button" class="qb-element-btn qb-element-btn--fire" data-element="Fire">
+      {{ 'fire'|tr|upper }}
+      <div class="planet-symbols qb-planet-symbols" data-element="Fire" aria-hidden="true"></div>
+      <div class="qb-element-popup element-popup" hidden aria-hidden="true"></div>
+    </button>
+    <button type="button" class="qb-element-btn qb-element-btn--earth" data-element="Earth">
+      {{ 'earth'|tr|upper }}
+      <div class="planet-symbols qb-planet-symbols" data-element="Earth" aria-hidden="true"></div>
+      <div class="qb-element-popup element-popup" hidden aria-hidden="true"></div>
+    </button>
+    <button type="button" class="qb-element-btn qb-element-btn--air" data-element="Air">
+      {{ 'air'|tr|upper }}
+      <div class="planet-symbols qb-planet-symbols" data-element="Air" aria-hidden="true"></div>
+      <div class="qb-element-popup element-popup" hidden aria-hidden="true"></div>
+    </button>
+    <button type="button" class="qb-element-btn qb-element-btn--water" data-element="Water">
+      {{ 'water'|tr|upper }}
+      <div class="planet-symbols qb-planet-symbols" data-element="Water" aria-hidden="true"></div>
+      <div class="qb-element-popup element-popup" hidden aria-hidden="true"></div>
+    </button>
+  </div>
+
   <div class="qb-dash-split">
-    <div class="qb-dash-sidebar-rail" id="qb-sidebar-rail" style="width: var(--qb-sidebar-width, 24%)">
-      <aside class="qb-dash-sidebar" aria-label="Account navigation and explorer">
-        <nav class="qb-dash-nav" aria-label="Primary">
-          <button type="button" class="qb-dash-nav-btn" data-dash-tab="private">Private Account</button>
-          <button type="button" class="qb-dash-nav-btn" data-dash-tab="personal">Personal Account</button>
-          <button type="button" class="qb-dash-nav-btn is-active" data-dash-tab="public">Public Account</button>
-          <button type="button" class="qb-dash-nav-btn" data-dash-tab="global">Global Account</button>
-        </nav>
-
-        <div id="qb-explorer-public" class="qb-loc-explorer" hidden>
-          <div class="qb-loc-explorer-head">India</div>
-          <div class="qb-loc-explorer-scroll qb-tree-scroll">
-            <div class="qb-tree qb-tree--india qb-tree-root" id="qb-tree-public-root" aria-label="India geography tree"></div>
-          </div>
-          <p class="qb-explorer-footer small text-muted mb-1 mt-2">
-            Select a place, then open its statistics (does not change your Public timeline).
-          </p>
-          <a class="qb-view-stats-link qb-explorer-stats-link" id="qb-explorer-public-stats-link" href="#" hidden
-            >Open full statistics page (explorer)</a
-          >
-        </div>
-
-        <div id="qb-explorer-global" class="qb-loc-explorer" hidden>
-          <div class="qb-loc-explorer-head">Earth</div>
-          <div class="qb-loc-explorer-scroll qb-tree-scroll">
-            <div class="qb-tree qb-tree--earth qb-tree-root" id="qb-tree-global-root" aria-label="Earth geography tree"></div>
-          </div>
-          <p class="qb-explorer-footer small text-muted mb-1 mt-2">
-            Select a continent or country to drive the Global timeline tabs.
-          </p>
-          <a class="qb-view-stats-link qb-explorer-stats-link" id="qb-explorer-global-stats-link" href="#" hidden
-            >Open full statistics page (explorer)</a
-          >
-        </div>
-      </aside>
-    </div>
-    <div
-      class="qb-dash-resizer"
-      id="qb-dash-resizer"
-      role="separator"
-      aria-orientation="vertical"
-      aria-label="Resize sidebar"
-      tabindex="0"
-    ></div>
-    <div class="qb-dash-content">
+    <div class="qb-dash-content main-content">
       <section
         id="dash-panel-private"
         class="qb-dash-panel"
         data-dash-panel="private"
         aria-labelledby="dash-private-heading"
-        hidden
+        {% if show_public_account %}hidden{% endif %}
       >
         <div class="qb-private-panel-head d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
-          <h2 id="dash-private-heading" class="h5 mb-0">Private Account</h2>
+          <h2 id="dash-private-heading" class="h5 mb-0">{{ 'private_account'|tr }}</h2>
           <div class="d-flex flex-wrap gap-2 align-items-start">
           <button type="button" class="qb-btn qb-btn-outline btn-sm" id="qb-my-post-btn" title="My posts">
             My Post
+          </button>
+          <button type="button" class="qb-btn qb-btn-outline btn-sm" id="qb-my-account-ids-btn" title="All public Account IDs">
+            My Account IDs
           </button>
           <button type="button" class="qb-qoin-wallet-btn" id="qb-qoin-wallet-btn" title="Qoins Wallet">
             <span class="qb-qoin-wallet-symbol" aria-hidden="true">₹</span>
@@ -211,21 +216,112 @@
           <p class="mb-1"><span class="badge bg-warning text-dark">Administrator</span></p>
           {% endif %}
           {% if birth_location_label %}
-          <p class="mb-1"><strong>Birth location:</strong> {{ birth_location_label }}</p>
+          <div class="info-row d-flex flex-wrap align-items-center gap-2 mb-1">
+            <span><strong>Birth location:</strong> {{ birth_location_label }}</span>
+            <span class="locked-badge badge bg-warning text-dark">Locked</span>
+          </div>
           {% else %}
           <p class="mb-1 text-muted small">Birth location not set.</p>
           {% endif %}
           {% if current_location_label %}
-          <p class="mb-1"><strong>Current location:</strong> {{ current_location_label }}</p>
+          <div class="info-row d-flex flex-wrap align-items-center gap-2 mb-1">
+            <span><strong>Current location:</strong> {{ current_location_label }}</span>
+            <span class="locked-badge badge bg-warning text-dark">Locked</span>
+          </div>
           {% else %}
           <p class="mb-1 text-muted small">Current location not set.</p>
           {% endif %}
+          <p class="location-note small text-muted mb-1">Your locations are permanently locked. Contact support if you need to change them.</p>
           <p class="mb-1"><strong>Sun sign:</strong> {{ user.sun_sign }}</p>
           <p class="mb-0"><strong>Element:</strong> {{ user.element }}</p>
+          {% include '_varna_profile.html' %}
+          <div class="profile-section qb-mother-tongue-section mt-3 pt-2 border-top border-secondary">
+            <label class="form-label small mb-1" for="mother-tongue">{{ 'mother_tongue'|tr }}</label>
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+              <select id="mother-tongue" class="form-select form-select-sm" style="max-width: 16rem">
+                <option value="">{{ 'select_language'|tr }}</option>
+                {% for lang in language_choices or [] %}
+                <option
+                  value="{{ lang.code }}"
+                  data-name="{{ lang.name }}"
+                  {% if user.mother_tongue_code == lang.code %}selected{% endif %}
+                >
+                  {{ lang.native_label }} ({{ lang.name }})
+                </option>
+                {% endfor %}
+              </select>
+              <button type="button" class="qb-btn qb-btn-outline btn-sm" id="save-mother-tongue">{{ 'save'|tr }}</button>
+            </div>
+            <p class="small text-muted mb-0 mt-1" id="qb-mother-tongue-flash" role="status" aria-live="polite"></p>
+          </div>
           <p class="mt-2 mb-0 small text-muted">
             To request changes, send a message to Admin using the messaging system below.
           </p>
         </div>
+
+        <section class="qb-panel mb-3 qb-referral-panel" id="qb-referral-panel" aria-labelledby="qb-referral-heading">
+          <h3 class="h6 text-secondary text-uppercase small" id="qb-referral-heading">{{ 'invite_friends'|tr }}</h3>
+          <p class="small text-muted mb-2">{{ 'referral_intro'|tr }}</p>
+          <div class="qb-referral-code-row d-flex flex-wrap align-items-center gap-2 mb-2">
+            <span class="small text-muted">{{ 'your_referral_code'|tr }}:</span>
+            <code class="qb-referral-code font-monospace" id="qb-referral-code-display">{{ referral_stats.referral_code if referral_stats else '—' }}</code>
+            <button type="button" class="qb-btn qb-btn-outline btn-sm" id="qb-referral-copy-code">{{ 'copy'|tr }}</button>
+          </div>
+          <div class="qb-referral-share-btns d-flex flex-wrap gap-2 mb-3">
+            <button type="button" class="qb-btn qb-btn-secondary btn-sm" id="qb-referral-whatsapp">{{ 'whatsapp'|tr }}</button>
+            <button type="button" class="qb-btn qb-btn-outline btn-sm" id="qb-referral-copy-link">{{ 'copy_link'|tr }}</button>
+            <button type="button" class="qb-btn qb-btn-outline btn-sm" id="qb-referral-show-qr">{{ 'qr_code'|tr }}</button>
+          </div>
+          <div class="qb-referral-qr-wrap mb-3" id="qb-referral-qr-wrap" hidden>
+            <img
+              src="{% if referral_qr_base64 %}data:image/png;base64,{{ referral_qr_base64 }}{% endif %}"
+              alt="{{ 'qr_code'|tr }}"
+              class="qb-referral-qr"
+              id="qb-referral-qr-img"
+              width="160"
+              height="160"
+            />
+            <p class="small text-muted mb-0 mt-1 font-monospace" id="qb-referral-link-text">{{ referral_registration_url or '' }}</p>
+          </div>
+          <div class="qb-referral-stats d-flex flex-wrap gap-4 mb-3">
+            <div>
+              <strong id="qb-referral-count">{{ referral_stats.referral_count if referral_stats else 0 }}</strong>
+              <span class="small text-muted ms-1">{{ 'your_referrals'|tr }}</span>
+            </div>
+            <div>
+              <strong id="qb-referral-earnings">{{ referral_stats.referral_earnings if referral_stats else 0 }}</strong>
+              <span class="small text-muted ms-1">{{ 'qoins_earned_referrals'|tr }}</span>
+            </div>
+          </div>
+          <details class="qb-referral-leaderboard-details">
+            <summary class="small fw-semibold">{{ 'top_referrers'|tr }}</summary>
+            <ol class="small mb-0 mt-2 ps-3" id="qb-referral-leaderboard">
+              {% for row in referral_leaderboard or [] %}
+              <li class="mb-1">
+                {{ row.rank }}. {{ row.name }} — {{ row.referral_count }} {{ 'referrals_label'|tr }} — ₹{{ row.referral_earnings }}
+              </li>
+              {% else %}
+              <li class="text-muted">{{ 'no_referrals_yet'|tr }}</li>
+              {% endfor %}
+            </ol>
+          </details>
+        </section>
+
+        <section class="qb-panel mb-3" id="qb-volunteer-panel">
+          {% if volunteer_status and volunteer_status.is_active %}
+          <h3 class="h6 text-secondary text-uppercase small mb-2">Volunteer</h3>
+          <p class="small text-muted mb-2">Your volunteer code: <code class="font-monospace">{{ volunteer_status.volunteer_code }}</code></p>
+          <button type="button" class="qb-btn qb-btn-primary btn-sm mb-2" id="qb-volunteer-dashboard-open">Volunteer Dashboard</button>
+          {% elif volunteer_status and volunteer_status.status == 'pending' %}
+          <h3 class="h6 text-secondary text-uppercase small mb-2">Volunteer Application</h3>
+          <p class="small text-muted mb-0" id="qb-volunteer-apply-status">Your volunteer application is pending review.</p>
+          {% else %}
+          <h3 class="h6 text-secondary text-uppercase small mb-2">Become a Volunteer and Earn Qoins</h3>
+          <p class="small text-muted mb-2">Apply to collect registration donations and earn commissions with a VOL- volunteer code.</p>
+          <button type="button" class="qb-btn qb-btn-outline btn-sm mb-2" id="applyVolunteerBtn">Apply to become Volunteer</button>
+          <p class="small mb-0" id="qb-volunteer-apply-status" role="status" aria-live="polite"></p>
+          {% endif %}
+        </section>
 
         <details class="qb-panel mb-3 qb-private-collapse" id="qb-private-education-details" open>
           <summary class="qb-private-collapse-summary h6 mb-0">Education</summary>
@@ -334,28 +430,13 @@
           </form>
         </details>
 
-        <p class="small text-muted mb-3">Use the ✉ icon (top right) for Inbox, Sent, Drafts, and Compose.</p>
+        <p class="small text-muted mb-3">Use the ✉ icon (top right) for Inbox, Sent, Drafts, and Compose. Qoin balance and weekly statements stay in your wallet button above.</p>
 
-        {% if user.is_admin %}
-        <section class="qb-panel mb-3 qb-private-admin-tools" id="qb-private-admin-tools">
-          <h3 class="h6 text-secondary text-uppercase small mb-2">Administration</h3>
-          <p class="small text-muted mb-2">
-            Review pending family removal requests from users (approve or reject).
-          </p>
-          <button
-            type="button"
-            class="qb-btn qb-btn-outline btn-sm"
-            id="qb-admin-removals-open"
-            title="Review pending family removal requests"
-          >
-            Family member removal request queue
-          </button>
-        </section>
-
+        {% if show_upgrade_panel %}
         <section class="qb-panel mb-3" id="qb-admin-upgrade-users">
           <h3 class="h6 text-secondary text-uppercase small mb-2">Upgrade User Accounts</h3>
           <p class="small text-muted mb-2">
-            Search a Human User by public ID or name, then assign Volunteer, Agent, Manager, Leader, or Mentor.
+            Search a Human User by public ID or name, then assign Volunteer, Agent, or Manager{% if user.is_admin %}, Leader, or Mentor{% endif %}.
           </p>
           <label class="form-label small" for="qb-admin-upgrade-search">User (public ID or name)</label>
           <input
@@ -373,13 +454,86 @@
             <option value="Volunteer">Volunteer</option>
             <option value="Agent">Agent</option>
             <option value="Manager">Manager</option>
-            <option value="Leader">Leader</option>
-            <option value="Mentor">Mentor</option>
+            <option value="Leader"{% if not user.is_admin %} disabled{% endif %}>Leader{% if not user.is_admin %} (Admin only){% endif %}</option>
+            <option value="Mentor"{% if not user.is_admin %} disabled{% endif %}>Mentor{% if not user.is_admin %} (Admin only){% endif %}</option>
           </select>
           <button type="button" class="qb-btn qb-btn-primary btn-sm" id="qb-admin-upgrade-submit" disabled>
             Upgrade
           </button>
           <p class="small text-info mt-2 mb-0" id="qb-admin-upgrade-flash" role="status" aria-live="polite"></p>
+        </section>
+        {% endif %}
+
+        {% if is_mentor %}
+        <section class="qb-panel mb-3" id="qb-mentor-mark-deceased">
+          <h3 class="h6 text-secondary text-uppercase small mb-2">Ākāśa — Mark User Deceased</h3>
+          <p class="small text-muted mb-2">Move a user into Space (Ancestors). Archives posts and freezes wallet.</p>
+          <label class="form-label small" for="qb-deceased-private-id">User private ID</label>
+          <input type="text" class="form-control form-control-sm mb-2 font-monospace" id="qb-deceased-private-id" placeholder="H_U_…" />
+          <label class="form-label small" for="qb-deceased-date">Date of death</label>
+          <input type="date" class="form-control form-control-sm mb-2" id="qb-deceased-date" />
+          <label class="form-label small" for="qb-deceased-heir">Heir private ID (optional)</label>
+          <input type="text" class="form-control form-control-sm mb-2 font-monospace" id="qb-deceased-heir" placeholder="Transfer remaining Qoins" />
+          <label class="form-label small" for="qb-deceased-obituary">Obituary (optional)</label>
+          <textarea class="form-control form-control-sm mb-2" id="qb-deceased-obituary" rows="2"></textarea>
+          <button type="button" class="qb-btn qb-btn-danger btn-sm" id="qb-deceased-submit">Mark as Deceased</button>
+          <p class="small mt-2 mb-0" id="qb-deceased-status" role="status" aria-live="polite"></p>
+        </section>
+        {% endif %}
+
+        {% if user.is_admin %}
+        {% include 'admin_dashboard.html' %}
+        <section class="qb-panel mb-3 qb-private-admin-tools" id="qb-private-admin-tools">
+          <h3 class="h6 text-secondary text-uppercase small mb-2">Administration</h3>
+          <p class="small text-muted mb-2">
+            Review pending family removal requests from users (approve or reject).
+          </p>
+          <button
+            type="button"
+            class="qb-btn qb-btn-outline btn-sm"
+            id="qb-admin-removals-open"
+            title="Review pending family removal requests"
+          >
+            Family member removal request queue
+          </button>
+        </section>
+
+        <section class="qb-panel mb-3" id="qb-admin-employment-requests">
+          <h3 class="h6 text-secondary text-uppercase small mb-2">Volunteer Applications</h3>
+          <p class="small text-muted mb-2">Approve or reject volunteer applications.</p>
+          <button type="button" class="qb-btn qb-btn-outline btn-sm mb-2" id="qb-admin-employment-refresh">Refresh requests</button>
+          <ul class="list-unstyled small mb-0" id="qb-admin-employment-list"></ul>
+        </section>
+
+        <section class="qb-panel mb-3" id="qb-admin-qoin-economy">
+          <h3 class="h6 text-secondary text-uppercase small mb-2">Qoin Economy (Council)</h3>
+          <p class="small text-muted mb-2">Pending transactions settle every Sunday 23:59 IST.</p>
+          <button type="button" class="qb-btn qb-btn-outline btn-sm mb-2" id="qb-admin-settlement-btn">Run off-cycle settlement</button>
+          <p class="small mb-2" id="qb-admin-settlement-flash" role="status"></p>
+          <div class="mb-2">
+            <h4 class="h6 small text-secondary">Karma action types</h4>
+            <ul class="list-unstyled small mb-2" id="qb-admin-karma-types-list"></ul>
+            <div class="row g-2 align-items-end">
+              <div class="col-md-4">
+                <label class="form-label small" for="qb-admin-karma-code">Code</label>
+                <input type="text" class="form-control form-control-sm" id="qb-admin-karma-code" placeholder="plant_tree" />
+              </div>
+              <div class="col-md-4">
+                <label class="form-label small" for="qb-admin-karma-label">Label</label>
+                <input type="text" class="form-control form-control-sm" id="qb-admin-karma-label" />
+              </div>
+              <div class="col-md-2">
+                <label class="form-label small" for="qb-admin-karma-value">₹</label>
+                <input type="number" class="form-control form-control-sm" id="qb-admin-karma-value" min="1" />
+              </div>
+              <div class="col-md-2">
+                <button type="button" class="qb-btn qb-btn-primary btn-sm w-100" id="qb-admin-karma-save">Save</button>
+              </div>
+            </div>
+          </div>
+          <p class="small mb-0" id="qb-admin-pending-summary"></p>
+          <p class="small mb-0 mt-2" id="qb-admin-circulation-summary"></p>
+          <ul class="list-unstyled small mb-0 mt-2" id="qb-admin-nested-wallets"></ul>
         </section>
 
         <section class="qb-panel mb-3" id="qb-admin-donation-reports">
@@ -440,7 +594,11 @@
               <div>
                 <h3 class="h5 mb-1">Personal Collective Board (PCB)</h3>
                 <p class="small text-muted mb-0">
+                  {% if user_situation_type == 'C' %}
+                  Your posts stay here for 7 days. Positive scores escalate through Public Account (State &rarr; Country &rarr; Continent &rarr; Earth); zero or negative scores move to My Post &rarr; Previous Posts.
+                  {% else %}
                   Your posts and your connections&rsquo; posts stay here up to 7 days. Positive scores escalate to Village; zero or negative scores move to My Post &rarr; Previous Posts.
+                  {% endif %}
                 </p>
               </div>
               <div class="qb-personal-board-head-actions">
@@ -707,7 +865,7 @@
               <p class="small text-muted mb-0 mt-2">
                 The tree shows your nuclear family. Use <strong>Add Member in Tree</strong> for parents,
                 spouse, children, siblings, and grandparents. Use <strong>Add Family Member</strong> for
-                extended relatives (they must have a Quantum Box account). View everyone in
+                extended relatives (they must have a Qumanity account). View everyone in
                 <strong>View All Family Members</strong>.
               </p>
             </div>
@@ -734,54 +892,40 @@
         class="qb-dash-panel"
         data-dash-panel="public"
         aria-labelledby="dash-public-heading"
+        {% if not show_public_account %}hidden{% endif %}
       >
-        <h2 id="dash-public-heading" class="visually-hidden">Public account</h2>
+        <h2 id="dash-public-heading" class="visually-hidden">{{ 'public_account'|tr }}</h2>
         {% if default_active_location_id %}
         <section
-          class="qb-public-timeline"
+          class="qb-public-timeline no-gap"
           data-default-location-id="{{ default_active_location_id }}"
           aria-label="Public timeline for your home location"
         >
-          <header class="qb-public-head qb-timeline-head-row">
-            <div class="qb-timeline-head-main">
-              <h3 class="qb-public-title h5 mb-1">Public Timeline</h3>
-              <p class="qb-public-location-id small font-monospace text-secondary mb-1">
-                Location ID: {{ user_current_location_id_display or "—" }}
-              </p>
-              <p class="qb-public-sub small text-muted mb-0">
-                Tabs always reflect <strong>your current living location</strong> from your profile.
-              </p>
-            </div>
-            <p class="qb-timeline-user-identity small mb-0 text-end">
-              <strong>{{ display_name }}</strong>
-              <span class="text-muted"> | ACCOUNT: </span>
-              <span class="font-monospace">{{ user.public_id }}</span>
-            </p>
-          </header>
-
-          <div class="qb-location-tabs qb-js-public-tabs" role="tablist" aria-label="Your location hierarchy">
+          <div class="location-tabs-row qb-location-tabs qb-js-public-tabs" role="tablist" aria-label="Your location hierarchy">
             {% for item in current_hierarchy %}
             <button
               type="button"
-              class="qb-location-tab qb-js-public-tab{% if item.scope == 'village' %} is-active{% endif %}"
+              class="location-tab qb-location-tab qb-js-public-tab{% if item.scope == 'village' %} is-active active{% endif %}"
               data-location-id="{{ item.id }}"
               data-scope="{{ item.scope }}"
+              data-level="{{ item.scope }}"
+              title="{{ item.name }}"
               role="tab"
               aria-selected="{% if item.scope == 'village' %}true{% else %}false{% endif %}"
             >
+              <span class="qb-location-tab-label">{{ item.scope|tr|upper }}</span>
               <span class="qb-location-tab-name">{{ item.name }}</span>
-              <span class="qb-location-tab-scope">{{ item.scope|capitalize }}</span>
             </button>
             {% endfor %}
           </div>
 
-          <div class="qb-public-main-stats-grid">
+          <div class="qb-public-main-stats-grid location-main-content">
             <div class="qb-public-feed-col">
               <div class="qb-panel qb-public-feed-panel qb-collective-board">
                 <div class="qb-board-head">
-                  <h4 class="qb-panel-title mb-1" id="qb-collective-board-title">CVB (Collective Village Board)</h4>
+                  <h4 class="qb-panel-title qb-board-title mb-1" id="qb-collective-board-title">{{ 'collective_village_board'|tr }}</h4>
                   <p class="small text-muted mb-0" id="qb-collective-board-subtitle">
-                    Live and frozen posts for your selected public level.
+                    {{ 'board_subtitle_live'|tr }}
                   </p>
                 </div>
                 <div class="qb-board-tabs" role="tablist" aria-label="Collective Board post state">
@@ -792,7 +936,7 @@
                     role="tab"
                     aria-selected="true"
                   >
-                    Live
+                    {{ 'live'|tr }}
                   </button>
                   <button
                     type="button"
@@ -801,7 +945,7 @@
                     role="tab"
                     aria-selected="false"
                   >
-                    Freeze
+                    {{ 'freeze'|tr }}
                   </button>
                 </div>
                 <p class="small text-muted mb-2">
@@ -810,114 +954,57 @@
                 <ul id="qb-public-feed" class="list-unstyled small mb-0"></ul>
                 <p id="qb-public-feed-empty" class="small text-muted mb-0" hidden>No posts at this level yet.</p>
               </div>
-              <div class="qb-panel qb-election-panel mt-3" id="qb-election-panel" hidden>
-                <h4 class="qb-panel-title mb-1">Quantum Punch Elections</h4>
-                <p class="small text-muted mb-2">
-                  Rohini Sector‑24 village council (zodiac month). Visible on the <strong>Village</strong> tab.
-                </p>
-                <div id="qb-election-status-line" class="qb-election-status-line small mb-2" role="status"></div>
-                <p class="small mb-1" id="qb-election-phase-window" hidden></p>
-                <p class="small text-muted mb-2" id="qb-election-next-phase" hidden></p>
-                <p class="mb-2">
-                  <button type="button" class="qb-btn qb-btn-outline btn-sm" id="qb-election-history-btn" hidden>
-                    Election History
-                  </button>
-                </p>
-                <div id="qb-election-candidate-profiles" class="qb-election-candidate-profiles mb-3" hidden>
-                  <h5 class="h6 mb-2">Approved candidates</h5>
-                  <p class="small text-muted mb-2">Profiles for this zodiac cycle (voting week).</p>
-                  <ul class="list-unstyled small mb-0" id="qb-election-candidate-profiles-list"></ul>
-                </div>
-                {% if election_nomination_eligible %}
-                <div id="qb-election-nomination-block" hidden>
-                  <h5 class="h6 mt-2 mb-2">Stand for election</h5>
-                  <p class="small text-muted mb-2">
-                    Yuvak residents (ages 25–49) whose sun sign matches the active zodiac cycle may nominate once per cycle.
-                  </p>
-                  <form id="qb-election-nominate-form" class="qb-election-form">
-                    <label class="form-label small" for="qb-election-why">Why do you want to stand for election? <span class="text-danger">*</span></label>
-                    <textarea id="qb-election-why" class="form-control form-control-sm mb-2" rows="3" required maxlength="2000"></textarea>
-                    <label class="form-label small" for="qb-election-changes">What changes do you want to bring after becoming a council member? <span class="text-danger">*</span></label>
-                    <textarea id="qb-election-changes" class="form-control form-control-sm mb-2" rows="3" required maxlength="2000"></textarea>
-                    <button type="submit" class="qb-btn qb-btn-primary btn-sm" id="qb-election-nominate-submit">Submit nomination</button>
-                    <span class="small text-muted ms-2" id="qb-election-nominate-msg" aria-live="polite"></span>
-                  </form>
-                </div>
-                {% endif %}
-                <p class="small text-success mb-0" id="qb-election-nomination-done" hidden role="status">
-                  Your nomination has been submitted and is pending admin approval for this zodiac cycle.
-                </p>
-                <div id="qb-election-voting-block" hidden>
-                  <h5 class="h6 mt-2 mb-2">Cast your vote</h5>
-                  <p class="small text-muted mb-2">One vote per gender for this zodiac cycle (age 13+, same element as the active zodiac cycle).</p>
-                  <div class="qb-election-vote-col">
-                    <h6 class="small text-uppercase text-secondary mb-1">Male candidates</h6>
-                    <ul class="list-unstyled qb-election-candidate-list" id="qb-election-male-list"></ul>
-                  </div>
-                  <div class="qb-election-vote-col mt-3">
-                    <h6 class="small text-uppercase text-secondary mb-1">Female candidates</h6>
-                    <ul class="list-unstyled qb-election-candidate-list" id="qb-election-female-list"></ul>
-                  </div>
-                  <button type="button" class="qb-btn qb-btn-primary btn-sm mt-2" id="qb-election-vote-submit" disabled>Submit votes</button>
-                  <span class="small text-muted ms-2" id="qb-election-vote-msg" aria-live="polite"></span>
-                </div>
-                <div id="qb-election-postvote-block" class="small" hidden>
-                  <p class="text-info mb-0" id="qb-election-postvote-text"></p>
-                </div>
-                <div id="qb-election-closed-block" class="small" hidden>
-                  <p class="mb-0" id="qb-election-closed-text"></p>
-                </div>
-                <p class="small text-muted mb-0" id="qb-election-ineligible" hidden></p>
-              </div>
             </div>
             <aside class="qb-public-stats-col" aria-label="Statistics for selected tab">
               <div class="qb-dash-inline-stats qb-panel qb-public-stats-panel">
                 <div class="qb-users-in-scope">
                   <strong id="qb-public-total" class="text-info">—</strong>
-                  <span class="text-uppercase small ms-1">users in scope</span>
+                  <span class="text-uppercase small ms-1">{{ 'human_member'|tr }}</span>
                 </div>
+                <div class="qb-public-action-btns d-flex flex-column gap-2 mb-2 mt-2">
                 {% if user.is_admin %}
-                <p class="mb-2 mt-2">
                   <button
                     type="button"
                     class="qb-btn qb-btn-primary btn-sm"
                     id="qb-admin-village-members-btn"
                     hidden
                   >
-                    All Village Members
+                    {{ 'all_village_members'|tr }}
                   </button>
-                </p>
                 {% endif %}
-                <p class="mb-2 {% if user.is_admin %}mt-0{% else %}mt-2{% endif %}">
+                  <button type="button" class="qb-btn qb-btn-outline btn-sm" id="qb-village-services-btn">
+                    {{ 'village_services'|tr }}
+                  </button>
+                  <button type="button" class="qb-btn qb-btn-outline btn-sm" id="qb-elections-btn">
+                    {{ 'elections'|tr }}
+                  </button>
+                </div>
+                <p class="mb-2 mt-0">
                   <a class="qb-view-stats-link" id="qb-public-village-stats-link" href="{{ user_village_stats_url }}"
-                    >Open full statistics page</a
+                    >{{ 'open_full_statistics_page'|tr }}</a
                   >
-                  <span class="text-muted small"> (your village)</span>
+                  <span class="text-muted small"> {{ 'your_village_suffix'|tr }}</span>
                 </p>
-                <h4 class="h6 mt-3 mb-2 text-secondary text-uppercase small">By gender</h4>
+                {% with panel_id='public', show_appoint_buttons=user.is_admin %}
+                {% include 'leadership_section.html' %}
+                {% endwith %}
+                <h4 class="h6 mt-3 mb-2 text-secondary text-uppercase small">{{ 'by_gender'|tr }}</h4>
                 <div class="qb-mini-table-wrap">
                   <table class="table table-sm table-borderless text-secondary mb-0" id="qb-public-gender-table">
                     <tbody></tbody>
                   </table>
                 </div>
-                <h4 class="h6 mt-3 mb-2 text-secondary text-uppercase small">By zodiac element</h4>
+                <h4 class="h6 mt-3 mb-2 text-secondary text-uppercase small">{{ 'by_zodiac_element'|tr }}</h4>
                 <div class="qb-mini-table-wrap">
                   <table class="table table-sm table-borderless text-secondary mb-0" id="qb-public-element-table">
                     <tbody></tbody>
                   </table>
                 </div>
-                <h4 class="h6 mt-3 mb-2 text-secondary text-uppercase small">By age group</h4>
+                <h4 class="h6 mt-3 mb-2 text-secondary text-uppercase small">{{ 'by_age_group'|tr }}</h4>
                 <div class="qb-mini-table-wrap">
                   <table class="table table-sm table-borderless text-secondary mb-0" id="qb-public-life-table">
                     <tbody></tbody>
                   </table>
-                </div>
-                <div class="qb-panel qb-election-council-card mt-3" id="qb-election-council-card" hidden>
-                  <h4 class="h6 mt-0 mb-2 text-secondary text-uppercase small">Council members (Quantum Punch)</h4>
-                  <p class="small mb-1" id="qb-election-king-line"></p>
-                  <p class="small mb-2" id="qb-election-queen-line"></p>
-                  <p class="small text-muted mb-2" id="qb-election-upcoming-line"></p>
-                  <ul class="list-unstyled small mb-0 qb-election-council-zodiac" id="qb-election-council-zodiac-list"></ul>
                 </div>
               </div>
             </aside>
@@ -937,79 +1024,75 @@
         aria-labelledby="dash-global-heading"
         hidden
       >
-        <header class="qb-global-head qb-timeline-head-row mb-3">
-          <div class="qb-timeline-head-main">
-            <h2 id="dash-global-heading" class="h5 mb-1">Global Account</h2>
-            <p class="qb-global-location-id small font-monospace text-secondary mb-0">
-              Global ID: {{ user_global_id_display }}
-            </p>
-          </div>
-          <p class="qb-timeline-user-identity small mb-0 text-end">
-            <strong>{{ display_name }}</strong>
-            <span class="text-muted"> | ACCOUNT: </span>
-            <span class="font-monospace">{{ user.public_id }}</span>
-          </p>
-        </header>
-        <section class="qb-global-timeline" aria-label="Global statistics">
-          <div class="qb-location-tabs qb-js-global-tabs" role="tablist" aria-label="Global levels">
+        <h2 id="dash-global-heading" class="visually-hidden">{{ 'global_account'|tr }}</h2>
+        <section class="qb-global-timeline no-gap" aria-label="Global statistics">
+          <div class="location-tabs-row qb-location-tabs qb-js-global-tabs" role="tablist" aria-label="Global levels">
             <button
               type="button"
-              class="qb-location-tab qb-js-global-tab is-active"
+              class="location-tab qb-location-tab qb-js-global-tab is-active active"
               data-global-scope="earth"
               data-global-id="0"
+              data-level="earth"
+              data-location-id="0"
               role="tab"
               aria-selected="true"
             >
-              <span class="qb-location-tab-name">Earth</span>
-              <span class="qb-location-tab-scope">Planet</span>
+              <span class="qb-location-tab-label">{{ 'earth'|tr|upper }}</span>
+              <span class="qb-location-tab-name">Planet Earth</span>
             </button>
             <button
               type="button"
-              class="qb-location-tab qb-js-global-tab"
+              class="location-tab qb-location-tab qb-js-global-tab"
               data-global-scope="continent"
               data-global-id="{{ user_continent_id or '' }}"
+              data-level="continent"
+              data-location-id="{{ user_continent_id or '' }}"
               role="tab"
               aria-selected="false"
             >
-              <span class="qb-location-tab-name">{% if user_continent_name %}{{ user_continent_name }}{% elif user_continent_id %}{{ user_continent_id }}{% else %}—{% endif %}</span>
-              <span class="qb-location-tab-scope">Continent</span>
+              <span class="qb-location-tab-label">{{ 'continent'|tr|upper }}</span>
+              <span class="qb-location-tab-name">{{ user_continent_name or '—' }}</span>
             </button>
             <button
               type="button"
-              class="qb-location-tab qb-js-global-tab"
+              class="location-tab qb-location-tab qb-js-global-tab"
               data-global-scope="country"
               data-global-id="{{ user_country_id or '' }}"
+              data-level="country"
+              data-location-id="{{ user_country_id or '' }}"
               role="tab"
               aria-selected="false"
             >
-              <span class="qb-location-tab-name">{% if user_country_name %}{{ user_country_name }}{% elif user_country_id %}{{ user_country_id }}{% else %}—{% endif %}</span>
-              <span class="qb-location-tab-scope">Country</span>
+              <span class="qb-location-tab-label">{{ 'country'|tr|upper }}</span>
+              <span class="qb-location-tab-name">{{ user_country_name or '—' }}</span>
             </button>
             <button
               type="button"
-              class="qb-location-tab qb-js-global-tab qb-global-tab-zone"
+              class="location-tab qb-location-tab qb-js-global-tab qb-global-tab-zone"
               id="qb-global-tab-zone"
               data-global-scope="zone"
               data-global-id="{{ user_zone_id or '' }}"
+              data-level="zone"
+              data-location-id="{{ user_zone_id or '' }}"
               role="tab"
               aria-selected="false"
               {% if not user_show_zone_tab %}hidden{% endif %}
             >
-              <span class="qb-location-tab-name">{% if user_zone_name %}{{ user_zone_name }}{% else %}Zone{% endif %}</span>
-              <span class="qb-location-tab-scope">India</span>
+              <span class="qb-location-tab-label">{{ 'zone'|tr|upper }}</span>
+              <span class="qb-location-tab-name">{{ user_zone_name or '—' }}</span>
             </button>
           </div>
 
-          <div class="qb-public-main-stats-grid qb-global-main-stats-grid">
+          <div class="qb-public-main-stats-grid qb-global-main-stats-grid location-main-content">
             <div class="qb-public-feed-col">
               <div class="qb-panel qb-public-feed-panel qb-collective-board">
                 <div class="qb-board-head">
-                  <h4 class="qb-panel-title mb-1" id="qb-global-board-title">Global Collective Board</h4>
+                  <h4 class="qb-panel-title qb-board-title mb-1" id="qb-global-board-title">{{ 'collective_earth_board'|tr }}</h4>
                   <p class="small text-muted mb-0" id="qb-global-board-subtitle">Live and frozen posts for the selected global level.</p>
                 </div>
                 <div class="qb-board-tabs qb-js-global-board-tabs" role="tablist" aria-label="Global Collective Board post state">
-                  <button type="button" class="qb-board-tab is-active qb-js-global-board-tab" data-board-state="live" role="tab" aria-selected="true">Live</button>
-                  <button type="button" class="qb-board-tab qb-js-global-board-tab" data-board-state="frozen" role="tab" aria-selected="false">Freeze</button>
+                  <button type="button" class="qb-board-tab is-active qb-js-global-board-tab" data-board-state="live" role="tab" aria-selected="true">{{ 'live'|tr }}</button>
+                  <button type="button" class="qb-board-tab qb-js-global-board-tab" data-board-state="frozen" role="tab" aria-selected="false">{{ 'freeze'|tr }}</button>
                 </div>
                 <ul id="qb-global-feed" class="list-unstyled small mb-0"></ul>
                 <p id="qb-global-feed-empty" class="small text-muted mb-0" hidden>No posts at this level yet.</p>
@@ -1019,24 +1102,27 @@
               <div class="qb-dash-inline-stats qb-panel qb-public-stats-panel">
             <div class="qb-users-in-scope">
               <strong id="qb-global-total" class="text-info">—</strong>
-              <span class="text-uppercase small ms-1">users in scope</span>
+              <span class="text-uppercase small ms-1">{{ 'human_member'|tr }}</span>
             </div>
             <p class="mb-2 mt-2">
-              <a class="qb-view-stats-link" id="qb-global-stats-link" href="#">Open full statistics page</a>
+              <a class="qb-view-stats-link" id="qb-global-stats-link" href="#">{{ 'open_full_statistics_page'|tr }}</a>
             </p>
-            <h4 class="h6 mt-3 mb-2 text-secondary text-uppercase small">By gender</h4>
+            {% with panel_id='global', show_appoint_buttons=user.is_admin %}
+            {% include 'leadership_section.html' %}
+            {% endwith %}
+            <h4 class="h6 mt-3 mb-2 text-secondary text-uppercase small">{{ 'by_gender'|tr }}</h4>
             <div class="qb-mini-table-wrap">
               <table class="table table-sm table-borderless text-secondary mb-0" id="qb-global-gender-table">
                 <tbody></tbody>
               </table>
             </div>
-            <h4 class="h6 mt-3 mb-2 text-secondary text-uppercase small">By zodiac element</h4>
+            <h4 class="h6 mt-3 mb-2 text-secondary text-uppercase small">{{ 'by_zodiac_element'|tr }}</h4>
             <div class="qb-mini-table-wrap">
               <table class="table table-sm table-borderless text-secondary mb-0" id="qb-global-element-table">
                 <tbody></tbody>
               </table>
             </div>
-            <h4 class="h6 mt-3 mb-2 text-secondary text-uppercase small">By age group</h4>
+            <h4 class="h6 mt-3 mb-2 text-secondary text-uppercase small">{{ 'by_age_group'|tr }}</h4>
             <div class="qb-mini-table-wrap">
               <table class="table table-sm table-borderless text-secondary mb-0" id="qb-global-life-table">
                 <tbody></tbody>
@@ -1047,6 +1133,147 @@
           </div>
         </section>
       </section>
+    </div>
+  </div>
+</div>
+
+{# Village Services modal (content moved from inline panel) #}
+<div class="qb-modal-backdrop" id="qb-village-services-modal" hidden>
+  <div class="qb-modal-dialog qb-modal-dialog--wide qb-modal-dialog--scroll" role="dialog" aria-modal="true" aria-labelledby="qb-village-services-modal-title">
+    <div class="qb-modal-head">
+      <h2 class="h5 mb-0" id="qb-village-services-modal-title">Village Services</h2>
+      <button type="button" class="qb-modal-close" data-qb-close-modal="qb-village-services-modal" aria-label="Close">×</button>
+    </div>
+    <p class="small text-muted mb-3">
+      Marketplace, jobs, karma, transport, food, education, and business registration for your home village.
+    </p>
+    <div class="qb-panel qb-village-hub-panel mb-0" id="qb-village-hub-panel">
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                  <a href="{{ url_for('marketplace_page') }}" class="qb-btn qb-btn-primary btn-sm" id="qb-village-marketplace-btn">Village Marketplace</a>
+                  <a href="{{ url_for('job_portal_page') }}" class="qb-btn qb-btn-primary btn-sm" id="qb-village-job-portal-btn">Job Portal</a>
+                  <button type="button" class="qb-btn qb-btn-outline btn-sm" id="qb-village-business-btn">Register as Business</button>
+                </div>
+
+                <section class="qb-panel mb-3 p-2" id="qb-village-karma-panel">
+                  <h5 class="h6 text-secondary text-uppercase small mb-2">Karma Tracker</h5>
+                  <p class="small text-muted mb-2">Submit verified ethical actions for Council review. Approved karma converts to Qoins at weekly settlement.</p>
+                  <ul class="list-unstyled small mb-2" id="qb-karma-pending-list"></ul>
+                  <p class="small text-muted mb-2" id="qb-karma-pending-empty" hidden>No pending karma claims.</p>
+                  <form id="qb-village-karma-claim-form" class="row g-2" enctype="multipart/form-data">
+                    <div class="col-md-4">
+                      <label class="form-label small" for="qb-karma-action-select">Action type</label>
+                      <select id="qb-karma-action-select" class="form-select form-select-sm" name="action_code" required></select>
+                    </div>
+                    <div class="col-md-8">
+                      <label class="form-label small" for="qb-karma-description">Description</label>
+                      <input type="text" class="form-control form-control-sm" id="qb-karma-description" name="description" required />
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label small" for="qb-karma-proof">Proof photo</label>
+                      <input type="file" class="form-control form-control-sm" id="qb-karma-proof" name="proof" accept="image/*" />
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label small" for="qb-karma-witness">Witness public ID (optional)</label>
+                      <input type="text" class="form-control form-control-sm font-monospace" id="qb-karma-witness" name="witness_public_id" />
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                      <button type="submit" class="qb-btn qb-btn-outline btn-sm w-100" id="qb-karma-log-btn">Submit karma claim</button>
+                    </div>
+                    <input type="hidden" name="gps_lat" id="qb-karma-gps-lat" />
+                    <input type="hidden" name="gps_lng" id="qb-karma-gps-lng" />
+                  </form>
+                  <div class="d-flex flex-wrap gap-2 mt-2">
+                    <button type="button" class="qb-btn qb-btn-secondary btn-sm" id="qb-share-karma-btn" hidden>
+                      {{ 'share_karma'|tr }}
+                    </button>
+                  </div>
+                  <p class="small mt-2 mb-0" id="qb-karma-flash" role="status"></p>
+                </section>
+
+                <section class="qb-panel mb-0 p-2" id="qb-village-council-approvals" hidden>
+                  <h5 class="h6 text-secondary text-uppercase small mb-2">Pending Approvals (Council)</h5>
+                  <h6 class="small mb-1">Karma claims</h6>
+                  <ul class="list-unstyled small mb-2" id="qb-council-karma-list"></ul>
+                  <h6 class="small mb-1">Business registrations</h6>
+                  <ul class="list-unstyled small mb-0" id="qb-council-business-list"></ul>
+                </section>
+    </div>
+  </div>
+</div>
+
+<div class="qb-modal-backdrop" id="qb-elections-modal" hidden>
+  <div class="qb-modal-dialog qb-modal-dialog--wide qb-modal-dialog--scroll" role="dialog" aria-modal="true" aria-labelledby="qb-elections-modal-title">
+    <div class="qb-modal-head">
+      <h2 class="h5 mb-0" id="qb-elections-modal-title">Elections</h2>
+      <button type="button" class="qb-modal-close" data-qb-close-modal="qb-elections-modal" aria-label="Close">×</button>
+    </div>
+    <div id="qb-election-paused-banner" class="qb-alert qb-alert-success mb-3" role="status">
+      Elections are currently paused. They will resume during the Gemini month. Please check back later.
+    </div>
+    <div class="qb-panel qb-election-panel" id="qb-election-panel" hidden>
+      <p class="small text-muted mb-2">
+        Rohini Sector‑24 village council (zodiac month).
+      </p>
+      <div id="qb-election-status-line" class="qb-election-status-line small mb-2" role="status"></div>
+      <p class="small mb-1" id="qb-election-phase-window" hidden></p>
+      <p class="small text-muted mb-2" id="qb-election-next-phase" hidden></p>
+      <p class="mb-2">
+        <button type="button" class="qb-btn qb-btn-outline btn-sm" id="qb-election-history-btn" hidden>
+          Election History
+        </button>
+      </p>
+      <div id="qb-election-candidate-profiles" class="qb-election-candidate-profiles mb-3" hidden>
+        <h5 class="h6 mb-2">Approved candidates</h5>
+        <p class="small text-muted mb-2">Profiles for this zodiac cycle (voting week).</p>
+        <ul class="list-unstyled small mb-0" id="qb-election-candidate-profiles-list"></ul>
+      </div>
+      {% if election_nomination_eligible %}
+      <div id="qb-election-nomination-block" hidden>
+        <h5 class="h6 mt-2 mb-2">Stand for election</h5>
+        <p class="small text-muted mb-2">
+          Yuvak residents (ages 25–49) whose sun sign matches the active zodiac cycle may nominate once per cycle.
+        </p>
+        <form id="qb-election-nominate-form" class="qb-election-form">
+          <label class="form-label small" for="qb-election-why">Why do you want to stand for election? <span class="text-danger">*</span></label>
+          <textarea id="qb-election-why" class="form-control form-control-sm mb-2" rows="3" required maxlength="2000"></textarea>
+          <label class="form-label small" for="qb-election-changes">What changes do you want to bring after becoming a council member? <span class="text-danger">*</span></label>
+          <textarea id="qb-election-changes" class="form-control form-control-sm mb-2" rows="3" required maxlength="2000"></textarea>
+          <button type="submit" class="qb-btn qb-btn-primary btn-sm" id="qb-election-nominate-submit">Submit nomination</button>
+          <span class="small text-muted ms-2" id="qb-election-nominate-msg" aria-live="polite"></span>
+        </form>
+      </div>
+      {% endif %}
+      <p class="small text-success mb-0" id="qb-election-nomination-done" hidden role="status">
+        Your nomination has been submitted and is pending admin approval for this zodiac cycle.
+      </p>
+      <div id="qb-election-voting-block" hidden>
+        <h5 class="h6 mt-2 mb-2">Cast your vote</h5>
+        <p class="small text-muted mb-2">One vote per gender for this zodiac cycle (age 13+, same element as the active zodiac cycle).</p>
+        <div class="qb-election-vote-col">
+          <h6 class="small text-uppercase text-secondary mb-1">Male candidates</h6>
+          <ul class="list-unstyled qb-election-candidate-list" id="qb-election-male-list"></ul>
+        </div>
+        <div class="qb-election-vote-col mt-3">
+          <h6 class="small text-uppercase text-secondary mb-1">Female candidates</h6>
+          <ul class="list-unstyled qb-election-candidate-list" id="qb-election-female-list"></ul>
+        </div>
+        <button type="button" class="qb-btn qb-btn-primary btn-sm mt-2" id="qb-election-vote-submit" disabled>Submit votes</button>
+        <span class="small text-muted ms-2" id="qb-election-vote-msg" aria-live="polite"></span>
+      </div>
+      <div id="qb-election-postvote-block" class="small" hidden>
+        <p class="text-info mb-0" id="qb-election-postvote-text"></p>
+      </div>
+      <div id="qb-election-closed-block" class="small" hidden>
+        <p class="mb-0" id="qb-election-closed-text"></p>
+      </div>
+      <p class="small text-muted mb-0" id="qb-election-ineligible" hidden></p>
+    </div>
+    <div class="qb-panel qb-election-council-card mt-3" id="qb-election-council-card" hidden>
+      <h4 class="h6 mt-0 mb-2 text-secondary text-uppercase small">Elected leaders (Quantum Punch)</h4>
+      <p class="small mb-1" id="qb-election-king-line"></p>
+      <p class="small mb-2" id="qb-election-queen-line"></p>
+      <p class="small text-muted mb-2" id="qb-election-upcoming-line"></p>
+      <ul class="list-unstyled small mb-0 qb-election-council-zodiac" id="qb-election-council-zodiac-list"></ul>
     </div>
   </div>
 </div>
@@ -1170,16 +1397,53 @@
   </div>
 </div>
 
+<div class="qb-modal-backdrop" id="qb-business-register-modal" hidden>
+  <div class="qb-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="qb-business-register-title">
+    <div class="qb-modal-head">
+      <h2 class="h5 mb-0" id="qb-business-register-title">Register as Business</h2>
+      <button type="button" class="qb-modal-close" data-qb-close-modal="qb-business-register-modal" aria-label="Close">×</button>
+    </div>
+    <form id="qb-business-register-form">
+      <label class="form-label small" for="qb-biz-name">Business name</label>
+      <input type="text" class="form-control form-control-sm mb-2" id="qb-biz-name" required />
+      <label class="form-label small" for="qb-biz-type">Business type</label>
+      <select class="form-select form-select-sm mb-2" id="qb-biz-type" required>
+        <option value="">Choose…</option>
+        <option>Shop</option>
+        <option>Service Provider</option>
+        <option>Farm</option>
+        <option>Food Vendor</option>
+        <option>Delivery Service</option>
+        <option>Other</option>
+      </select>
+      <label class="form-label small" for="qb-biz-address">Address</label>
+      <input type="text" class="form-control form-control-sm mb-2" id="qb-biz-address" />
+      <label class="form-label small" for="qb-biz-gst">GST (optional)</label>
+      <input type="text" class="form-control form-control-sm mb-2" id="qb-biz-gst" />
+      <label class="form-label small" for="qb-biz-pan">PAN (optional)</label>
+      <input type="text" class="form-control form-control-sm mb-2" id="qb-biz-pan" />
+      <div class="form-check mb-2">
+        <input class="form-check-input" type="checkbox" id="qb-biz-terms" required />
+        <label class="form-check-label small" for="qb-biz-terms">I accept the terms &amp; conditions</label>
+      </div>
+      <button type="submit" class="qb-btn qb-btn-primary btn-sm">Submit for approval</button>
+      <p class="small mt-2 mb-0" id="qb-business-register-flash" role="status"></p>
+    </form>
+  </div>
+</div>
+
 <div class="qb-modal-backdrop" id="qb-qoin-wallet-modal" hidden>
   <div class="qb-modal-dialog qb-modal-dialog--wide" role="dialog" aria-modal="true" aria-labelledby="qb-qoin-wallet-title">
     <div class="qb-modal-head">
       <h2 class="h5 mb-0" id="qb-qoin-wallet-title">Qoins Wallet</h2>
       <button type="button" class="qb-modal-close" data-qb-close-modal="qb-qoin-wallet-modal" aria-label="Close">×</button>
     </div>
-    <div class="mb-3">
+    <div class="mb-3 qb-wallet-summary">
       <p class="mb-1"><strong>Balance:</strong> <span id="qb-wallet-balance-qoins" class="text-info">—</span> Qoins</p>
-      <p class="mb-0"><strong>Total value:</strong> ₹<span id="qb-wallet-balance-rupees">—</span></p>
-      <ul class="list-unstyled small mt-2 mb-0" id="qb-wallet-coin-breakdown"></ul>
+      <p class="mb-1"><strong>Total value:</strong> ₹<span id="qb-wallet-balance-rupees">—</span></p>
+      <p class="small text-muted mb-1">Settled weekly (Sunday 23:59 IST). Pending activity clears at settlement.</p>
+      <div class="qb-qoin-chips" id="qb-wallet-coin-chips" aria-label="Qoin denominations"></div>
+      <p class="small mb-0 mt-2" id="qb-wallet-pending-line" hidden></p>
     </div>
     <div class="d-flex flex-wrap gap-2 mb-3">
       <button type="button" class="qb-btn qb-btn-outline btn-sm" id="qb-wallet-txn-btn">Transaction Statement</button>
@@ -1260,12 +1524,23 @@
 <div class="qb-modal-backdrop" id="qb-wallet-txn-modal" hidden>
   <div class="qb-modal-dialog qb-modal-dialog--wide qb-modal-dialog--scroll" role="dialog" aria-modal="true" aria-labelledby="qb-wallet-txn-title">
     <div class="qb-modal-head">
-      <h2 class="h5 mb-0" id="qb-wallet-txn-title">Transaction Statement</h2>
+      <h2 class="h5 mb-0" id="qb-wallet-txn-title">Weekly Transaction Statements</h2>
       <button type="button" class="qb-modal-close" data-qb-close-modal="qb-wallet-txn-modal" aria-label="Close">×</button>
     </div>
     <p class="small text-info mb-2" id="qb-wallet-txn-flash" role="status"></p>
-    <ul class="list-unstyled small mb-0" id="qb-wallet-txn-list"></ul>
-    <p class="small text-muted mb-0" id="qb-wallet-txn-empty" hidden>No transactions yet.</p>
+    <div class="row g-3">
+      <div class="col-md-4">
+        <h3 class="h6 text-secondary small text-uppercase">Weeks</h3>
+        <ul class="list-unstyled small mb-0 qb-stmt-week-list" id="qb-wallet-stmt-weeks"></ul>
+        <p class="small text-muted mb-0" id="qb-wallet-stmt-weeks-empty" hidden>No statements yet.</p>
+      </div>
+      <div class="col-md-8">
+        <div id="qb-wallet-stmt-detail" class="qb-stmt-detail-panel small" hidden>
+          <iframe id="qb-wallet-stmt-iframe" class="qb-stmt-iframe" title="Weekly statement report"></iframe>
+        </div>
+        <p class="small text-muted mb-0" id="qb-wallet-stmt-pick-hint">Select a week to view the full statement.</p>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1373,7 +1648,7 @@
         type="hidden"
         class="qb-js-post-location-id"
         name="location_id"
-        value="{{ default_active_location_id }}"
+        value="{{ post_form_location_id or default_active_location_id }}"
       />
       <label class="form-label small" for="qb-new-post-content">Post content</label>
       <textarea
@@ -1575,7 +1850,7 @@
     </div>
     <form id="qb-family-add-general-form">
       <p class="small text-muted mb-2">
-        Extended relatives must be registered on Quantum Box. A connection request is sent; after they accept,
+        Extended relatives must be registered on Qumanity. A connection request is sent; after they accept,
         the person appears under <strong>View All Family Members</strong> (not in the tree).
       </p>
       <label class="form-label small" for="qb-fam-gen-type">Family member type <span class="text-danger">*</span></label>
@@ -1863,7 +2138,7 @@
     <p class="small text-muted mb-2">
       Ask
       <strong id="qb-family-link-target-name">this family member</strong>
-      to link their Quantum Box account to this tree position. They receive a bell notification and inbox message and
+      to link their Qumanity account to this tree position. They receive a bell notification and inbox message and
       must accept before the link is active.
     </p>
     <label class="form-label small" for="qb-family-link-public-id">Account ID (Public ID)</label>
@@ -2035,10 +2310,126 @@
   </div>
 </div>
 
+<!-- My Account IDs -->
+<div class="qb-modal-backdrop" id="qb-account-ids-modal" hidden>
+  <div class="qb-modal-dialog qb-modal-dialog--wide" role="dialog" aria-modal="true" aria-labelledby="qb-account-ids-title">
+    <div class="qb-modal-head">
+      <h2 class="h5 mb-0" id="qb-account-ids-title">My Account IDs</h2>
+      <button type="button" class="qb-modal-close" data-qb-close-modal="qb-account-ids-modal" aria-label="Close">×</button>
+    </div>
+    <p class="small text-muted mb-2">
+      One Private ID (User ID) — multiple Public IDs (Account IDs) for different locations.
+      Voting uses your primary present-location account only.
+    </p>
+    <ul id="qb-account-ids-list" class="list-unstyled small mb-0"></ul>
+    <p id="qb-account-ids-empty" class="small text-muted mb-0" hidden>No account IDs found.</p>
+    <div class="qb-modal-actions">
+      <button type="button" class="qb-btn qb-btn-outline" data-qb-close-modal="qb-account-ids-modal">Close</button>
+    </div>
+  </div>
+</div>
+
+{# Volunteer application modal #}
+<div class="qb-modal-backdrop" id="qb-volunteer-apply-modal" hidden>
+  <div class="qb-modal-dialog qb-modal-dialog--wide" role="dialog" aria-modal="true" aria-labelledby="qb-volunteer-apply-title">
+    <div class="qb-modal-head">
+      <h2 class="h5 mb-0" id="qb-volunteer-apply-title">📝 Apply to Become a Volunteer</h2>
+      <button type="button" class="qb-modal-close" data-qb-close-modal="qb-volunteer-apply-modal" aria-label="Close">×</button>
+    </div>
+    <form id="qb-volunteer-apply-form">
+      <fieldset class="mb-3">
+        <legend class="form-label small mb-2">Bank Details</legend>
+        <label class="form-label small" for="qb-volunteer-bank-name">Bank Name</label>
+        <input type="text" id="qb-volunteer-bank-name" class="form-control form-control-sm mb-2" required />
+        <label class="form-label small" for="qb-volunteer-account-number">Account Number</label>
+        <input type="text" id="qb-volunteer-account-number" class="form-control form-control-sm mb-2" required />
+        <label class="form-label small" for="qb-volunteer-branch">Branch</label>
+        <input type="text" id="qb-volunteer-branch" class="form-control form-control-sm mb-2" required />
+        <label class="form-label small" for="qb-volunteer-ifsc">IFSC Code</label>
+        <input type="text" id="qb-volunteer-ifsc" class="form-control form-control-sm mb-2 font-monospace" required />
+      </fieldset>
+      <label class="form-label small" for="qb-volunteer-reason">Why do you want to become a volunteer?</label>
+      <textarea id="qb-volunteer-reason" class="form-control form-control-sm mb-3" rows="4" required></textarea>
+      <div class="qb-modal-actions d-flex gap-2">
+        <button type="submit" class="qb-btn qb-btn-primary btn-sm">Submit Application</button>
+        <button type="button" class="qb-btn qb-btn-neutral btn-sm" data-qb-close-modal="qb-volunteer-apply-modal">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# Volunteer dashboard modal #}
+<div class="qb-modal-backdrop" id="qb-volunteer-dashboard-modal" hidden>
+  <div class="qb-modal-dialog qb-modal-dialog--wide" role="dialog" aria-modal="true" aria-labelledby="qb-volunteer-dashboard-title">
+    <div class="qb-modal-head">
+      <h2 class="h5 mb-0" id="qb-volunteer-dashboard-title">👤 Volunteer Dashboard</h2>
+      <button type="button" class="qb-modal-close" data-qb-close-modal="qb-volunteer-dashboard-modal" aria-label="Close">×</button>
+    </div>
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+      <span class="small text-muted">Your Volunteer Code:</span>
+      <code class="font-monospace" id="qb-volunteer-dash-code">—</code>
+      <button type="button" class="qb-btn qb-btn-outline btn-sm" id="qb-volunteer-dash-copy">📋 Copy</button>
+    </div>
+    <div class="qb-panel p-2 mb-3">
+      <h3 class="h6 small text-secondary mb-2">📊 Performance Summary</h3>
+      <div class="table-responsive">
+        <table class="table table-sm table-dark mb-0 small">
+          <thead>
+            <tr><th></th><th>This Week</th><th>This Month</th><th>This Year</th><th>Total</th></tr>
+          </thead>
+          <tbody id="qb-volunteer-perf-body">
+            <tr><td>Signups</td><td colspan="4" class="text-muted">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="qb-panel p-2 mb-3">
+      <h3 class="h6 small text-secondary mb-2">📋 New Users Added (Last 12 Months)</h3>
+      <div class="table-responsive">
+        <table class="table table-sm table-dark mb-0 small">
+          <thead>
+            <tr><th>User Name</th><th>Signup Date</th><th>Status</th><th>Qoins Earned</th></tr>
+          </thead>
+          <tbody id="qb-volunteer-signups-body">
+            <tr><td colspan="4" class="text-muted">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="qb-modal-actions d-flex gap-2">
+      <button type="button" class="qb-btn qb-btn-outline btn-sm" id="qb-volunteer-export">Export Report</button>
+      <button type="button" class="qb-btn qb-btn-neutral btn-sm" data-qb-close-modal="qb-volunteer-dashboard-modal">Close</button>
+    </div>
+  </div>
+</div>
+
+{# Legacy employment modal alias — kept for compatibility #}
+<div class="qb-modal-backdrop" id="qb-employment-apply-modal" hidden aria-hidden="true"></div>
+
+{# Share Karma modal #}
+<div class="qb-modal-backdrop" id="qb-share-karma-modal" hidden>
+  <div class="qb-modal-dialog qb-modal-dialog--wide" role="dialog" aria-modal="true" aria-labelledby="qb-share-karma-title">
+    <div class="qb-modal-head">
+      <h2 class="h5 mb-0" id="qb-share-karma-title">{{ 'share_your_karma'|tr }}</h2>
+      <button type="button" class="qb-modal-close" data-qb-close-modal="qb-share-karma-modal" aria-label="Close">×</button>
+    </div>
+    <p class="small mb-3" id="qb-share-karma-text"></p>
+    <div class="qb-referral-share-btns d-flex flex-wrap gap-2">
+      <button type="button" class="qb-btn qb-btn-secondary btn-sm" id="qb-share-karma-whatsapp">{{ 'whatsapp'|tr }}</button>
+      <button type="button" class="qb-btn qb-btn-outline btn-sm" id="qb-share-karma-copy">{{ 'copy_text'|tr }}</button>
+      <button type="button" class="qb-btn qb-btn-outline btn-sm" id="qb-share-karma-qr">{{ 'share_qr'|tr }}</button>
+    </div>
+    <div class="qb-referral-qr-wrap mt-3" id="qb-share-karma-qr-wrap" hidden>
+      <img src="" alt="{{ 'qr_code'|tr }}" class="qb-referral-qr" id="qb-share-karma-qr-img" width="160" height="160" />
+    </div>
+  </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
 <script src="{{ url_for('static', filename='family_tree.js') }}"></script>
-<script src="{{ url_for('static', filename='dashboard.js') }}"></script>
+<script src="{{ url_for('static', filename='planetary.js') }}?v=8"></script>
+<script src="{{ url_for('static', filename='dashboard.js') }}?v=14"></script>
 {% endblock %}

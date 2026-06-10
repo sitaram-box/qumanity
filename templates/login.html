@@ -1,45 +1,66 @@
 {% extends "base.html" %}
 
-{% block title %}Log in — Quantum Box{% endblock %}
+{% block title %}{{ 'login'|tr }} — Qumanity{% endblock %}
 
 {% block body %}
-<section class="qb-hero mb-4">
-  <h1>Log in</h1>
-  <p class="qb-lead">Use your <strong>Private ID</strong> and password.</p>
-</section>
+<div class="login-container">
+  <div class="login-card">
+    <div class="login-header">
+      <img
+        src="{{ url_for('static', filename='images/logo-qumanity.png') }}"
+        alt="Qumanity"
+        class="login-logo"
+        width="80"
+        height="80"
+      />
+      <h1>Welcome Back</h1>
+      <p>Login to continue your conscious journey</p>
+    </div>
 
-{% if error %}
-<div class="qb-alert qb-alert-error" role="alert">{{ error }}</div>
-{% endif %}
+    {% if error %}
+    <div class="qb-alert qb-alert-error" role="alert">{{ error }}</div>
+    {% endif %}
 
-<form method="post" action="{{ url_for('login') }}" class="qb-form">
-  <div class="qb-form-group">
-    <label for="private_id">Private ID</label>
-    <input
-      type="text"
-      class="form-control qb-form-control font-monospace"
-      id="private_id"
-      name="private_id"
-      required
-      placeholder="Private ID (e.g. U-7XK9M2L or H_U_ADMIN)"
-      value="{{ request.form.get('private_id', '') }}"
-      autocomplete="username"
-    />
+    <form method="post" action="{{ url_for('login') }}" class="login-form" id="login-form">
+      <div class="qb-form-group">
+        <label for="private_id">{{ 'private_id_label'|tr }}</label>
+        <input
+          type="text"
+          class="form-control qb-form-control font-monospace"
+          id="private_id"
+          name="private_id"
+          required
+          placeholder="Enter your 9-digit Private ID or H_U_ADMIN"
+          value="{{ request.form.get('private_id', '') }}"
+          autocomplete="username"
+        />
+        <small class="login-hint">Enter the 9-digit Private ID you received during registration, or <strong>H_U_ADMIN</strong> for the admin account</small>
+      </div>
+
+      <div class="qb-form-group">
+        <label for="password">{{ 'password_label'|tr }}</label>
+        <input
+          type="password"
+          class="form-control qb-form-control"
+          id="password"
+          name="password"
+          required
+          placeholder="Enter your password"
+          autocomplete="current-password"
+        />
+        <div class="password-options">
+          <a href="{{ url_for('recovery_page') }}" class="forgot-link">Forgot Password?</a>
+          <a href="{{ url_for('recovery_page') }}" class="recover-link">Forgot Private ID?</a>
+        </div>
+      </div>
+
+      <button type="submit" class="btn-login">Login to Qumanity</button>
+    </form>
+
+    <div class="login-footer">
+      <p>{{ 'new_here'|tr }} <a href="{{ url_for('register') }}">{{ 'create_account'|tr }}</a></p>
+      <p class="demo-note small text-muted mb-0">Having trouble? Contact your Village Council for assistance.</p>
+    </div>
   </div>
-  <div class="qb-form-group">
-    <label for="password">Password</label>
-    <input
-      type="password"
-      class="form-control qb-form-control"
-      id="password"
-      name="password"
-      required
-      autocomplete="current-password"
-    />
-  </div>
-  <button type="submit" class="qb-btn qb-btn-primary">Sign in</button>
-  <p class="mt-3 text-muted small">
-    New here? <a href="{{ url_for('register') }}">Create an account</a>
-  </p>
-</form>
+</div>
 {% endblock %}

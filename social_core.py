@@ -18,6 +18,14 @@ POST_LEVEL_ORDER = (
     "earth",
 )
 
+GLOBAL_POST_LEVEL_ORDER = (
+    "personal",
+    "state",
+    "country",
+    "continent",
+    "earth",
+)
+
 LEVEL_DAYS = 7
 LEVEL_DAYS_BY_LEVEL = {
     "personal": 7,
@@ -25,6 +33,14 @@ LEVEL_DAYS_BY_LEVEL = {
     "tehsil": 7,
     "district": 7,
     "state": 7,
+    "country": 7,
+    "continent": 7,
+    "earth": 7,
+}
+
+GLOBAL_LEVEL_DAYS_BY_LEVEL = {
+    "personal": 7,
+    "state": 14,
     "country": 7,
     "continent": 7,
     "earth": 7,
@@ -211,6 +227,25 @@ def recompute_post_score(conn: sqlite3.Connection, post_id: int) -> None:
     )
 
 
+def origins_for_global_user(
+    country_id: str | None,
+    continent_id: str | None,
+    *,
+    state_id: str | None = None,
+) -> dict[str, str | None]:
+    cc = (country_id or "").strip().upper() or None
+    co = (continent_id or "").strip().upper() or None
+    st = (state_id or "").strip() or None
+    return {
+        "village": None,
+        "tehsil": None,
+        "district": None,
+        "state": st,
+        "country": cc,
+        "continent": co,
+    }
+
+
 def origins_from_hierarchy(
     hierarchy: list[dict[str, str]],
     country_id: str | None = None,
@@ -233,11 +268,49 @@ def origins_from_hierarchy(
     return m
 
 
-def _level_idx(level: str) -> int:
+def _level_idx(level: str, order: tuple[str, ...] | None = None) -> int:
+    seq = order or POST_LEVEL_ORDER
     try:
-        return POST_LEVEL_ORDER.index(level)
+        return seq.index(level)
     except ValueError:
         return 0
+
+
+def is_global_escalation_post(post: sqlite3.Row | dict) -> bool:
+    """Posts without an Indian village/state chain use the global escalation path."""
+    if isinstance(post, sqlite3.Row):
+        keys = post.keys()
+        get = lambda k: str(post[k] or "").strip() if k in keys else ""
+    else:
+        get = lambda k: str(post.get(k) or "").strip()
+    if get("origin_village_id") or get("origin_tehsil_id") or get("origin_district_id"):
+        return False
+    indian_state = get("origin_state_id")
+    if indian_state and (indian_state.startswith("0.") or "IND" in indian_state):
+        return False
+    if get("origin_country_id"):
+        return True
+    if indian_state and "." in indian_state:
+        return True
+    return False
+
+
+def post_level_order(post: sqlite3.Row | dict) -> tuple[str, ...]:
+    return GLOBAL_POST_LEVEL_ORDER if is_global_escalation_post(post) else POST_LEVEL_ORDER
+
+
+def level_days_for_post(post: sqlite3.Row | dict, level: str) -> int:
+    if is_global_escalation_post(post):
+        return GLOBAL_LEVEL_DAYS_BY_LEVEL.get(level, LEVEL_DAYS)
+    return LEVEL_DAYS_BY_LEVEL.get(level, LEVEL_DAYS)
+
+
+def next_post_level(post: sqlite3.Row | dict, level: str) -> str | None:
+    order = post_level_order(post)
+    idx = _level_idx(level, order)
+    if idx >= len(order) - 1:
+        return None
+    return order[idx + 1]
 
 
 def _parse_sqlite_datetime(value: object) -> datetime | None:
@@ -339,10 +412,11 @@ def _freeze_and_ascend(
     score = int(post["total_score"] or 0)
     author = str(post["user_private_id"])
     prev = (post["previous_levels"] or "").strip()
-    idx = _level_idx(level)
-    if idx >= len(POST_LEVEL_ORDER) - 1:
+    order = post_level_order(post)
+    idx = _level_idx(level, order)
+    if idx >= len(order) - 1:
         return False
-    new_level = POST_LEVEL_ORDER[idx + 1]
+    new_level = order[idx + 1]
     new_prev = prev + ("," if prev else "") + level
     ts = now.isoformat(timespec="seconds")
     frozen_level = _frozen_level_name(level)
@@ -471,12 +545,13 @@ def escalate_posts(conn: sqlite3.Connection, now: datetime | None = None) -> Non
             score = int(post["total_score"] or 0)
             level = str(post["current_level"] or "personal").strip().lower()
             started_at = _parse_sqlite_datetime(post["level_start_time"])
-            level_days = LEVEL_DAYS_BY_LEVEL.get(level, LEVEL_DAYS)
+            level_days = level_days_for_post(post, level)
             if started_at is None or now < started_at + timedelta(days=level_days):
                 continue
 
-            idx = _level_idx(level)
-            if idx >= len(POST_LEVEL_ORDER) - 1:
+            order = post_level_order(post)
+            idx = _level_idx(level, order)
+            if idx >= len(order) - 1:
                 if score <= 0:
                     _archive_live_post(conn, post, "earth", now)
                 else:

@@ -1,0 +1,227 @@
+/* Registration page — donation dropdown & preview */
+
+.qb-donation-select-group {
+  margin: 1rem 0;
+  padding: 1rem;
+  background: var(--qb-surface);
+  border: 1px solid var(--qb-border);
+  border-radius: 12px;
+}
+
+.qb-donation-select-group label {
+  color: var(--qb-muted);
+  font-weight: 500;
+}
+
+.qb-donation-dropdown {
+  width: 100%;
+  padding: 0.65rem 0.85rem;
+  font-size: 1rem;
+  background: var(--qb-bg);
+  color: var(--qb-text);
+  border: 1px solid var(--qb-border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.qb-donation-dropdown:focus {
+  border-color: var(--qb-primary);
+  box-shadow: 0 0 0 2px var(--qb-primary-dim);
+  outline: none;
+}
+
+.payment-option {
+  padding: 0.65rem 0.75rem;
+  background: var(--qb-bg);
+  border: 1px solid var(--qb-border);
+  border-radius: 8px;
+}
+
+.payment-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  color: var(--qb-text);
+}
+
+.qr-code-box {
+  padding: 1rem;
+  text-align: center;
+  background: var(--qb-surface);
+  border: 1px dashed var(--qb-border);
+  border-radius: 8px;
+}
+
+.qr-image-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 9rem;
+  margin: 0 auto;
+  max-width: 14rem;
+  color: var(--qb-muted);
+  font-size: 0.8rem;
+  background: var(--qb-bg);
+  border: 1px solid var(--qb-border);
+  border-radius: 8px;
+}
+
+.qb-custom-amount-group input {
+  width: 100%;
+  background: var(--qb-bg);
+  color: var(--qb-text);
+  border: 1px solid var(--qb-border);
+  border-radius: 8px;
+}
+
+.qb-reg-distribution-preview {
+  background: var(--qb-bg);
+  border: 1px solid var(--qb-border);
+  border-radius: 12px;
+}
+
+.qb-reg-location-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.35rem 1rem;
+}
+
+.qb-reg-location-list li {
+  padding: 0.25rem 0;
+  border-bottom: 1px solid var(--qb-border);
+}
+
+.qb-reg-user-share {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--qb-border);
+  color: var(--qb-subtle);
+}
+
+.qb-reg-preview-loading {
+  text-align: center;
+  padding: 1rem;
+}
+
+.qb-reg-preview-error {
+  color: var(--qb-danger);
+  padding: 0.75rem;
+  background: var(--qb-danger-dim);
+  border-radius: 8px;
+  margin-bottom: 0.75rem;
+}
+
+@media (max-width: 576px) {
+  .qb-reg-location-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+.qb-password-requirements {
+  margin-top: 0.5rem;
+  padding: 0.65rem 0.75rem;
+  background: var(--qb-surface);
+  border: 1px solid var(--qb-border);
+  border-radius: 8px;
+}
+
+.qb-password-req-list {
+  list-style: none;
+  padding-left: 0;
+  margin-top: 0.35rem;
+  font-size: 0.875rem;
+  color: var(--qb-text-muted, #94a3b8);
+}
+
+.qb-password-req-list li {
+  padding: 0.15rem 0;
+}
+
+.qb-password-req-list li.is-met {
+  color: var(--qb-success, #10b981);
+}
+
+.qb-password-req-list li.is-unmet {
+  color: var(--qb-text-muted, #94a3b8);
+}
+
+/* Post-registration ID save modal (shown after donation flow finalizes) */
+.qb-id-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.qb-id-modal-backdrop[hidden] {
+  display: none !important;
+}
+
+.qb-id-modal {
+  width: min(100%, 28rem);
+  padding: 1.25rem 1.35rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--qb-border);
+  background: var(--qb-surface, #1e293b);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+
+.qb-id-modal-warning {
+  color: var(--qb-warning, #f59e0b);
+}
+
+.qb-id-copy-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--qb-border);
+  border-radius: 0.5rem;
+  background: var(--qb-bg, rgba(255, 255, 255, 0.02));
+}
+
+/* Location selection summary + edit (registration — editable until submit) */
+.selected-location-info {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  background: var(--qb-surface);
+  border: 1px solid var(--qb-border);
+  border-radius: 8px;
+  padding: 0.65rem 0.75rem;
+  margin-top: 0.65rem;
+  font-size: 0.8125rem;
+  color: var(--qb-text);
+}
+
+.selected-location-info .selected-label {
+  font-weight: 600;
+  color: var(--qb-subtle);
+}
+
+.selected-location-info .selected-value {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.edit-location-btn {
+  flex-shrink: 0;
+}
+
+.selected-location-wrap .selected-location,
+.selected-location {
+  background: var(--qb-surface);
+  border: 1px solid var(--qb-border);
+  border-radius: 8px;
+  padding: 0.65rem 0.75rem;
+  margin-top: 0.65rem;
+  font-size: 0.8125rem;
+  color: var(--qb-text);
+}
