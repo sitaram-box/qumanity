@@ -18,16 +18,10 @@ from datetime import date, datetime, timedelta, timezone
 from functools import wraps
 from pathlib import Path
 from typing import Any
-from urllib.parse import unquote, urlparse
-
 import bcrypt
 
-try:
-    import psycopg2
-except ImportError:
-    psycopg2 = None  # type: ignore[assignment,misc]
-
 import config  # loads .env at import time; single source of truth for settings
+from db_path import ensure_database_parent, resolve_database_path
 import birth_chart
 import calendar_time
 import election_scheduler
@@ -61,64 +55,9 @@ from flask import (
 
 BASE_DIR = Path(__file__).resolve().parent
 
-# Database configuration (SQLite default; PostgreSQL scaffold for future cloud migration)
-DATABASE_URL = os.environ.get("DATABASE_URL")
-
-
-def _resolve_sqlite_path(base_dir: Path) -> Path:
-    """Resolve the on-disk SQLite path from DATABASE_URL.
-
-    Slash convention (matches SQLAlchemy), so the URL is unambiguous:
-      sqlite:///indiaq.db        -> RELATIVE to the project root (base_dir)
-      sqlite:////data/indiaq.db  -> ABSOLUTE path /data/indiaq.db
-    A bare filesystem path with no scheme is also accepted, e.g.
-      /Users/me/qumanity/indiaq.db   or   ./indiaq.db
-
-    Any relative result is anchored to base_dir, so the directory Flask is
-    launched from does not matter. (Previously ``sqlite:///indiaq.db`` was
-    parsed to the root path ``/indiaq.db``, which SQLite cannot open.)
-    """
-    default = base_dir / "indiaq.db"
-    url = (DATABASE_URL or "").strip()
-    if not url or url.startswith("postgres"):
-        return default
-
-    if url.startswith("sqlite:"):
-        # Strip the "sqlite://" scheme prefix, keep the remaining path portion.
-        raw = unquote(url[len("sqlite://"):])
-        if raw.startswith("//"):
-            candidate = Path(raw[1:])           # four-slash form: absolute
-        else:
-            candidate = Path(raw.lstrip("/"))   # three-slash form: relative
-    else:
-        candidate = Path(url)                   # bare filesystem path
-
-    text = str(candidate).strip()
-    if not text or text == ".":
-        return default
-    if not candidate.is_absolute():
-        candidate = base_dir / candidate
-    return candidate
-
-
-def get_db_connection():
-    """Return a database connection (PostgreSQL or SQLite).
-
-    PostgreSQL is scaffolded for cloud deploy; the app still uses SQLite SQL via
-    ``get_db()`` until a full migration is complete.
-    """
-    if DATABASE_URL and DATABASE_URL.startswith("postgres"):
-        if psycopg2 is None:
-            raise RuntimeError(
-                "psycopg2 is required for PostgreSQL. Install psycopg2-binary."
-            )
-        return psycopg2.connect(DATABASE_URL)
-    conn = sqlite3.connect(str(_resolve_sqlite_path(BASE_DIR)))
-    conn.row_factory = sqlite3.Row
-    return conn
-
-
-DB_PATH = _resolve_sqlite_path(BASE_DIR)
+DATABASE_PATH = str(resolve_database_path(BASE_DIR))
+DB_PATH = Path(DATABASE_PATH)
+ensure_database_parent(DB_PATH)
 
 PATH_PREFIX = "0.राम|"
 _GEO_CHILD_TABLES = frozenset({"district", "tehsil", "village"})
@@ -709,11 +648,6 @@ except ImportError:
 
 
 def get_db() -> sqlite3.Connection:
-    if DATABASE_URL and DATABASE_URL.startswith("postgres"):
-        raise RuntimeError(
-            "PostgreSQL DATABASE_URL is set but Qumanity still uses SQLite SQL. "
-            "Use DATABASE_URL=sqlite:////data/indiaq.db for Docker/cloud deploy."
-        )
     if "db" not in g:
         conn = sqlite3.connect(DB_PATH)
         conn.row_factory = sqlite3.Row

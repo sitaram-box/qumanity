@@ -6,6 +6,9 @@
 # Python
 __pycache__/
 *.py[cod]
+*.pyo
+*.so
+.Python
 *.egg-info/
 .eggs/
 build/
@@ -15,9 +18,12 @@ dist/
 .venv/
 venv/
 env/
+ENV/
 
 # Databases (geography + app data are large / local)
+indiaq.db
 *.db
+*.db-journal
 *.db-wal
 *.db-shm
 instance/
@@ -30,9 +36,15 @@ instance/
 .vscode/
 .idea/
 *.swp
+.cursor/
 
 # Logs
 *.log
+
+# Testing / coverage
+.pytest_cache/
+.coverage
+htmlcov/
 
 # Node (village-commerce)
 village-commerce/node_modules/

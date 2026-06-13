@@ -3,15 +3,11 @@
 One-off migration for indiaq.db: global geography above zone.
 
 Creates earth, continent, country; loads ISO 3166-1 alpha-3 rows from bundled
-data/iso3166_countries.json (UN M49 region → continent code mapping);
-adds zone.country_id (default IND for existing Indian zones).
+data/iso3166_countries.json when present, otherwise a built-in minimal list;
+seeds global_core tables (states_global, countries_global); adds zone.country_id.
 
 Run from the project root:
     python3 add_global_geography.py
-
-Country rows are built from ``data/iso3166_countries.json`` (UN M49 region fields
-from the lukes/ISO-3166-countries-with-regional-codes dataset), mapped to
-continent codes AS, AF, EU, NA, SA, OC, AN.
 """
 
 from __future__ import annotations
@@ -21,8 +17,11 @@ import sqlite3
 import sys
 from pathlib import Path
 
+from db_path import ensure_database_parent, resolve_database_path
+
 BASE_DIR = Path(__file__).resolve().parent
-DB_PATH = BASE_DIR / "indiaq.db"
+DB_PATH = resolve_database_path(BASE_DIR)
+ensure_database_parent(DB_PATH)
 JSON_PATH = BASE_DIR / "data" / "iso3166_countries.json"
 
 CONTINENTS: tuple[tuple[str, str], ...] = (
@@ -44,6 +43,28 @@ INDIA_ZONE_NAMES: dict[str, str] = {
     "SS": "South India State",
     "ES": "East India State",
 }
+
+FALLBACK_COUNTRIES: tuple[tuple[str, str, str], ...] = (
+    ("IND", "India", "AS"),
+    ("USA", "United States", "NA"),
+    ("CAN", "Canada", "NA"),
+    ("GBR", "United Kingdom", "EU"),
+    ("DEU", "Germany", "EU"),
+    ("FRA", "France", "EU"),
+    ("AUS", "Australia", "OC"),
+    ("JPN", "Japan", "AS"),
+    ("CHN", "China", "AS"),
+    ("SGP", "Singapore", "AS"),
+    ("ARE", "United Arab Emirates", "AS"),
+    ("BRA", "Brazil", "SA"),
+    ("ZAF", "South Africa", "AF"),
+    ("NGA", "Nigeria", "AF"),
+    ("MEX", "Mexico", "NA"),
+    ("NPL", "Nepal", "AS"),
+    ("PAK", "Pakistan", "AS"),
+    ("BGD", "Bangladesh", "AS"),
+    ("LKA", "Sri Lanka", "AS"),
+)
 
 
 def log(msg: str) -> None:
@@ -82,7 +103,7 @@ def map_un_region_to_continent_id(
     return "AS"
 
 
-def load_country_rows() -> list[tuple[str, str, str]]:
+def load_country_rows_from_json() -> list[tuple[str, str, str]]:
     raw = json.loads(JSON_PATH.read_text(encoding="utf-8"))
     rows: list[tuple[str, str, str]] = []
     for row in raw:
@@ -99,6 +120,14 @@ def load_country_rows() -> list[tuple[str, str, str]]:
         rows.append((a3, name, cid))
     rows.sort(key=lambda t: t[0])
     return rows
+
+
+def load_country_rows() -> list[tuple[str, str, str]]:
+    if JSON_PATH.is_file():
+        log(f"Loading countries from {JSON_PATH.name} …")
+        return load_country_rows_from_json()
+    log("iso3166_countries.json not found — using built-in country list.")
+    return list(FALLBACK_COUNTRIES)
 
 
 def column_exists(conn: sqlite3.Connection, table: str, col: str) -> bool:
@@ -182,16 +211,42 @@ def ensure_zone_table(conn: sqlite3.Connection) -> None:
         )
 
 
+def seed_global_core_tables(conn: sqlite3.Connection) -> None:
+    import global_core
+
+    log("Migrating global_core schema (states_global, countries_global, …) …")
+    global_core.migrate_global_location_schema(conn)
+    n = global_core.seed_continents(conn)
+    log(f"  continents (global_core): {n} rows seeded/updated")
+    n = global_core.seed_countries_from_meta(conn)
+    log(f"  countries_global from meta: {n} rows")
+    n = global_core.seed_countries_from_existing_table(conn)
+    log(f"  countries_global from country table: {n} rows")
+    n = global_core.seed_states_from_json(conn)
+    log(f"  states_global from JSON: {n} rows")
+
+
+def verify(conn: sqlite3.Connection) -> bool:
+    ok = True
+    for table in ("continent", "country", "earth"):
+        n = row_count(conn, table)
+        log(f"  {table}: {n} rows")
+        if table == "continent" and n == 0:
+            ok = False
+    if table_exists(conn, "states_global"):
+        log(f"  states_global: {row_count(conn, 'states_global')} rows")
+    return ok
+
+
 def main() -> int:
     if not DB_PATH.is_file():
         log(f"ERROR: database not found: {DB_PATH}")
-        return 1
-    if not JSON_PATH.is_file():
-        log(f"ERROR: missing {JSON_PATH} (ISO country list).")
+        log("Run init_db.py first.")
         return 1
 
     log(f"Connecting to {DB_PATH} …")
     conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = OFF")
     try:
         log("Creating table earth (if missing) …")
@@ -234,7 +289,6 @@ def main() -> int:
             """
         )
 
-        log("Loading countries from JSON …")
         country_rows = load_country_rows()
         log(f"Inserting {len(country_rows)} country rows …")
         conn.executemany(
@@ -259,9 +313,18 @@ def main() -> int:
             log("Column zone.country_id already exists — skipping ALTER.")
 
         log("Setting country_id = 'IND' for all zones (idempotent) …")
-        conn.execute("UPDATE zone SET country_id = 'IND' WHERE country_id IS NULL OR TRIM(country_id) = ''")
+        conn.execute(
+            "UPDATE zone SET country_id = 'IND' "
+            "WHERE country_id IS NULL OR TRIM(country_id) = ''"
+        )
+
+        seed_global_core_tables(conn)
 
         conn.commit()
+        log("Verification:")
+        if not verify(conn):
+            log("ERROR: continent table is still empty.")
+            return 1
         log("Done. Global geography tables are ready.")
     except Exception as exc:
         conn.rollback()
