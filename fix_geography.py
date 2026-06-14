@@ -16,15 +16,20 @@ Then:
 from __future__ import annotations
 
 import argparse
+import gzip
+import shutil
 import sqlite3
 import subprocess
 import sys
 from pathlib import Path
 
+from db_path import ensure_database_parent, resolve_database_path
+
 BASE_DIR = Path(__file__).resolve().parent
-DB_PATH = BASE_DIR / "indiaq.db"
-DEFAULT_SOURCE = BASE_DIR / "indiaq_backup.db"
 PREFIX = "0.राम|"
+SEED_DB = BASE_DIR / "data" / "india_geography_seed.db"
+SEED_GZ = BASE_DIR / "data" / "india_geography_seed.db.gz"
+LEGACY_BACKUP = BASE_DIR / "indiaq_backup.db"
 
 # Parent → child (FK order for inserts).
 INDIA_TABLES: tuple[str, ...] = ("zone", "state", "district", "tehsil", "village")
@@ -91,6 +96,30 @@ def geography_complete(conn: sqlite3.Connection) -> bool:
     return all(
         table_exists(conn, table) and row_count(conn, table) > 0
         for table in INDIA_TABLES
+    )
+
+
+def resolve_geography_source(explicit: Path | None = None) -> Path:
+    """Locate bundled or local geography seed; extract gzip bundle when needed."""
+    if explicit is not None and explicit.is_file():
+        return explicit.resolve()
+    for candidate in (SEED_DB, LEGACY_BACKUP):
+        if candidate.is_file():
+            return candidate.resolve()
+    if SEED_GZ.is_file():
+        if not SEED_DB.is_file():
+            print(f"Extracting {SEED_GZ.name} …", flush=True)
+            with gzip.open(SEED_GZ, "rb") as src, open(SEED_DB, "wb") as dst:
+                shutil.copyfileobj(src, dst)
+        return SEED_DB.resolve()
+    raise SystemExit(
+        "Source geography database not found.\n\n"
+        "Expected one of:\n"
+        f"  - {SEED_DB}\n"
+        f"  - {SEED_GZ}\n"
+        f"  - {LEGACY_BACKUP}\n"
+        "Or pass --source PATH.\n"
+        "Do NOT run setup_indiaq.py — it replaces the entire indiaq.db."
     )
 
 
@@ -184,17 +213,14 @@ def copy_table(conn: sqlite3.Connection, table: str) -> None:
     print(f"  {table}: copied {row_count(conn, table)} rows")
 
 
-def merge_geography(source_path: Path) -> None:
-    if not DB_PATH.is_file():
-        raise SystemExit(f"Target database not found: {DB_PATH}")
-    if not source_path.is_file():
-        raise SystemExit(
-            f"Source geography database not found: {source_path}\n\n"
-            "Place indiaq_backup.db in the project root, or pass --source PATH.\n"
-            "Do NOT run setup_indiaq.py — it replaces the entire indiaq.db."
-        )
+def merge_geography(source_path: Path, target_path: Path | None = None) -> None:
+    db_path = target_path or resolve_database_path(BASE_DIR)
+    ensure_database_parent(db_path)
 
-    conn = sqlite3.connect(DB_PATH)
+    if not source_path.is_file():
+        raise SystemExit(f"Source geography database not found: {source_path}")
+
+    conn = sqlite3.connect(str(db_path), timeout=60)
     try:
         conn.execute("PRAGMA foreign_keys = OFF")
         conn.execute("ATTACH DATABASE ? AS src", (str(source_path.resolve()),))
@@ -243,11 +269,12 @@ def main() -> None:
     parser.add_argument(
         "--source",
         type=Path,
-        default=DEFAULT_SOURCE,
-        help=f"Geography source DB (default: {DEFAULT_SOURCE.name})",
+        default=None,
+        help="Geography source DB (default: bundled data/india_geography_seed.db.gz)",
     )
     args = parser.parse_args()
-    merge_geography(args.source.resolve())
+    source = resolve_geography_source(args.source)
+    merge_geography(source)
 
     print("\nDone. Verify with: python3 check_db.py")
     print("Then restart Flask and open http://127.0.0.1:5000/")

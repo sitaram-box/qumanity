@@ -26,6 +26,7 @@ indiaq.db
 *.db-journal
 *.db-wal
 *.db-shm
+!data/india_geography_seed.db.gz
 instance/
 
 # Flask

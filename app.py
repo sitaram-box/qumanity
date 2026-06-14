@@ -590,6 +590,9 @@ def _bind_ui_language() -> None:
     if request.path == "/health":
         g.ui_language = "en"
         return
+    if request.path == "/setup":
+        g.ui_language = "en"
+        return
     if session.get("language_user_choice"):
         g.ui_language = str(session.get("preferred_language") or "en").strip().lower() or "en"
         return
@@ -3289,6 +3292,8 @@ def _before_request() -> None:
     if request.endpoint and str(request.endpoint).startswith("static"):
         return
     if request.path == "/health":
+        return
+    if request.path == "/setup":
         return
     # Public diagnostic — no DB so /debug/check works even if migrations fail.
     if request.path == "/debug/check":
@@ -13330,11 +13335,18 @@ def _seed_geography_background() -> None:
             return
     time.sleep(5)
     try:
-        result = subprocess.run(
+        subprocess.run(
             [sys.executable, str(BASE_DIR / "add_global_geography.py")],
             capture_output=True,
             text=True,
             timeout=60,
+            cwd=str(BASE_DIR),
+        )
+        result = subprocess.run(
+            [sys.executable, str(BASE_DIR / "fix_geography.py")],
+            capture_output=True,
+            text=True,
+            timeout=600,
             cwd=str(BASE_DIR),
         )
         if result.returncode == 0:
@@ -13346,7 +13358,7 @@ def _seed_geography_background() -> None:
                 (result.stderr or result.stdout or "").strip() or result.returncode,
             )
     except subprocess.TimeoutExpired:
-        logger.warning("Geography seeding timed out after 60 seconds")
+        logger.warning("Geography seeding timed out")
     except Exception as exc:
         logger.warning("Geography seeding error: %s", exc)
 
@@ -13358,6 +13370,92 @@ def _start_geography_background() -> None:
 
 with app.app_context():
     _start_geography_background()
+
+
+@app.route("/setup")
+def setup_database():
+    """Temporary route to seed database — remove after first use."""
+    result: dict[str, Any] = {"steps": []}
+
+    def _count_table(table: str) -> int:
+        try:
+            row = conn.execute(f"SELECT COUNT(*) FROM [{table}]").fetchone()
+            return int(row[0]) if row else 0
+        except sqlite3.Error:
+            return 0
+
+    try:
+        result["steps"].append("Running init_db.py...")
+        r1 = subprocess.run(
+            [sys.executable, str(BASE_DIR / "init_db.py")],
+            timeout=30,
+            capture_output=True,
+            text=True,
+            cwd=str(BASE_DIR),
+        )
+        result["steps"].append(f"init_db: {r1.returncode}")
+
+        result["steps"].append("Running add_global_geography.py...")
+        r2 = subprocess.run(
+            [sys.executable, str(BASE_DIR / "add_global_geography.py")],
+            timeout=60,
+            capture_output=True,
+            text=True,
+            cwd=str(BASE_DIR),
+        )
+        result["steps"].append(f"global geography: {r2.returncode}")
+
+        result["steps"].append("Running fix_geography.py (Indian states/villages)...")
+        r3 = subprocess.run(
+            [sys.executable, str(BASE_DIR / "fix_geography.py")],
+            timeout=600,
+            capture_output=True,
+            text=True,
+            cwd=str(BASE_DIR),
+        )
+        result["steps"].append(f"india geography: {r3.returncode}")
+        if r3.returncode != 0:
+            result["steps"].append(
+                (r3.stderr or r3.stdout or "fix_geography failed").strip()[:500]
+            )
+
+        conn = sqlite3.connect(str(DB_PATH), timeout=15)
+        continent_count = _count_table("continent")
+        country_count = _count_table("country")
+        state_count = _count_table("state")
+        district_count = _count_table("district")
+        tehsil_count = _count_table("tehsil")
+        village_count = _count_table("village")
+        conn.close()
+
+        result["continent_count"] = continent_count
+        result["country_count"] = country_count
+        result["state_count"] = state_count
+        result["district_count"] = district_count
+        result["tehsil_count"] = tehsil_count
+        result["village_count"] = village_count
+        result["status"] = (
+            "success"
+            if state_count > 0 and village_count > 0
+            else "partial"
+        )
+
+        return f"""
+        <h1>Database Setup Complete</h1>
+        <ul>
+            <li>Continents: {continent_count}</li>
+            <li>Countries: {country_count}</li>
+            <li>States: {state_count}</li>
+            <li>Districts: {district_count}</li>
+            <li>Tehsils: {tehsil_count}</li>
+            <li>Villages: {village_count}</li>
+            <li>Status: {result['status']}</li>
+        </ul>
+        <p><a href="/register">Go to Registration Page</a></p>
+        """
+
+    except Exception as exc:
+        return f"<h1>Error</h1><pre>{str(exc)}</pre>"
 
 
 if __name__ == "__main__":
