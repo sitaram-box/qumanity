@@ -13,6 +13,8 @@ Run from the project root:
 from __future__ import annotations
 
 import json
+import os
+import signal
 import sqlite3
 import sys
 from pathlib import Path
@@ -21,8 +23,6 @@ from db_path import ensure_database_parent, resolve_database_path
 from blockchain_core import migrate_blockchain_schema
 
 BASE_DIR = Path(__file__).resolve().parent
-DB_PATH = resolve_database_path(BASE_DIR)
-ensure_database_parent(DB_PATH)
 JSON_PATH = BASE_DIR / "data" / "iso3166_countries.json"
 
 CONTINENTS: tuple[tuple[str, str], ...] = (
@@ -66,6 +66,31 @@ FALLBACK_COUNTRIES: tuple[tuple[str, str, str], ...] = (
     ("BGD", "Bangladesh", "AS"),
     ("LKA", "Sri Lanka", "AS"),
 )
+
+_DEPLOY_TIMEOUT_SECONDS = 30
+_timeout_enabled = False
+
+
+def _timeout_handler(_signum: int, _frame: object) -> None:
+    log("Geography seeding timed out after 30 seconds - exiting to allow gunicorn to start")
+    sys.exit(0)
+
+
+def _enable_deploy_timeout() -> None:
+    global _timeout_enabled
+    if os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("DATABASE_PATH"):
+        if hasattr(signal, "SIGALRM"):
+            signal.signal(signal.SIGALRM, _timeout_handler)
+            signal.alarm(_DEPLOY_TIMEOUT_SECONDS)
+            _timeout_enabled = True
+            log(f"Deploy timeout enabled ({_DEPLOY_TIMEOUT_SECONDS}s)")
+
+
+def _clear_deploy_timeout() -> None:
+    global _timeout_enabled
+    if _timeout_enabled and hasattr(signal, "SIGALRM"):
+        signal.alarm(0)
+        _timeout_enabled = False
 
 
 def log(msg: str) -> None:
@@ -239,105 +264,147 @@ def verify(conn: sqlite3.Connection) -> bool:
     return ok
 
 
-def main() -> int:
-    if not DB_PATH.is_file():
-        log(f"ERROR: database not found: {DB_PATH}")
-        log("Run init_db.py first.")
-        return 1
+def geography_already_seeded(conn: sqlite3.Connection) -> bool:
+    return (
+        table_exists(conn, "continent")
+        and row_count(conn, "continent") > 0
+        and table_exists(conn, "country")
+        and row_count(conn, "country") > 0
+        and table_exists(conn, "earth")
+        and row_count(conn, "earth") > 0
+    )
 
-    log(f"Connecting to {DB_PATH} …")
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = OFF")
-    try:
-        log("Creating table earth (if missing) …")
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS earth (
-                id TEXT PRIMARY KEY,
-                name TEXT NOT NULL
-            )
-            """
-        )
-        conn.execute(
-            "INSERT OR IGNORE INTO earth (id, name) VALUES ('0', 'Earth')"
-        )
 
-        log("Creating table continent (if missing) …")
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS continent (
-                id TEXT PRIMARY KEY,
-                name TEXT NOT NULL
-            )
-            """
-        )
-        for cid, cname in CONTINENTS:
-            conn.execute(
-                "INSERT OR IGNORE INTO continent (id, name) VALUES (?, ?)",
-                (cid, cname),
-            )
-
-        log("Creating table country (if missing) …")
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS country (
-                id TEXT PRIMARY KEY,
-                name TEXT NOT NULL,
-                continent_id TEXT NOT NULL,
-                FOREIGN KEY (continent_id) REFERENCES continent(id)
-            )
-            """
-        )
-
-        country_rows = load_country_rows()
-        log(f"Inserting {len(country_rows)} country rows …")
-        conn.executemany(
-            """
-            INSERT OR IGNORE INTO country (id, name, continent_id)
-            VALUES (?, ?, ?)
-            """,
-            country_rows,
-        )
-
-        ensure_zone_table(conn)
-
-        if not column_exists(conn, "zone", "country_id"):
-            log("Adding zone.country_id (NOT NULL DEFAULT 'IND') …")
-            conn.execute(
-                """
-                ALTER TABLE zone ADD COLUMN country_id TEXT NOT NULL DEFAULT 'IND'
-                    REFERENCES country(id)
-                """
-            )
-        else:
-            log("Column zone.country_id already exists — skipping ALTER.")
-
-        log("Setting country_id = 'IND' for all zones (idempotent) …")
-        conn.execute(
-            "UPDATE zone SET country_id = 'IND' "
-            "WHERE country_id IS NULL OR TRIM(country_id) = ''"
-        )
-
-        seed_global_core_tables(conn)
+def run_geography_seed(conn: sqlite3.Connection) -> None:
+    if geography_already_seeded(conn):
+        log("Geography already seeded — running quick schema sync only.")
         migrate_blockchain_schema(conn)
-
         conn.commit()
         log("Verification:")
-        if not verify(conn):
-            log("ERROR: continent table is still empty.")
-            return 1
-        log("Done. Global geography tables are ready.")
-    except Exception as exc:
-        conn.rollback()
-        log(f"ERROR: {exc}")
-        return 1
-    finally:
-        conn.execute("PRAGMA foreign_keys = ON")
-        conn.close()
+        verify(conn)
+        return
 
-    return 0
+    log("Creating table earth (if missing) …")
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS earth (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        "INSERT OR IGNORE INTO earth (id, name) VALUES ('0', 'Earth')"
+    )
+
+    log("Creating table continent (if missing) …")
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS continent (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL
+        )
+        """
+    )
+    for cid, cname in CONTINENTS:
+        conn.execute(
+            "INSERT OR IGNORE INTO continent (id, name) VALUES (?, ?)",
+            (cid, cname),
+        )
+
+    log("Creating table country (if missing) …")
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS country (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            continent_id TEXT NOT NULL,
+            FOREIGN KEY (continent_id) REFERENCES continent(id)
+        )
+        """
+    )
+
+    country_rows = load_country_rows()
+    log(f"Inserting {len(country_rows)} country rows …")
+    conn.executemany(
+        """
+        INSERT OR IGNORE INTO country (id, name, continent_id)
+        VALUES (?, ?, ?)
+        """,
+        country_rows,
+    )
+
+    ensure_zone_table(conn)
+
+    if not column_exists(conn, "zone", "country_id"):
+        log("Adding zone.country_id (NOT NULL DEFAULT 'IND') …")
+        conn.execute(
+            """
+            ALTER TABLE zone ADD COLUMN country_id TEXT NOT NULL DEFAULT 'IND'
+                REFERENCES country(id)
+            """
+        )
+    else:
+        log("Column zone.country_id already exists — skipping ALTER.")
+
+    log("Setting country_id = 'IND' for all zones (idempotent) …")
+    conn.execute(
+        "UPDATE zone SET country_id = 'IND' "
+        "WHERE country_id IS NULL OR TRIM(country_id) = ''"
+    )
+
+    seed_global_core_tables(conn)
+    migrate_blockchain_schema(conn)
+
+    conn.commit()
+    log("Verification:")
+    if not verify(conn):
+        log("WARNING: continent table is still empty after seeding.")
+    else:
+        log("Done. Global geography tables are ready.")
+
+
+def main() -> None:
+    db_path = resolve_database_path(BASE_DIR)
+    ensure_database_parent(db_path)
+
+    if not db_path.is_file():
+        log(f"WARNING: database not found: {db_path}")
+        log("Run init_db.py first — skipping geography seed.")
+        return
+
+    log(f"Connecting to {db_path} …")
+    conn: sqlite3.Connection | None = None
+    try:
+        conn = sqlite3.connect(str(db_path), timeout=15)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA foreign_keys = OFF")
+        run_geography_seed(conn)
+    except Exception as exc:
+        if conn is not None:
+            try:
+                conn.rollback()
+            except sqlite3.Error:
+                pass
+        log(f"Geography seeding error: {exc}")
+    finally:
+        if conn is not None:
+            try:
+                conn.execute("PRAGMA foreign_keys = ON")
+            except sqlite3.Error:
+                pass
+            conn.close()
+        log("Geography seeding process finished")
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    _enable_deploy_timeout()
+    try:
+        main()
+    except Exception as exc:
+        log(f"Geography seeding error: {exc}")
+    finally:
+        _clear_deploy_timeout()
+        log("Geography seeding completed or timed out - exiting")
+    print("Geography seeding process finished", flush=True)
+    sys.exit(0)
