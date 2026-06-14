@@ -31,3 +31,6 @@ def ensure_database_parent(db_path: Path) -> None:
     parent = db_path.parent
     if str(parent) and not parent.exists():
         parent.mkdir(parents=True, exist_ok=True)
+
+
+DB_PATH = resolve_database_path()

@@ -64,6 +64,30 @@ DATABASE_PATH = str(resolve_database_path(BASE_DIR))
 DB_PATH = Path(DATABASE_PATH)
 ensure_database_parent(DB_PATH)
 
+
+def _init_db_if_needed() -> None:
+    """Initialize database tables if they don't exist — runs in background."""
+    try:
+        conn = sqlite3.connect(str(DB_PATH), timeout=15)
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='users'"
+        )
+        if not cursor.fetchone():
+            subprocess.run(
+                [sys.executable, str(BASE_DIR / "init_db.py")],
+                timeout=30,
+                capture_output=True,
+                cwd=str(BASE_DIR),
+            )
+            print("Database initialized", flush=True)
+        conn.close()
+    except Exception as exc:
+        print(f"Database init warning: {exc}", flush=True)
+
+
+threading.Thread(target=_init_db_if_needed, daemon=True).start()
+
 if os.environ.get("ENABLE_BLOCKCHAIN", "false").lower() == "true":
     blockchain.enabled = True
 
@@ -491,6 +515,11 @@ def build_geo_public_url(kind: str, gid: str) -> str:
     abort(404)
 
 app = Flask(__name__)
+
+@app.get("/health")
+def health():
+    return jsonify({"status": "ok", "database_ready": True})
+
 # Session signing and cookie hardening come from config.py (env-driven).
 app.config.update(config.as_flask_config())
 app.secret_key = app.config["SECRET_KEY"]
@@ -501,11 +530,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger("qumanity")
 config.log_warnings()
-
-
-@app.get("/health")
-def health():
-    return jsonify({"status": "ok"})
 
 
 def _language_geo_helpers() -> dict[str, Any]:
@@ -563,6 +587,9 @@ def translate_filter(key: str, language_code: str | None = None) -> str:
 
 @app.before_request
 def _bind_ui_language() -> None:
+    if request.path == "/health":
+        g.ui_language = "en"
+        return
     if session.get("language_user_choice"):
         g.ui_language = str(session.get("preferred_language") or "en").strip().lower() or "en"
         return
@@ -3260,6 +3287,8 @@ def _before_request() -> None:
     Skips DB work for static assets and the lightweight /debug/check diagnostic.
     """
     if request.endpoint and str(request.endpoint).startswith("static"):
+        return
+    if request.path == "/health":
         return
     # Public diagnostic — no DB so /debug/check works even if migrations fail.
     if request.path == "/debug/check":

@@ -71,6 +71,19 @@ _DEPLOY_TIMEOUT_SECONDS = 30
 _timeout_enabled = False
 
 
+def is_already_seeded() -> bool:
+    try:
+        db_path = resolve_database_path(BASE_DIR)
+        conn = sqlite3.connect(str(db_path), timeout=15)
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM continent")
+        count = cursor.fetchone()[0]
+        conn.close()
+        return count > 0
+    except Exception:
+        return False
+
+
 def _timeout_handler(_signum: int, _frame: object) -> None:
     log("Geography seeding timed out after 30 seconds - exiting to allow gunicorn to start")
     os._exit(0)
@@ -402,6 +415,9 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    if is_already_seeded():
+        log("Geography already seeded - exiting")
+        os._exit(0)
     _enable_deploy_timeout()
     try:
         main()

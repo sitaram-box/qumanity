@@ -2,11 +2,10 @@
   "$schema": "https://railway.com/railway.schema.json",
   "build": {
     "builder": "NIXPACKS",
-    "buildCommand": "pip install -r requirements.txt && python init_db.py"
+    "buildCommand": "pip install -r requirements.txt"
   },
   "deploy": {
     "startCommand": "gunicorn app:app --bind 0.0.0.0:$PORT",
-    "restartPolicyType": "ON_FAILURE",
-    "healthcheckPath": "/health"
+    "restartPolicyType": "ON_FAILURE"
   }
 }
