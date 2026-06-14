@@ -13,6 +13,9 @@ import re
 import secrets
 import sqlite3
 import string
+import subprocess
+import sys
+import threading
 import time
 from datetime import date, datetime, timedelta, timezone
 from functools import wraps
@@ -13285,6 +13288,47 @@ register_varna_routes(app, get_db, login_required, admin_required)
 from space_routes import register_space_routes
 
 register_space_routes(app, get_db, login_required, is_admin_user_fn=is_admin_user)
+
+_geography_seeded = False
+_geography_seed_lock = threading.Lock()
+
+
+def _seed_geography_background() -> None:
+    """Run geography seeding once in background after startup."""
+    global _geography_seeded
+    with _geography_seed_lock:
+        if _geography_seeded:
+            return
+    time.sleep(5)
+    try:
+        result = subprocess.run(
+            [sys.executable, str(BASE_DIR / "add_global_geography.py")],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            cwd=str(BASE_DIR),
+        )
+        if result.returncode == 0:
+            logger.info("Geography seeded successfully in background")
+            _geography_seeded = True
+        else:
+            logger.warning(
+                "Geography seeding warning: %s",
+                (result.stderr or result.stdout or "").strip() or result.returncode,
+            )
+    except subprocess.TimeoutExpired:
+        logger.warning("Geography seeding timed out after 60 seconds")
+    except Exception as exc:
+        logger.warning("Geography seeding error: %s", exc)
+
+
+def _start_geography_background() -> None:
+    thread = threading.Thread(target=_seed_geography_background, daemon=True)
+    thread.start()
+
+
+with app.app_context():
+    _start_geography_background()
 
 
 if __name__ == "__main__":

@@ -2,7 +2,7 @@
 nixPkgs = ["python311"]
 
 [phases.install]
-cmds = ["pip install -r requirements.txt"]
+cmds = ["pip install -r requirements.txt", "python init_db.py"]
 
 [start]
-cmd = "python init_db.py && (python add_global_geography.py || true) && exec gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 120 --access-logfile - --error-logfile -"
+cmd = "gunicorn app:app --bind 0.0.0.0:$PORT"
