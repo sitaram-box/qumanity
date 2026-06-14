@@ -18,6 +18,7 @@ import sys
 from pathlib import Path
 
 from db_path import ensure_database_parent, resolve_database_path
+from blockchain_core import migrate_blockchain_schema
 
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = resolve_database_path(BASE_DIR)
@@ -319,6 +320,7 @@ def main() -> int:
         )
 
         seed_global_core_tables(conn)
+        migrate_blockchain_schema(conn)
 
         conn.commit()
         log("Verification:")

@@ -1560,15 +1560,15 @@
   var upiPaymentAcknowledged = false;
 
   var DONATION_PREVIEW = {
-    1: "You receive: 1 Qoin (₹1). Village: none.",
-    2: "You receive: 1 Qoin (₹1). Village: 1 Qoin (₹1).",
-    5: "You receive: 2 Qoins (₹2 each). Village: 1 Qoin (₹1).",
-    10: "You receive: 3 Qoins (₹5, ₹3, ₹1). Village: 1 Qoin (₹2).",
-    20: "You receive: 3 Qoins (₹5 each). Village: 1 Qoin (₹5).",
-    50: "You receive: 2 Qoins (₹20 each). Village: 1 Qoin (₹10).",
-    100: "You receive: 3 Qoins (₹50, ₹20, ₹10). Village: 1 Qoin (₹20).",
-    200: "You receive: 2 Qoins (₹100, ₹50). Village: 1 Qoin (₹50).",
-    500: "You receive: 2 Qoins (₹200 each). Village: 1 Qoin (₹100).",
+    1: "You receive: 1 Karma Point (₹1). Village: none.",
+    2: "You receive: 1 Karma Point (₹1). Village: 1 Karma Point (₹1).",
+    5: "You receive: 2 Karma Points (₹2 each). Village: 1 Karma Point (₹1).",
+    10: "You receive: 3 Karma Points (₹5, ₹3, ₹1). Village: 1 Karma Point (₹2).",
+    20: "You receive: 3 Karma Points (₹5 each). Village: 1 Karma Point (₹5).",
+    50: "You receive: 2 Karma Points (₹20 each). Village: 1 Karma Point (₹10).",
+    100: "You receive: 3 Karma Points (₹50, ₹20, ₹10). Village: 1 Karma Point (₹20).",
+    200: "You receive: 2 Karma Points (₹100, ₹50). Village: 1 Karma Point (₹50).",
+    500: "You receive: 2 Karma Points (₹200 each). Village: 1 Karma Point (₹100).",
   };
 
   function educationHasData(edu) {
@@ -1978,19 +1978,19 @@
     });
   }
 
-  function renderQoinChips(container, coins) {
+  function renderKarmaChips(container, coins) {
     if (!container) return;
     container.innerHTML = "";
     (coins || []).forEach(function (c) {
       var span = document.createElement("span");
-      span.className = "qb-qoin-chip";
+      span.className = "qb-karma-chip";
       span.textContent = "₹" + c.rupee_value + "×" + c.count;
       container.appendChild(span);
     });
     if (!coins || !coins.length) {
       var empty = document.createElement("span");
       empty.className = "qb-stmt-muted";
-      empty.textContent = "No Qoins yet";
+      empty.textContent = "No Karma Points yet";
       container.appendChild(empty);
     }
   }
@@ -2004,7 +2004,7 @@
     var iframe = document.getElementById("qb-wallet-stmt-iframe");
     if (flash) text(flash, "Loading…");
     if (weeksUl) weeksUl.innerHTML = "";
-    return fetch("/api/qoin/statements", {
+    return fetch("/api/karma/statements", {
       credentials: "same-origin",
       headers: { Accept: "application/json" },
     })
@@ -2035,7 +2035,7 @@
           btn.addEventListener("click", function () {
             if (hint) hint.hidden = true;
             if (detail) detail.hidden = false;
-            if (iframe) iframe.src = "/api/qoin/statements/" + s.id + "/html";
+            if (iframe) iframe.src = "/api/karma/statements/" + s.id + "/html";
           });
           li.appendChild(btn);
           weeksUl.appendChild(li);
@@ -2068,8 +2068,8 @@
         if (!x.ok) throw new Error((x.b && x.b.error) || "Load failed");
         text(document.getElementById("qb-wallet-balance-qoins"), String(x.b.balance_qoins || 0));
         text(document.getElementById("qb-wallet-balance-rupees"), String(x.b.total_rupees || 0));
-        renderQoinChips(document.getElementById("qb-wallet-coin-chips"), x.b.coins || []);
-        return fetch("/api/qoin/pending", {
+        renderKarmaChips(document.getElementById("qb-wallet-coin-chips"), x.b.coins || []);
+        return fetch("/api/karma/pending", {
           credentials: "same-origin",
           headers: { Accept: "application/json" },
         }).then(function (r2) {
@@ -2170,9 +2170,9 @@
     });
   });
 
-  var qoinWalletBtn = document.getElementById("qb-qoin-wallet-btn");
-  if (qoinWalletBtn) {
-    qoinWalletBtn.addEventListener("click", function () {
+  var karmaWalletBtn = document.getElementById("qb-karma-wallet-btn");
+  if (karmaWalletBtn) {
+    karmaWalletBtn.addEventListener("click", function () {
       selectedDonateAmount = 0;
       text(document.getElementById("qb-donate-preview"), "");
       text(document.getElementById("qb-donate-flash"), "");
@@ -2182,7 +2182,7 @@
         b.classList.remove("qb-btn-primary");
         b.classList.add("qb-btn-outline");
       });
-      openModal("qb-qoin-wallet-modal");
+      openModal("qb-karma-wallet-modal");
       syncDonateMethodUi();
       loadWalletModal();
     });
@@ -2219,7 +2219,7 @@
       text(document.getElementById("qb-donate-flash"), "Processing…");
       var body = { amount: selectedDonateAmount, method: method };
       if (method === "cash") body.agent_id = agentId;
-      fetch("/api/qoin/donate", {
+      fetch("/api/karma/donate", {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -3447,7 +3447,7 @@
         escHtml(c.karma_index == null ? "0" : String(c.karma_index)) +
         " · Wallet: " +
         escHtml(c.wallet_balance == null ? "0" : String(c.wallet_balance)) +
-        " Qoins</div>" +
+        " Karma Points</div>" +
         "<div class='small mt-1 text-muted'>" +
         escHtml(body).replace(/\n/g, "<br/>") +
         "</div>";
@@ -3722,7 +3722,7 @@
             escHtml(c.karma_index == null ? "0" : String(c.karma_index)) +
             " · " +
             escHtml(c.wallet_balance == null ? "0" : String(c.wallet_balance)) +
-            " Qoins</span>" +
+            " Karma Points</span>" +
             "<div class='qb-election-manifest small text-muted'>" +
             escHtml(body).replace(/\n/g, "<br/>") +
             "</div></label>";
@@ -7094,7 +7094,7 @@
       "</p>" +
       "<p class='mb-1'><strong>Wallet balance:</strong> " +
       escHtml(d.wallet_balance == null ? "0" : String(d.wallet_balance)) +
-      " Qoins</p>" +
+      " Karma Points</p>" +
       "<h3 class='h6 mt-3 mb-2 text-secondary text-uppercase small'>Recent transactions</h3>" +
       txHtml;
   }
@@ -7773,7 +7773,7 @@
   }
 
   function loadKarmaTypes() {
-    return fetch("/api/qoin/karma/types", {
+    return fetch("/api/karma/karma/types", {
       credentials: "same-origin",
       headers: { Accept: "application/json" },
     })
@@ -7938,9 +7938,9 @@
     });
   }
 
-  function loadAdminQoinPanel() {
+  function loadAdminKarmaPanel() {
     if (!dashCfg.isAdmin) return;
-    fetch("/api/qoin/pending", {
+    fetch("/api/karma/pending", {
       credentials: "same-origin",
       headers: { Accept: "application/json" },
     })
@@ -7963,7 +7963,7 @@
             " karma";
         }
       });
-    fetch("/api/admin/qoin/nested-wallets", {
+    fetch("/api/admin/karma/nested-wallets", {
       credentials: "same-origin",
       headers: { Accept: "application/json" },
     })
@@ -7979,7 +7979,7 @@
           circ.textContent =
             "Circulation: " +
             x.b.circulation.total_qoins +
-            " Qoins (₹" +
+            " Karma Points (₹" +
             x.b.circulation.total_rupees +
             ")";
         }
@@ -7994,13 +7994,13 @@
             w.owner_id +
             " — " +
             w.balance_qoins +
-            " Qoins (₹" +
+            " Karma Points (₹" +
             w.total_rupees +
             ")";
           nw.appendChild(li);
         });
       });
-    fetch("/api/admin/qoin/karma-types", {
+    fetch("/api/admin/karma/karma-types", {
       credentials: "same-origin",
       headers: { Accept: "application/json" },
     })
@@ -8027,7 +8027,7 @@
     adminSettlementBtn.addEventListener("click", function () {
       var flash = document.getElementById("qb-admin-settlement-flash");
       if (flash) text(flash, "Running settlement…");
-      fetch("/api/admin/qoin/settlement", {
+      fetch("/api/admin/karma/settlement", {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -8050,7 +8050,7 @@
                 ((res.insufficient_users || []).length || 0)
             );
           }
-          loadAdminQoinPanel();
+          loadAdminKarmaPanel();
         })
         .catch(function (err) {
           if (flash) text(flash, err.message || "Error");
@@ -8064,7 +8064,7 @@
       var code = (document.getElementById("qb-admin-karma-code") || {}).value || "";
       var label = (document.getElementById("qb-admin-karma-label") || {}).value || "";
       var val = parseInt(String((document.getElementById("qb-admin-karma-value") || {}).value || ""), 10);
-      fetch("/api/admin/qoin/karma-types", {
+      fetch("/api/admin/karma/karma-types", {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -8081,7 +8081,7 @@
         })
         .then(function (x) {
           if (!x.ok) throw new Error((x.b && x.b.error) || "Save failed");
-          loadAdminQoinPanel();
+          loadAdminKarmaPanel();
           loadKarmaTypes();
         })
         .catch(function (err) {
@@ -8091,7 +8091,7 @@
   }
 
   loadKarmaTypes();
-  loadAdminQoinPanel();
+  loadAdminKarmaPanel();
 
   function refreshLocationMode(nextMode) {
     return fetch("/api/user/location-mode", {
@@ -8489,7 +8489,7 @@
               "</td><td>" +
               ((perf.total && perf.total.signups) || 0) +
               "</td></tr>" +
-              "<tr><td>Qoins</td><td>" +
+              "<tr><td>Karma Points</td><td>" +
               ((perf.week && perf.week.qoins) || 0) +
               "</td><td>" +
               ((perf.month && perf.month.qoins) || 0) +
@@ -8524,7 +8524,7 @@
               (row.status || "") +
               "</td><td>" +
               (row.qoins_earned || 0) +
-              " Qoins</td>";
+              " Karma Points</td>";
             signupsBody.appendChild(tr);
           });
           if (!signupsBody.children.length) {
@@ -8558,7 +8558,7 @@
             return r.json();
           })
           .then(function (b) {
-            var lines = ["User Name,Signup Date,Status,Qoins Earned"];
+            var lines = ["User Name,Signup Date,Status,Karma Points Earned"];
             (b.signups || []).forEach(function (row) {
               lines.push(
                 [

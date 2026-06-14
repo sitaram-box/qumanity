@@ -708,7 +708,7 @@
           if (noReferral && previewNote) {
             if (x.b.system_generated || amount === 0) {
               previewNote.textContent =
-                "✨ ₹0 selected — system generates 1 Qoin (₹1) for distribution.";
+                "✨ ₹0 selected — system generates 1 Karma Point (₹1) for distribution.";
               previewNote.hidden = false;
             } else {
               previewNote.hidden = true;

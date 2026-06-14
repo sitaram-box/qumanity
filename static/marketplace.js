@@ -129,7 +129,7 @@
     })
       .then(function (x) {
         if (!x.ok) throw new Error((x.b && x.b.error) || "Checkout failed");
-        flash.textContent = "Order " + x.b.order_ref + " placed (Qoins pending settlement).";
+        flash.textContent = "Order " + x.b.order_ref + " placed (Karma Points pending settlement).";
         loadCart();
         loadOrders();
       })

@@ -39,3 +39,8 @@ def apply_category_bonus(
     return varna_core.apply_karma_category_bonus(
         conn, user_private_id, action_code, base_amount
     )
+
+
+# Karma Points wallet economy — re-exported from qoin_core during gradual migration.
+# Import wallet helpers via karma_core or continue using qoin_core directly.
+from qoin_core import *  # noqa: F403, F401

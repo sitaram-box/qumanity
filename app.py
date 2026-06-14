@@ -21,6 +21,8 @@ from typing import Any
 import bcrypt
 
 import config  # loads .env at import time; single source of truth for settings
+from blockchain_adapter import blockchain
+from blockchain_core import migrate_blockchain_schema
 from db_path import ensure_database_parent, resolve_database_path
 import birth_chart
 import calendar_time
@@ -58,6 +60,9 @@ BASE_DIR = Path(__file__).resolve().parent
 DATABASE_PATH = str(resolve_database_path(BASE_DIR))
 DB_PATH = Path(DATABASE_PATH)
 ensure_database_parent(DB_PATH)
+
+if os.environ.get("ENABLE_BLOCKCHAIN", "false").lower() == "true":
+    blockchain.enabled = True
 
 PATH_PREFIX = "0.राम|"
 _GEO_CHILD_TABLES = frozenset({"district", "tehsil", "village"})
@@ -3287,6 +3292,7 @@ def _before_request() -> None:
         planetary_core.migrate_space_schema(conn)
         global_core.migrate_global_location_schema(conn)
         element_core.migrate_element_core_schema(conn)
+        migrate_blockchain_schema(conn)
         if elections_are_enabled():
             try:
                 election_scheduler.process_election_cycles(
@@ -8330,6 +8336,7 @@ def api_wallet_balance():
     return jsonify(
         {
             "balance_qoins": bal,
+            "karma_points": bal,
             "total_rupees": rupees,
             "coins": _user_wallet_coin_breakdown(conn, pid),
         }
@@ -8344,6 +8351,7 @@ def _user_wallet_coin_breakdown(conn: sqlite3.Connection, pid: str) -> list[dict
     ]
 
 
+@app.post("/api/karma/donate")
 @app.post("/api/qoin/donate")
 @login_required
 def api_qoin_donate():
@@ -8383,6 +8391,7 @@ def api_qoin_donate():
     return jsonify({"ok": True, **result})
 
 
+@app.get("/api/karma/transactions")
 @app.get("/api/qoin/transactions")
 @login_required
 def api_qoin_transactions():
@@ -8395,6 +8404,7 @@ def api_qoin_transactions():
     return jsonify({"transactions": qoin_core.user_transactions(conn, pid, limit=limit)})
 
 
+@app.get("/api/karma/statements")
 @app.get("/api/qoin/statements")
 @login_required
 def api_qoin_statements_list():
@@ -8403,6 +8413,7 @@ def api_qoin_statements_list():
     return jsonify({"statements": qoin_core.list_weekly_statements(conn, pid)})
 
 
+@app.get("/api/karma/statements/<int:statement_id>")
 @app.get("/api/qoin/statements/<int:statement_id>")
 @login_required
 def api_qoin_statement_detail(statement_id: int):
@@ -8414,6 +8425,7 @@ def api_qoin_statement_detail(statement_id: int):
     return jsonify(stmt)
 
 
+@app.get("/api/karma/statements/<int:statement_id>/html")
 @app.get("/api/qoin/statements/<int:statement_id>/html")
 @login_required
 def api_qoin_statement_html(statement_id: int):
@@ -8426,6 +8438,7 @@ def api_qoin_statement_html(statement_id: int):
     return html, 200, {"Content-Type": "text/html; charset=utf-8"}
 
 
+@app.get("/api/karma/pending")
 @app.get("/api/qoin/pending")
 @login_required
 def api_qoin_pending_summary():
@@ -8436,6 +8449,7 @@ def api_qoin_pending_summary():
     return jsonify({**summary, "karma_pending": karma})
 
 
+@app.post("/api/karma/commercial")
 @app.post("/api/qoin/commercial")
 @login_required
 def api_qoin_commercial():
@@ -8464,6 +8478,8 @@ def api_qoin_commercial():
     return jsonify({"ok": True, "transaction_id": txid, "pending": True})
 
 
+@app.post("/api/karma/record")
+@app.post("/api/karma/karma")
 @app.post("/api/qoin/karma")
 @login_required
 def api_qoin_karma_record():
@@ -8487,6 +8503,7 @@ def api_qoin_karma_record():
     return jsonify({"ok": True, **result})
 
 
+@app.get("/api/karma/types")
 @app.get("/api/qoin/karma/types")
 @login_required
 def api_qoin_karma_types():
@@ -9201,6 +9218,7 @@ def api_rewards_activate():
     return jsonify({"ok": True, "activated": activated})
 
 
+@app.get("/api/karma/karma/pending")
 @app.get("/api/qoin/karma/pending")
 @login_required
 def api_qoin_karma_pending():
@@ -9209,6 +9227,7 @@ def api_qoin_karma_pending():
     return jsonify({"items": qoin_core.user_pending_karma(conn, pid)})
 
 
+@app.post("/api/admin/karma/settlement")
 @app.post("/api/admin/qoin/settlement")
 @admin_required
 def api_admin_qoin_settlement():
@@ -9232,6 +9251,7 @@ def api_admin_qoin_settlement():
     return jsonify({"ok": True, "result": result})
 
 
+@app.get("/api/admin/karma/nested-wallets")
 @app.get("/api/admin/qoin/nested-wallets")
 @admin_required
 def api_admin_nested_wallets():
@@ -9242,6 +9262,7 @@ def api_admin_nested_wallets():
     return jsonify({"circulation": circulation, "wallets": wallets, "pending": pending})
 
 
+@app.get("/api/admin/karma/karma-types")
 @app.get("/api/admin/qoin/karma-types")
 @admin_required
 def api_admin_karma_types_list():
@@ -9249,6 +9270,7 @@ def api_admin_karma_types_list():
     return jsonify({"actions": qoin_core.karma_action_types_list(conn)})
 
 
+@app.post("/api/admin/karma/karma-types")
 @app.post("/api/admin/qoin/karma-types")
 @admin_required
 def api_admin_karma_types_upsert():

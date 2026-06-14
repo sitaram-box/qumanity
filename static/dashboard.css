@@ -2437,7 +2437,7 @@ body.qb-page-dashboard header.qb-navbar {
   position: relative;
 }
 
-.qb-qoin-wallet-btn {
+.qb-karma-wallet-btn {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
@@ -2451,25 +2451,25 @@ body.qb-page-dashboard header.qb-navbar {
   cursor: pointer;
 }
 
-.qb-qoin-wallet-btn:hover {
+.qb-karma-wallet-btn:hover {
   border-color: rgba(59, 130, 246, 0.45);
   background: rgba(59, 130, 246, 0.1);
 }
 
-.qb-qoin-wallet-symbol {
+.qb-karma-wallet-symbol {
   font-size: 1.05rem;
   line-height: 1;
   color: #fbbf24;
 }
 
-.qb-qoin-chips {
+.qb-karma-chips {
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem;
   margin-top: 0.35rem;
 }
 
-.qb-qoin-chip {
+.qb-karma-chip {
   display: inline-flex;
   align-items: center;
   padding: 0.2rem 0.55rem;

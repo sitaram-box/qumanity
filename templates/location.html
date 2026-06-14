@@ -58,7 +58,7 @@
       {% if scope == 'village' and village_wallet_qoins is defined %}
       <p class="small mb-0 mt-2">
         <strong>Village Wallet:</strong>
-        <span class="text-info">{{ village_wallet_qoins }}</span> Qoins
+        <span class="text-info">{{ village_wallet_qoins }}</span> Karma Points
         <span class="text-muted">(₹{{ village_wallet_rupees }})</span>
       </p>
       {% endif %}
@@ -106,7 +106,7 @@
       <div class="qb-zodiac-rail-title">Village Wallet</div>
       <div class="qb-location-wallet-name">{{ location_name }}</div>
       <div class="qb-location-wallet-balance">
-        {{ wallet_balance }} <span>Qoins</span>
+        {{ wallet_balance }} <span>Karma Points</span>
       </div>
       {% if wallet_account_id %}
       <div class="qb-location-wallet-id font-monospace">{{ wallet_account_id }}</div>

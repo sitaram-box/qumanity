@@ -139,6 +139,7 @@ def apply_migrations(conn: sqlite3.Connection, *, verbose: bool = True) -> None:
         ("global location schema", global_core.migrate_global_location_schema),
         ("zodiac planets / country languages", element_core.migrate_element_core_schema),
         ("admin profile patch (H_U_ADMIN)", migrate_admin_user_profile),
+        ("blockchain schema", migrate_blockchain_schema),
     ]
 
     for label, fn in steps:

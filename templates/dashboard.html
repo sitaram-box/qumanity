@@ -156,9 +156,9 @@
           <button type="button" class="qb-btn qb-btn-outline btn-sm" id="qb-my-account-ids-btn" title="All public Account IDs">
             My Account IDs
           </button>
-          <button type="button" class="qb-qoin-wallet-btn" id="qb-qoin-wallet-btn" title="Qoins Wallet">
-            <span class="qb-qoin-wallet-symbol" aria-hidden="true">₹</span>
-            <span class="qb-qoin-wallet-label">Qoin ₹ Wallet</span>
+          <button type="button" class="qb-karma-wallet-btn" id="qb-karma-wallet-btn" title="Karma Points Wallet">
+            <span class="qb-karma-wallet-symbol" aria-hidden="true">₹</span>
+            <span class="qb-karma-wallet-label">Karma Points Wallet</span>
           </button>
           <button
             type="button"
@@ -316,7 +316,7 @@
           <h3 class="h6 text-secondary text-uppercase small mb-2">Volunteer Application</h3>
           <p class="small text-muted mb-0" id="qb-volunteer-apply-status">Your volunteer application is pending review.</p>
           {% else %}
-          <h3 class="h6 text-secondary text-uppercase small mb-2">Become a Volunteer and Earn Qoins</h3>
+          <h3 class="h6 text-secondary text-uppercase small mb-2">Become a Volunteer and Earn Karma Points</h3>
           <p class="small text-muted mb-2">Apply to collect registration donations and earn commissions with a VOL- volunteer code.</p>
           <button type="button" class="qb-btn qb-btn-outline btn-sm mb-2" id="applyVolunteerBtn">Apply to become Volunteer</button>
           <p class="small mb-0" id="qb-volunteer-apply-status" role="status" aria-live="polite"></p>
@@ -430,7 +430,7 @@
           </form>
         </details>
 
-        <p class="small text-muted mb-3">Use the ✉ icon (top right) for Inbox, Sent, Drafts, and Compose. Qoin balance and weekly statements stay in your wallet button above.</p>
+        <p class="small text-muted mb-3">Use the ✉ icon (top right) for Inbox, Sent, Drafts, and Compose. Karma Point balance and weekly statements stay in your wallet button above.</p>
 
         {% if show_upgrade_panel %}
         <section class="qb-panel mb-3" id="qb-admin-upgrade-users">
@@ -473,7 +473,7 @@
           <label class="form-label small" for="qb-deceased-date">Date of death</label>
           <input type="date" class="form-control form-control-sm mb-2" id="qb-deceased-date" />
           <label class="form-label small" for="qb-deceased-heir">Heir private ID (optional)</label>
-          <input type="text" class="form-control form-control-sm mb-2 font-monospace" id="qb-deceased-heir" placeholder="Transfer remaining Qoins" />
+          <input type="text" class="form-control form-control-sm mb-2 font-monospace" id="qb-deceased-heir" placeholder="Transfer remaining Karma Points" />
           <label class="form-label small" for="qb-deceased-obituary">Obituary (optional)</label>
           <textarea class="form-control form-control-sm mb-2" id="qb-deceased-obituary" rows="2"></textarea>
           <button type="button" class="qb-btn qb-btn-danger btn-sm" id="qb-deceased-submit">Mark as Deceased</button>
@@ -505,8 +505,8 @@
           <ul class="list-unstyled small mb-0" id="qb-admin-employment-list"></ul>
         </section>
 
-        <section class="qb-panel mb-3" id="qb-admin-qoin-economy">
-          <h3 class="h6 text-secondary text-uppercase small mb-2">Qoin Economy (Council)</h3>
+        <section class="qb-panel mb-3" id="qb-admin-karma-economy">
+          <h3 class="h6 text-secondary text-uppercase small mb-2">Karma Points Economy (Council)</h3>
           <p class="small text-muted mb-2">Pending transactions settle every Sunday 23:59 IST.</p>
           <button type="button" class="qb-btn qb-btn-outline btn-sm mb-2" id="qb-admin-settlement-btn">Run off-cycle settlement</button>
           <p class="small mb-2" id="qb-admin-settlement-flash" role="status"></p>
@@ -550,7 +550,7 @@
           <button type="button" class="qb-btn qb-btn-primary btn-sm" id="qb-admin-donation-report-btn">Get Report</button>
           <div class="mt-3 small" id="qb-admin-donation-report-out" hidden>
             <p class="mb-1"><strong>Village:</strong> <span id="qb-admin-report-village-label"></span></p>
-            <p class="mb-1"><strong>Total Qoins (village):</strong> <span id="qb-admin-report-total-qoins"></span></p>
+            <p class="mb-1"><strong>Total Karma Points (village):</strong> <span id="qb-admin-report-total-qoins"></span></p>
             <p class="mb-2"><strong>Total ₹ value:</strong> <span id="qb-admin-report-total-rupees"></span></p>
             <h4 class="h6 text-secondary small">Recent village donations</h4>
             <ul class="list-unstyled mb-0" id="qb-admin-report-recent"></ul>
@@ -1156,7 +1156,7 @@
 
                 <section class="qb-panel mb-3 p-2" id="qb-village-karma-panel">
                   <h5 class="h6 text-secondary text-uppercase small mb-2">Karma Tracker</h5>
-                  <p class="small text-muted mb-2">Submit verified ethical actions for Council review. Approved karma converts to Qoins at weekly settlement.</p>
+                  <p class="small text-muted mb-2">Submit verified ethical actions for Council review. Approved karma converts to Karma Points at weekly settlement.</p>
                   <ul class="list-unstyled small mb-2" id="qb-karma-pending-list"></ul>
                   <p class="small text-muted mb-2" id="qb-karma-pending-empty" hidden>No pending karma claims.</p>
                   <form id="qb-village-karma-claim-form" class="row g-2" enctype="multipart/form-data">
@@ -1432,25 +1432,25 @@
   </div>
 </div>
 
-<div class="qb-modal-backdrop" id="qb-qoin-wallet-modal" hidden>
-  <div class="qb-modal-dialog qb-modal-dialog--wide" role="dialog" aria-modal="true" aria-labelledby="qb-qoin-wallet-title">
+<div class="qb-modal-backdrop" id="qb-karma-wallet-modal" hidden>
+  <div class="qb-modal-dialog qb-modal-dialog--wide" role="dialog" aria-modal="true" aria-labelledby="qb-karma-wallet-title">
     <div class="qb-modal-head">
-      <h2 class="h5 mb-0" id="qb-qoin-wallet-title">Qoins Wallet</h2>
-      <button type="button" class="qb-modal-close" data-qb-close-modal="qb-qoin-wallet-modal" aria-label="Close">×</button>
+      <h2 class="h5 mb-0" id="qb-karma-wallet-title">Karma Points Wallet</h2>
+      <button type="button" class="qb-modal-close" data-qb-close-modal="qb-karma-wallet-modal" aria-label="Close">×</button>
     </div>
     <div class="mb-3 qb-wallet-summary">
-      <p class="mb-1"><strong>Balance:</strong> <span id="qb-wallet-balance-qoins" class="text-info">—</span> Qoins</p>
+      <p class="mb-1"><strong>Balance:</strong> <span id="qb-wallet-balance-qoins" class="text-info">—</span> Karma Points</p>
       <p class="mb-1"><strong>Total value:</strong> ₹<span id="qb-wallet-balance-rupees">—</span></p>
       <p class="small text-muted mb-1">Settled weekly (Sunday 23:59 IST). Pending activity clears at settlement.</p>
-      <div class="qb-qoin-chips" id="qb-wallet-coin-chips" aria-label="Qoin denominations"></div>
+      <div class="qb-karma-chips" id="qb-wallet-coin-chips" aria-label="Karma Point denominations"></div>
       <p class="small mb-0 mt-2" id="qb-wallet-pending-line" hidden></p>
     </div>
     <div class="d-flex flex-wrap gap-2 mb-3">
       <button type="button" class="qb-btn qb-btn-outline btn-sm" id="qb-wallet-txn-btn">Transaction Statement</button>
     </div>
     <hr />
-    <h3 class="h6 mb-2">Donate ₹ and Earn Qoins</h3>
-    <p class="small text-muted mb-2">Choose an amount (₹1–₹500). User Qoins are credited to you; part may go to your village wallet.</p>
+    <h3 class="h6 mb-2">Donate ₹ and Earn Karma Points</h3>
+    <p class="small text-muted mb-2">Choose an amount (₹1–₹500). User Karma Points are credited to you; part may go to your village wallet.</p>
     <fieldset class="mb-2">
       <legend class="form-label small mb-1">Donation method</legend>
       <label class="me-3 small"
@@ -2388,7 +2388,7 @@
       <div class="table-responsive">
         <table class="table table-sm table-dark mb-0 small">
           <thead>
-            <tr><th>User Name</th><th>Signup Date</th><th>Status</th><th>Qoins Earned</th></tr>
+            <tr><th>User Name</th><th>Signup Date</th><th>Status</th><th>Karma Points Earned</th></tr>
           </thead>
           <tbody id="qb-volunteer-signups-body">
             <tr><td colspan="4" class="text-muted">Loading…</td></tr>
