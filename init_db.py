@@ -58,6 +58,7 @@ from app import (
     migrate_users_app_extensions,
 )
 from social_core import ensure_posts_escalation_columns, ensure_wallet_and_vote_tables
+from blockchain_core import migrate_blockchain_schema
 
 
 def _table_exists(conn: sqlite3.Connection, name: str) -> bool:
