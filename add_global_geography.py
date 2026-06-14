@@ -73,17 +73,21 @@ _timeout_enabled = False
 
 def _timeout_handler(_signum: int, _frame: object) -> None:
     log("Geography seeding timed out after 30 seconds - exiting to allow gunicorn to start")
-    sys.exit(0)
+    os._exit(0)
 
 
 def _enable_deploy_timeout() -> None:
     global _timeout_enabled
-    if os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("DATABASE_PATH"):
-        if hasattr(signal, "SIGALRM"):
-            signal.signal(signal.SIGALRM, _timeout_handler)
-            signal.alarm(_DEPLOY_TIMEOUT_SECONDS)
-            _timeout_enabled = True
-            log(f"Deploy timeout enabled ({_DEPLOY_TIMEOUT_SECONDS}s)")
+    is_railway = bool(
+        os.environ.get("RAILWAY_ENVIRONMENT_NAME")
+        or os.environ.get("RAILWAY_ENVIRONMENT")
+        or os.environ.get("DATABASE_PATH")
+    )
+    if is_railway and hasattr(signal, "SIGALRM"):
+        signal.signal(signal.SIGALRM, _timeout_handler)
+        signal.alarm(_DEPLOY_TIMEOUT_SECONDS)
+        _timeout_enabled = True
+        log("Railway environment detected - timeout enabled (30 seconds)")
 
 
 def _clear_deploy_timeout() -> None:
@@ -407,4 +411,4 @@ if __name__ == "__main__":
         _clear_deploy_timeout()
         log("Geography seeding completed or timed out - exiting")
     print("Geography seeding process finished", flush=True)
-    sys.exit(0)
+    os._exit(0)
