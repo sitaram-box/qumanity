@@ -6,4 +6,4 @@ python init_db.py
 python add_global_geography.py
 
 # Railway sets PORT; Docker/local default 5000
-exec gunicorn --bind "0.0.0.0:${PORT:-5000}" app:app
+exec gunicorn app:app --bind "0.0.0.0:${PORT:-5000}" --workers 1 --timeout 120 --access-logfile - --error-logfile -

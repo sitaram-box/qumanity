@@ -500,6 +500,11 @@ logger = logging.getLogger("qumanity")
 config.log_warnings()
 
 
+@app.get("/health")
+def health():
+    return jsonify({"status": "ok"})
+
+
 def _language_geo_helpers() -> dict[str, Any]:
     return {
         "geo_path_to_state_path": geo_path_to_state_path,
@@ -13283,7 +13288,5 @@ register_space_routes(app, get_db, login_required, is_admin_user_fn=is_admin_use
 
 
 if __name__ == "__main__":
-    # On macOS, AirPlay Receiver may bind to port 5000; browsers then show 403/empty
-    # with no Flask log line — avoid 5000 for local dev unless you disable AirPlay Receiver.
-    port = int(os.environ.get("FLASK_RUN_PORT", "5001"))
-    app.run(debug=True, host="127.0.0.1", port=port)
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host="0.0.0.0", port=port)
