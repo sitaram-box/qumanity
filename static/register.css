@@ -45,6 +45,11 @@
   color: var(--qb-text);
 }
 
+.qb-payment-success {
+  color: var(--qb-success);
+  font-weight: 500;
+}
+
 .qr-code-box {
   padding: 1rem;
   text-align: center;

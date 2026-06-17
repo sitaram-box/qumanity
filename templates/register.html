@@ -659,8 +659,8 @@
         </label>
         <div id="reg-qr-placeholder" class="qr-placeholder mt-2" hidden>
           <p class="small mb-2">
-            Scan this QR code to donate directly to SITA Foundation via any UPI app
-            (Google Pay, PhonePe, Paytm, etc.)
+            Scan the SITA Foundation QR below, then complete payment via Razorpay for
+            <strong>automatic confirmation</strong> (no manual steps).
           </p>
           <img
             src="{{ url_for('static', filename='images/SitaFoundation Donate.jpg') }}"
@@ -669,15 +669,18 @@
             width="220"
             height="220"
           />
-          <button type="button" class="qb-btn qb-btn-secondary btn-sm mt-2" id="reg-qr-payment-completed">
-            Payment Completed
+          <button type="button" class="qb-btn qb-btn-primary btn-sm mt-2" id="reg-razorpay-pay-btn" hidden>
+            Pay via Razorpay (UPI / Card)
           </button>
-          <p class="small text-muted mt-1 mb-0" id="reg-qr-payment-status" hidden>Payment marked — submit registration to record your donation.</p>
+          <p class="small text-muted mt-2 mb-0" id="reg-payment-waiting">
+            Waiting for payment confirmation…
+          </p>
+          <p class="small text-success mt-1 mb-0 qb-payment-success" id="reg-qr-webhook-status" hidden></p>
         </div>
       </div>
     </div>
     <p class="small text-danger mb-2" id="reg-donation-error" hidden></p>
-    <button type="button" class="qb-btn qb-btn-primary" id="reg-donation-submit" {% if not show_donation_step %}disabled{% endif %}>
+    <button type="button" class="qb-btn qb-btn-neutral" id="reg-donation-submit" disabled>
       Submit Registration
     </button>
   </section>
@@ -724,7 +727,8 @@
     }
   };
 </script>
+<script src="https://checkout.razorpay.com/v1/checkout.js" defer></script>
 <script src="{{ url_for('static', filename='register_geo.js') }}?v=6" defer></script>
-<script src="{{ url_for('static', filename='register.js') }}?v=12" defer></script>
+<script src="{{ url_for('static', filename='register.js') }}?v=15" defer></script>
 {% endif %}
 {% endblock %}
