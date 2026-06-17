@@ -39,6 +39,7 @@ from translations import TRANSLATIONS, get_dashboard_ui_strings, get_text
 import qoin_core
 import scheduler as qoin_scheduler
 import social_core
+import sita_platform_core
 import varna_core
 import planetary_core
 import element_core
@@ -577,6 +578,11 @@ def language_dropdown_options(
     return language_core.build_language_dropdown_options(
         conn, user_row, **_language_geo_helpers()
     )
+
+
+@app.template_filter("mask_private_id")
+def mask_private_id_filter(private_id: str | None) -> str:
+    return sita_platform_core.mask_private_id(str(private_id or ""))
 
 
 @app.template_filter("tr")
@@ -3335,6 +3341,7 @@ def _before_request() -> None:
         global_core.migrate_global_location_schema(conn)
         element_core.migrate_element_core_schema(conn)
         migrate_blockchain_schema(conn)
+        sita_platform_core.migrate_sita_platform_schema(conn)
         if elections_are_enabled():
             try:
                 election_scheduler.process_election_cycles(
@@ -12458,6 +12465,18 @@ def _finalize_registration_with_donation(
                 agent_public_id=str(agent_row["public_id"]),
                 amount_rupees=int(donation_rupees),
             )
+    if donation_rupees > 0:
+        pay_method = "qr_code" if method == "qr" else "cash"
+        donation_status = "pending" if pay_method == "qr_code" else "confirmed"
+        sita_platform_core.record_donation(
+            conn,
+            user_private_id=private_id,
+            user_public_id=public_id,
+            amount=int(donation_rupees),
+            payment_method=pay_method,
+            referral_id=agent_private_id or referrer_private_id or None,
+            status=donation_status,
+        )
     conn.commit()
     return private_id, public_id
 
@@ -12552,6 +12571,203 @@ def api_register_donate():
             "redirect": url_for("login"),
         }
     )
+
+
+@app.route("/sita-foundation")
+def sita_foundation_page():
+    return render_template("sita_foundation.html")
+
+
+@app.post("/api/donation/record")
+@login_required
+def api_donation_record():
+    data = request.get_json(silent=True) or {}
+    user_row = g.current_user
+    try:
+        amount = int(data.get("amount") or 0)
+    except (TypeError, ValueError):
+        return jsonify({"error": "amount must be an integer"}), 400
+    if amount < 0 or amount > 200:
+        return jsonify({"error": "amount must be between 0 and 200"}), 400
+    method = str(data.get("payment_method") or data.get("method") or "qr_code").strip().lower()
+    if method == "qr":
+        method = "qr_code"
+    referral_id = str(data.get("referral_id") or data.get("referral_code") or "").strip() or None
+    status = "pending" if method == "qr_code" and amount > 0 else "confirmed"
+    conn = get_db()
+    donation_id = sita_platform_core.record_donation(
+        conn,
+        user_private_id=str(user_row["private_id"]),
+        user_public_id=str(user_row["public_id"]),
+        amount=amount,
+        payment_method=method,
+        referral_id=referral_id,
+        status=status if amount > 0 else "confirmed",
+    )
+    conn.commit()
+    return jsonify({"ok": True, "donation_id": donation_id, "status": status})
+
+
+@app.get("/api/donation/history")
+@login_required
+def api_donation_history():
+    conn = get_db()
+    payload = sita_platform_core.user_donation_history(conn, str(g.current_user["private_id"]))
+    return jsonify(payload)
+
+
+@app.get("/api/donation/admin/list")
+@login_required
+def api_donation_admin_list():
+    if not is_admin_user(g.current_user):
+        return jsonify({"error": "Admin only"}), 403
+    conn = get_db()
+    return jsonify(sita_platform_core.admin_donation_list(conn))
+
+
+@app.get("/api/donation/admin/export")
+@login_required
+def api_donation_admin_export():
+    if not is_admin_user(g.current_user):
+        return jsonify({"error": "Admin only"}), 403
+    conn = get_db()
+    csv_data = sita_platform_core.donations_csv(conn)
+    return (
+        csv_data,
+        200,
+        {
+            "Content-Type": "text/csv; charset=utf-8",
+            "Content-Disposition": "attachment; filename=donations.csv",
+        },
+    )
+
+
+@app.post("/api/donation/confirm")
+@login_required
+def api_donation_confirm():
+    if not is_admin_user(g.current_user):
+        return jsonify({"error": "Admin only"}), 403
+    data = request.get_json(silent=True) or {}
+    donation_id = data.get("donation_id") or data.get("id")
+    try:
+        donation_id_int = int(donation_id)
+    except (TypeError, ValueError):
+        return jsonify({"error": "donation_id required"}), 400
+    conn = get_db()
+    ok = sita_platform_core.confirm_donation(
+        conn, donation_id_int, str(g.current_user["private_id"])
+    )
+    if not ok:
+        return jsonify({"error": "Donation not found or already confirmed"}), 404
+    conn.commit()
+    return jsonify({"ok": True})
+
+
+@app.post("/api/donation/reject")
+@login_required
+def api_donation_reject():
+    if not is_admin_user(g.current_user):
+        return jsonify({"error": "Admin only"}), 403
+    data = request.get_json(silent=True) or {}
+    donation_id = data.get("donation_id") or data.get("id")
+    reason = str(data.get("reason") or data.get("admin_notes") or "").strip()
+    try:
+        donation_id_int = int(donation_id)
+    except (TypeError, ValueError):
+        return jsonify({"error": "donation_id required"}), 400
+    conn = get_db()
+    ok = sita_platform_core.reject_donation(
+        conn,
+        donation_id_int,
+        str(g.current_user["private_id"]),
+        reason,
+    )
+    if not ok:
+        return jsonify({"error": "Donation not found"}), 404
+    conn.commit()
+    return jsonify({"ok": True})
+
+
+@app.post("/api/edit/request")
+@login_required
+def api_edit_request():
+    data = request.get_json(silent=True) or {}
+    field_name = str(data.get("field_name") or "").strip()
+    new_value = str(data.get("new_value") or "").strip()
+    reason = str(data.get("reason") or "").strip()
+    conn = get_db()
+    try:
+        req_id = sita_platform_core.submit_edit_request(
+            conn,
+            str(g.current_user["private_id"]),
+            field_name,
+            new_value,
+            reason,
+        )
+        conn.commit()
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify({"ok": True, "request_id": req_id})
+
+
+@app.get("/api/edit/admin/list")
+@login_required
+def api_edit_admin_list():
+    if not is_admin_user(g.current_user):
+        return jsonify({"error": "Admin only"}), 403
+    conn = get_db()
+    return jsonify({"requests": sita_platform_core.admin_edit_request_list(conn)})
+
+
+@app.post("/api/edit/admin/approve")
+@login_required
+def api_edit_admin_approve():
+    if not is_admin_user(g.current_user):
+        return jsonify({"error": "Admin only"}), 403
+    data = request.get_json(silent=True) or {}
+    request_id = data.get("request_id") or data.get("id")
+    try:
+        request_id_int = int(request_id)
+    except (TypeError, ValueError):
+        return jsonify({"error": "request_id required"}), 400
+    conn = get_db()
+    ok = sita_platform_core.approve_edit_request(
+        conn,
+        request_id_int,
+        str(g.current_user["private_id"]),
+        notify_fn=send_system_message,
+        age_from_dob_fn=compute_age,
+    )
+    if not ok:
+        return jsonify({"error": "Request not found or not pending"}), 404
+    conn.commit()
+    return jsonify({"ok": True})
+
+
+@app.post("/api/edit/admin/reject")
+@login_required
+def api_edit_admin_reject():
+    if not is_admin_user(g.current_user):
+        return jsonify({"error": "Admin only"}), 403
+    data = request.get_json(silent=True) or {}
+    request_id = data.get("request_id") or data.get("id")
+    reason = str(data.get("reason") or data.get("admin_notes") or "").strip()
+    try:
+        request_id_int = int(request_id)
+    except (TypeError, ValueError):
+        return jsonify({"error": "request_id required"}), 400
+    conn = get_db()
+    ok = sita_platform_core.reject_edit_request(
+        conn,
+        request_id_int,
+        str(g.current_user["private_id"]),
+        reason,
+        notify_fn=send_system_message,
+    )
+    if not ok:
+        return jsonify({"error": "Request not found or not pending"}), 404
+    conn.commit()
+    return jsonify({"ok": True})
 
 
 RECOVERY_VERIFY_FAIL_MSG = (

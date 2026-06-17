@@ -203,8 +203,15 @@
             </span>
             {% endif %}
           </p>
-          <p class="mb-1"><strong>Private ID:</strong> <span class="font-monospace">{{ user.private_id }}</span></p>
           <p class="mb-1"><strong>Public ID:</strong> <span class="font-monospace">{{ user.public_id }}</span></p>
+          <p class="mb-1"><strong>Private ID:</strong> <span class="font-monospace">{{ user.private_id|mask_private_id }}</span></p>
+          <p class="small text-muted mb-2">
+            Your full Private ID was provided during registration. Please keep it safe.
+            If you have forgotten it, use the Edit Request feature below.
+          </p>
+          <button type="button" class="qb-btn qb-btn-outline btn-sm mb-2" id="qb-edit-request-open">
+            Request Profile Edit
+          </button>
           <p class="mb-1"><strong>Gender:</strong> {{ user.gender }}</p>
           <p class="mb-1"><strong>Age:</strong> {{ user.age }}</p>
           <p class="mb-1"><strong>Age group:</strong> {{ user_life_stage }}</p>
@@ -254,9 +261,44 @@
             </div>
             <p class="small text-muted mb-0 mt-1" id="qb-mother-tongue-flash" role="status" aria-live="polite"></p>
           </div>
-          <p class="mt-2 mb-0 small text-muted">
-            To request changes, send a message to Admin using the messaging system below.
-          </p>
+        </div>
+
+        <section class="qb-panel mb-3" id="qb-user-donations">
+          <h3 class="h6 text-secondary text-uppercase small mb-2">Your Donations</h3>
+          <p class="mb-1"><strong>Total donated:</strong> ₹<span id="qb-user-donation-total">0</span></p>
+          <ul class="list-unstyled small mb-0" id="qb-user-donation-list"></ul>
+          <p class="small text-muted mb-0 mt-2" id="qb-user-donation-empty" hidden>No donations recorded yet.</p>
+        </section>
+
+        <div id="qb-edit-request-modal" class="qb-modal-backdrop" hidden role="dialog" aria-modal="true" aria-labelledby="qb-edit-request-title">
+          <div class="qb-modal qb-panel p-3">
+            <h3 class="h6 mb-3" id="qb-edit-request-title">Request Profile Edit</h3>
+            <div class="mb-2">
+              <label class="form-label small" for="qb-edit-field">Select what you want to change</label>
+              <select id="qb-edit-field" class="form-select form-select-sm">
+                <option value="name">Name</option>
+                <option value="date_of_birth">Date of Birth</option>
+                <option value="birth_time">Birth Time</option>
+                <option value="birth_location">Birth Location</option>
+                <option value="current_location">Current Location</option>
+                <option value="phone">Phone</option>
+                <option value="email">Email</option>
+              </select>
+            </div>
+            <div class="mb-2">
+              <label class="form-label small" for="qb-edit-new-value">New Value</label>
+              <input type="text" class="form-control form-control-sm" id="qb-edit-new-value" />
+            </div>
+            <div class="mb-2">
+              <label class="form-label small" for="qb-edit-reason">Reason for change</label>
+              <textarea class="form-control form-control-sm" id="qb-edit-reason" rows="3"></textarea>
+            </div>
+            <p class="small text-danger mb-2" id="qb-edit-request-error" hidden></p>
+            <div class="d-flex gap-2">
+              <button type="button" class="qb-btn qb-btn-primary btn-sm" id="qb-edit-request-submit">Submit Request</button>
+              <button type="button" class="qb-btn qb-btn-neutral btn-sm" id="qb-edit-request-cancel">Cancel</button>
+            </div>
+          </div>
         </div>
 
         <section class="qb-panel mb-3 qb-referral-panel" id="qb-referral-panel" aria-labelledby="qb-referral-heading">
@@ -556,6 +598,26 @@
             <ul class="list-unstyled mb-0" id="qb-admin-report-recent"></ul>
           </div>
           <p class="small text-muted mb-0" id="qb-admin-donation-report-flash" role="status"></p>
+        </section>
+
+        <section class="qb-panel mb-3" id="qb-admin-donation-mgmt">
+          <h3 class="h6 text-secondary text-uppercase small mb-2">Donation Management</h3>
+          <p class="small mb-2">
+            <strong>Total confirmed donations:</strong> ₹<span id="qb-admin-donation-total">0</span>
+          </p>
+          <div class="d-flex flex-wrap gap-2 mb-2">
+            <button type="button" class="qb-btn qb-btn-outline btn-sm" id="qb-admin-donations-refresh">Refresh</button>
+            <a href="/api/donation/admin/export" class="qb-btn qb-btn-secondary btn-sm" id="qb-admin-donations-export">Export CSV</a>
+          </div>
+          <ul class="list-unstyled small mb-0" id="qb-admin-donations-list"></ul>
+          <p class="small text-muted mb-0 mt-2" id="qb-admin-donations-empty" hidden>No donations yet.</p>
+        </section>
+
+        <section class="qb-panel mb-3" id="qb-admin-edit-requests">
+          <h3 class="h6 text-secondary text-uppercase small mb-2">Edit Requests</h3>
+          <button type="button" class="qb-btn qb-btn-outline btn-sm mb-2" id="qb-admin-edit-refresh">Refresh</button>
+          <ul class="list-unstyled small mb-0" id="qb-admin-edit-list"></ul>
+          <p class="small text-muted mb-0 mt-2" id="qb-admin-edit-empty" hidden>No pending edit requests.</p>
         </section>
 
         <section class="qb-panel mb-3" id="qb-private-manage-elections">

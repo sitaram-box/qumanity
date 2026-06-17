@@ -211,6 +211,52 @@ p, li, label, td, th, span, div {
   color: var(--qb-topbar-accent);
 }
 
+.qb-brand-sita-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: var(--qb-topbar-accent);
+  color: #000;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  line-height: 1.2;
+}
+
+.qb-footer-link {
+  color: var(--qb-topbar-accent);
+  text-decoration: underline;
+  margin-left: 0.5rem;
+}
+
+.qb-donation-qr-img {
+  max-width: 220px;
+  height: auto;
+  border: 1px solid var(--qb-border);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.qb-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 1rem;
+}
+
+.qb-modal-backdrop[hidden] {
+  display: none !important;
+}
+
+.qb-modal {
+  max-width: 28rem;
+  width: 100%;
+}
+
 .qb-nav-cluster {
   display: flex;
   flex-wrap: wrap;

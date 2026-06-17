@@ -570,6 +570,27 @@
     var donateSubmit = document.getElementById("reg-donation-submit");
     var donateErr = document.getElementById("reg-donation-error");
     var previewRequestId = 0;
+    var qrPaymentConfirmed = false;
+    var qrPaymentStatus = document.getElementById("reg-qr-payment-status");
+    var qrPaymentCompletedBtn = document.getElementById("reg-qr-payment-completed");
+
+    function resetQrPaymentState() {
+      qrPaymentConfirmed = false;
+      if (qrPaymentStatus) qrPaymentStatus.hidden = true;
+      if (qrPaymentCompletedBtn) {
+        qrPaymentCompletedBtn.disabled = false;
+        qrPaymentCompletedBtn.textContent = "Payment Completed";
+      }
+    }
+
+    if (qrPaymentCompletedBtn) {
+      qrPaymentCompletedBtn.addEventListener("click", function () {
+        qrPaymentConfirmed = true;
+        if (qrPaymentStatus) qrPaymentStatus.hidden = false;
+        qrPaymentCompletedBtn.disabled = true;
+        qrPaymentCompletedBtn.textContent = "✓ Payment marked";
+      });
+    }
 
     function currentCountryId() {
       var co = document.getElementById("current_country_id");
@@ -605,6 +626,7 @@
           });
         if (qrPlaceholder) qrPlaceholder.hidden = true;
         if (cashFields) cashFields.hidden = true;
+        resetQrPaymentState();
       }
     }
 
@@ -792,6 +814,7 @@
         var isQr = radio.value === "qr" && radio.checked;
         if (cashFields) cashFields.hidden = !isCash;
         if (qrPlaceholder) qrPlaceholder.hidden = !isQr;
+        if (!isQr) resetQrPaymentState();
       });
     });
 
@@ -902,7 +925,15 @@
         var method = methodRadio ? methodRadio.value : "";
         if (amount > 0 && !method) {
           if (donateErr) {
-            donateErr.textContent = "Select a payment method (QR Code or Cash).";
+            donateErr.textContent = "Select a payment method (Cash or QR Code).";
+            donateErr.hidden = false;
+          }
+          return;
+        }
+        if (amount > 0 && method === "qr" && !qrPaymentConfirmed) {
+          if (donateErr) {
+            donateErr.textContent =
+              "After paying via QR code, click Payment Completed before submitting.";
             donateErr.hidden = false;
           }
           return;

@@ -8847,5 +8847,203 @@
     });
   }
 
+  function loadUserDonationHistory() {
+    var totalEl = document.getElementById("qb-user-donation-total");
+    var listEl = document.getElementById("qb-user-donation-list");
+    var emptyEl = document.getElementById("qb-user-donation-empty");
+    if (!listEl) return;
+    fetch("/api/donation/history", { credentials: "same-origin", headers: { Accept: "application/json" } })
+      .then(function (r) { return r.json(); })
+      .then(function (b) {
+        if (totalEl) totalEl.textContent = String(b.total_confirmed || 0);
+        listEl.innerHTML = "";
+        var rows = b.donations || [];
+        if (!rows.length) {
+          if (emptyEl) emptyEl.hidden = false;
+          return;
+        }
+        if (emptyEl) emptyEl.hidden = true;
+        rows.forEach(function (d) {
+          var li = document.createElement("li");
+          li.className = "mb-1";
+          li.textContent =
+            "₹" + d.amount + " — " + (d.status || "") + " — " + (d.created_at || "");
+          listEl.appendChild(li);
+        });
+      })
+      .catch(function () {});
+  }
+  loadUserDonationHistory();
+
+  var editModal = document.getElementById("qb-edit-request-modal");
+  var editOpen = document.getElementById("qb-edit-request-open");
+  var editCancel = document.getElementById("qb-edit-request-cancel");
+  var editSubmit = document.getElementById("qb-edit-request-submit");
+  var editErr = document.getElementById("qb-edit-request-error");
+  if (editOpen && editModal) {
+    editOpen.addEventListener("click", function () {
+      editModal.hidden = false;
+      if (editErr) editErr.hidden = true;
+    });
+  }
+  if (editCancel && editModal) {
+    editCancel.addEventListener("click", function () {
+      editModal.hidden = true;
+    });
+  }
+  if (editSubmit) {
+    editSubmit.addEventListener("click", function () {
+      var field = document.getElementById("qb-edit-field");
+      var val = document.getElementById("qb-edit-new-value");
+      var reason = document.getElementById("qb-edit-reason");
+      fetch("/api/edit/request", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          field_name: field ? field.value : "",
+          new_value: val ? val.value : "",
+          reason: reason ? reason.value : "",
+        }),
+      })
+        .then(function (r) { return r.json().then(function (b) { return { ok: r.ok, b: b }; }); })
+        .then(function (x) {
+          if (!x.ok) throw new Error((x.b && x.b.error) || "Request failed");
+          if (editModal) editModal.hidden = true;
+          if (window.qbToast) window.qbToast("Edit request submitted.", "success");
+        })
+        .catch(function (err) {
+          if (editErr) {
+            editErr.textContent = err.message || "Could not submit request";
+            editErr.hidden = false;
+          }
+        });
+    });
+  }
+
+  function loadAdminDonations() {
+    var listEl = document.getElementById("qb-admin-donations-list");
+    var totalEl = document.getElementById("qb-admin-donation-total");
+    var emptyEl = document.getElementById("qb-admin-donations-empty");
+    if (!listEl) return;
+    fetch("/api/donation/admin/list", { credentials: "same-origin", headers: { Accept: "application/json" } })
+      .then(function (r) { return r.json(); })
+      .then(function (b) {
+        if (totalEl) totalEl.textContent = String(b.total_confirmed || 0);
+        listEl.innerHTML = "";
+        var rows = b.donations || [];
+        if (!rows.length) {
+          if (emptyEl) emptyEl.hidden = false;
+          return;
+        }
+        if (emptyEl) emptyEl.hidden = true;
+        rows.forEach(function (d) {
+          var li = document.createElement("li");
+          li.className = "mb-2 p-2 border border-secondary rounded";
+          var name = ((d.first_name || "") + " " + (d.last_name || "")).trim();
+          li.innerHTML =
+            "<strong>" + name + "</strong> (" + (d.user_public_id || "") + ")<br>" +
+            "₹" + d.amount + " — " + (d.payment_method || "") + " — " + (d.status || "") +
+            "<br><small>" + (d.created_at || "") + "</small>";
+          if (d.status === "pending") {
+            li.innerHTML +=
+              "<br><button type='button' class='qb-btn qb-btn-primary btn-sm mt-1 me-1' data-don-confirm='" +
+              d.id + "'>Confirm</button>" +
+              "<button type='button' class='qb-btn qb-btn-danger btn-sm mt-1' data-don-reject='" +
+              d.id + "'>Reject</button>";
+          }
+          listEl.appendChild(li);
+        });
+        listEl.querySelectorAll("[data-don-confirm]").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            fetch("/api/donation/confirm", {
+              method: "POST",
+              credentials: "same-origin",
+              headers: { "Content-Type": "application/json", Accept: "application/json" },
+              body: JSON.stringify({ donation_id: btn.getAttribute("data-don-confirm") }),
+            }).then(function () { loadAdminDonations(); });
+          });
+        });
+        listEl.querySelectorAll("[data-don-reject]").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            var reason = prompt("Rejection reason (optional):") || "";
+            fetch("/api/donation/reject", {
+              method: "POST",
+              credentials: "same-origin",
+              headers: { "Content-Type": "application/json", Accept: "application/json" },
+              body: JSON.stringify({
+                donation_id: btn.getAttribute("data-don-reject"),
+                reason: reason,
+              }),
+            }).then(function () { loadAdminDonations(); });
+          });
+        });
+      })
+      .catch(function () {});
+  }
+  var adminDonRefresh = document.getElementById("qb-admin-donations-refresh");
+  if (adminDonRefresh) adminDonRefresh.addEventListener("click", loadAdminDonations);
+  if (document.getElementById("qb-admin-donations-list")) loadAdminDonations();
+
+  function loadAdminEditRequests() {
+    var listEl = document.getElementById("qb-admin-edit-list");
+    var emptyEl = document.getElementById("qb-admin-edit-empty");
+    if (!listEl) return;
+    fetch("/api/edit/admin/list", { credentials: "same-origin", headers: { Accept: "application/json" } })
+      .then(function (r) { return r.json(); })
+      .then(function (b) {
+        listEl.innerHTML = "";
+        var rows = b.requests || [];
+        if (!rows.length) {
+          if (emptyEl) emptyEl.hidden = false;
+          return;
+        }
+        if (emptyEl) emptyEl.hidden = true;
+        rows.forEach(function (req) {
+          var li = document.createElement("li");
+          li.className = "mb-2 p-2 border border-secondary rounded";
+          var name = ((req.first_name || "") + " " + (req.last_name || "")).trim();
+          li.innerHTML =
+            "<strong>" + name + "</strong><br>" +
+            "Field: " + (req.field_name || "") + "<br>" +
+            "New: " + (req.new_value || "") + "<br>" +
+            "Reason: " + (req.reason || "") +
+            "<br><button type='button' class='qb-btn qb-btn-primary btn-sm mt-1 me-1' data-edit-approve='" +
+            req.id + "'>Approve</button>" +
+            "<button type='button' class='qb-btn qb-btn-danger btn-sm mt-1' data-edit-reject='" +
+            req.id + "'>Reject</button>";
+          listEl.appendChild(li);
+        });
+        listEl.querySelectorAll("[data-edit-approve]").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            fetch("/api/edit/admin/approve", {
+              method: "POST",
+              credentials: "same-origin",
+              headers: { "Content-Type": "application/json", Accept: "application/json" },
+              body: JSON.stringify({ request_id: btn.getAttribute("data-edit-approve") }),
+            }).then(function () { loadAdminEditRequests(); });
+          });
+        });
+        listEl.querySelectorAll("[data-edit-reject]").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            var reason = prompt("Rejection reason (optional):") || "";
+            fetch("/api/edit/admin/reject", {
+              method: "POST",
+              credentials: "same-origin",
+              headers: { "Content-Type": "application/json", Accept: "application/json" },
+              body: JSON.stringify({
+                request_id: btn.getAttribute("data-edit-reject"),
+                reason: reason,
+              }),
+            }).then(function () { loadAdminEditRequests(); });
+          });
+        });
+      })
+      .catch(function () {});
+  }
+  var adminEditRefresh = document.getElementById("qb-admin-edit-refresh");
+  if (adminEditRefresh) adminEditRefresh.addEventListener("click", loadAdminEditRequests);
+  if (document.getElementById("qb-admin-edit-list")) loadAdminEditRequests();
+
   document.dispatchEvent(new CustomEvent("qb-dash-ready"));
 })();

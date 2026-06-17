@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}SITA Foundation — Qumanity{% endblock %}
+
+{% block body %}
+<div class="qb-panel p-4" style="max-width: 48rem; margin: 2rem auto;">
+  <h1 class="h3 mb-3">SITA Foundation</h1>
+  <p class="lead mb-3">Sekyor Intelligence Tantra Foundation</p>
+  <p>
+    SITA Foundation is a Section 8 (not-for-profit) company registered under the
+    Companies Act, 2013. The foundation stewards conscious technology, transparent
+    governance, and community-led economic participation across India and the world.
+  </p>
+  <p>
+    <strong>Qumanity</strong> is a flagship project of SITA Foundation — a sovereign
+    digital governance and Karma Points economy platform connecting villages, citizens,
+    and councils through verifiable civic participation.
+  </p>
+  <h2 class="h5 mt-4 mb-2">Legal status</h2>
+  <ul>
+    <li>Section 8 (Not-for-Profit) Company</li>
+    <li>Registered under the Companies Act, 2013</li>
+    <li>Donations support platform operations and community programmes</li>
+  </ul>
+  <p class="mt-4 mb-0">
+    <a href="{{ url_for('index') }}" class="qb-btn qb-btn-neutral btn-sm">← Back to Qumanity</a>
+  </p>
+</div>
+{% endblock %}

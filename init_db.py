@@ -28,6 +28,7 @@ import leadership_core
 import qoin_core
 import donation_core
 import referral_core
+import sita_platform_core
 import scheduler  # noqa: F401 — weekly settlement + monthly varna recalc
 import varna_core
 import element_core
@@ -141,6 +142,7 @@ def apply_migrations(conn: sqlite3.Connection, *, verbose: bool = True) -> None:
         ("zodiac planets / country languages", element_core.migrate_element_core_schema),
         ("admin profile patch (H_U_ADMIN)", migrate_admin_user_profile),
         ("blockchain schema", migrate_blockchain_schema),
+        ("donations / edit_requests", sita_platform_core.migrate_sita_platform_schema),
     ]
 
     for label, fn in steps:

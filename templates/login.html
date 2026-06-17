@@ -23,7 +23,7 @@
 
     <form method="post" action="{{ url_for('login') }}" class="login-form" id="login-form">
       <div class="qb-form-group">
-        <label for="private_id">{{ 'private_id_label'|tr }}</label>
+        <label for="private_id">Private ID</label>
         <input
           type="text"
           class="form-control qb-form-control font-monospace"
@@ -34,7 +34,7 @@
           value="{{ request.form.get('private_id', '') }}"
           autocomplete="username"
         />
-        <small class="login-hint">Enter the 9-digit Private ID you received during registration, or <strong>H_U_ADMIN</strong> for the admin account</small>
+        <small class="login-hint">Enter the 9-digit Private ID you received during registration, or <strong>H_U_ADMIN</strong> for the admin account.</small>
       </div>
 
       <div class="qb-form-group">

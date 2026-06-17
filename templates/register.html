@@ -643,25 +643,36 @@
       <h3 class="h6 small text-secondary mb-2">Select Payment Method</h3>
       <div class="payment-option mb-2">
         <label class="payment-label small">
-          <input type="radio" name="reg-donate-method" value="qr" class="reg-donate-method-radio" />
-          <span>📱 Scan QR Code</span>
-        </label>
-        <div id="reg-qr-placeholder" class="qr-placeholder mt-2" hidden>
-          <div class="qr-code-box">
-            <p class="small mb-2">Scan this QR code to pay</p>
-            <div class="qr-image-placeholder">[QR CODE WILL APPEAR HERE]</div>
-          </div>
-        </div>
-      </div>
-      <div class="payment-option mb-2">
-        <label class="payment-label small">
           <input type="radio" name="reg-donate-method" value="cash" class="reg-donate-method-radio" />
-          <span>💵 Cash (via Referral)</span>
+          <span>💵 Cash (via Referral ID)</span>
         </label>
         <div id="reg-donate-cash-fields" class="mt-2" hidden>
           <label class="form-label small" for="reg-donate-referral-id">Referral ID</label>
           <input type="text" class="form-control form-control-sm font-monospace" id="reg-donate-referral-id" placeholder="Enter Referral ID" autocomplete="off" />
           <small class="text-muted">Enter the Referral ID of the volunteer who helped you</small>
+        </div>
+      </div>
+      <div class="payment-option mb-2">
+        <label class="payment-label small">
+          <input type="radio" name="reg-donate-method" value="qr" class="reg-donate-method-radio" />
+          <span>📱 QR Code Scan</span>
+        </label>
+        <div id="reg-qr-placeholder" class="qr-placeholder mt-2" hidden>
+          <p class="small mb-2">
+            Scan this QR code to donate directly to SITA Foundation via any UPI app
+            (Google Pay, PhonePe, Paytm, etc.)
+          </p>
+          <img
+            src="{{ url_for('static', filename='images/SitaFoundation Donate.jpg') }}"
+            alt="SITA Foundation donation QR code"
+            class="qb-donation-qr-img"
+            width="220"
+            height="220"
+          />
+          <button type="button" class="qb-btn qb-btn-secondary btn-sm mt-2" id="reg-qr-payment-completed">
+            Payment Completed
+          </button>
+          <p class="small text-muted mt-1 mb-0" id="reg-qr-payment-status" hidden>Payment marked — submit registration to record your donation.</p>
         </div>
       </div>
     </div>
