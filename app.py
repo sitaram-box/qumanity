@@ -8600,55 +8600,79 @@ def _create_razorpay_order(amount_rupees: int, *, receipt: str = "") -> dict[str
     return client.order.create(data=order_data)
 
 
+def _parse_upi_vpa_from_qr_response(qr: dict[str, Any]) -> str:
+    """Extract merchant VPA from Razorpay QR `image_content` UPI URI."""
+    content = str(qr.get("image_content") or "").strip()
+    if not content or "?" not in content:
+        return ""
+    query = content.split("?", 1)[1]
+    for part in query.split("&"):
+        if part.startswith("pa="):
+            return part[3:].strip()
+    return ""
+
+
 def _create_razorpay_upi_qr_for_order(
     order_id: str,
     amount_paise: int,
     donation_id: int,
 ) -> dict[str, Any]:
-    """Create a Razorpay UPI QR linked to an order (scan-only flow, no checkout popup)."""
+    """Create a Razorpay UPI QR (scan-only; no checkout popup)."""
     client = _razorpay_client()
     if client is None:
         raise ValueError("Payment gateway is not configured")
-    close_by = int(time.time()) + 3600
-    notes = {"donation_id": str(donation_id)}
+    # Razorpay requires close_by at least 15 minutes ahead.
+    close_by = int(time.time()) + 900
+    notes = {
+        "donation_id": str(donation_id),
+        "order_id": str(order_id),
+    }
+    qr_data = {
+        "type": "upi_qr",
+        "name": "QumanityDonation",
+        "usage": "single_use",
+        "fixed_amount": True,
+        "payment_amount": int(amount_paise),
+        "description": f"Donation for order {order_id}",
+        "close_by": close_by,
+        "notes": notes,
+    }
     try:
-        qr = client.qrcode.create(
-            {
-                "type": "upi_qr",
-                "name": f"Qumanity donation {donation_id}",
-                "usage": "single_use",
-                "fixed_amount": True,
-                "payment_amount": int(amount_paise),
-                "description": "Qumanity registration donation",
-                "order_id": order_id,
-                "close_by": close_by,
-                "notes": notes,
-            }
-        )
+        qr = client.qrcode.create(qr_data)
+        upi_vpa = _parse_upi_vpa_from_qr_response(qr) or getattr(config, "DONATION_UPI_VPA", "")
+        image_url = str(qr.get("image_url") or "").strip()
         return {
             "qr_id": str(qr.get("id") or "").strip(),
-            "image_url": str(qr.get("image_url") or "").strip(),
+            "image_url": image_url,
             "qr_image_base64": None,
+            "upi_vpa": upi_vpa,
         }
     except Exception as exc:
-        app.logger.warning("Razorpay UPI QR create failed, using payment link: %s", exc)
-        plink = client.payment_link.create(
-            {
-                "amount": int(amount_paise),
-                "currency": "INR",
-                "description": "Qumanity registration donation",
-                "order_id": order_id,
-                "notes": notes,
+        app.logger.warning("Razorpay UPI QR create failed, trying payment link: %s", exc)
+        try:
+            plink = client.payment_link.create(
+                {
+                    "amount": int(amount_paise),
+                    "currency": "INR",
+                    "description": "Qumanity registration donation",
+                    "notes": notes,
+                }
+            )
+            short_url = str(plink.get("short_url") or "").strip()
+            qr_b64 = referral_core.generate_qr_base64(short_url) if short_url else None
+            if not qr_b64:
+                raise ValueError("Payment link created but QR image could not be generated")
+            return {
+                "qr_id": str(plink.get("id") or "").strip(),
+                "image_url": None,
+                "qr_image_base64": qr_b64,
+                "short_url": short_url,
+                "upi_vpa": getattr(config, "DONATION_UPI_VPA", ""),
             }
-        )
-        short_url = str(plink.get("short_url") or "").strip()
-        qr_b64 = referral_core.generate_qr_base64(short_url) if short_url else None
-        return {
-            "qr_id": str(plink.get("id") or "").strip(),
-            "image_url": None,
-            "qr_image_base64": qr_b64,
-            "short_url": short_url,
-        }
+        except Exception as plink_exc:
+            raise ValueError(
+                f"Could not generate payment QR: {plink_exc}"
+            ) from plink_exc
 
 
 def _verify_razorpay_payment(
@@ -9109,10 +9133,15 @@ def api_donation_create_order():
     session["pending_donation_id"] = donation_id
     session["pending_donation_marker"] = session_marker
     conn.commit()
-    upi_vpa = getattr(config, "DONATION_UPI_VPA", "") or ""
+    upi_vpa = (
+        str(qr_payload.get("upi_vpa") or "").strip()
+        or getattr(config, "DONATION_UPI_VPA", "")
+        or "—"
+    )
     return jsonify(
         {
             "ok": True,
+            "success": True,
             "donation_id": donation_id,
             "order_id": order_id,
             "amount": amount,
@@ -12635,9 +12664,21 @@ def api_register_donate():
                 return jsonify({"error": "Private ID must belong to an active volunteer"}), 400
         else:
             return jsonify({"error": "Referral ID is required for cash payments"}), 400
-    elif method == "qr":
-        # QR payment is a placeholder for now — no gateway verification.
-        pass
+    elif method == "qr" and amount > 0:
+        pending_donation_id = session.get("pending_donation_id")
+        if not pending_donation_id:
+            return jsonify({"error": "Complete QR payment first (scan the QR code)."}), 400
+        donation_row = sita_platform_core.get_donation(conn, int(pending_donation_id))
+        if not donation_row:
+            return jsonify({"error": "Payment record not found. Scan the QR and pay again."}), 400
+        pay_status = sita_platform_core._payment_status_for_row(donation_row)
+        if pay_status != "completed":
+            return jsonify(
+                {
+                    "error": "Payment not completed yet. Wait for confirmation after paying via UPI.",
+                    "payment_status": pay_status,
+                }
+            ), 400
     elif method in ("upi", "card", "netbanking") and amount > 0:
         if not all([payment_id, order_id, signature]):
             return jsonify({"error": "Complete payment before verifying registration"}), 400
