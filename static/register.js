@@ -735,9 +735,19 @@
           });
         })
         .then(function (x) {
-          if (!x.ok) throw new Error((x.b && x.b.error) || "Could not create payment order");
+          if (!x.ok) {
+            var err = (x.b && x.b.error) || "Could not create payment order";
+            if (x.b && x.b.code === "no_pending_registration") {
+              err =
+                "Registration session expired. Please complete the form steps again, then select QR payment.";
+            }
+            throw new Error(err);
+          }
           if (!x.b.qr_image_base64) {
-            throw new Error("Direct UPI QR was not generated. Check DONATION_UPI_VPA configuration.");
+            throw new Error(
+              (x.b && x.b.error) ||
+                "Server did not return a QR image. Check /api/diagnose-config on the server."
+            );
           }
           pendingDonationId = x.b.donation_id;
           displayQrPayment(x.b);
@@ -745,13 +755,7 @@
         })
         .catch(function (err) {
           if (donateErr) {
-            var msg = err.message || "Could not initialize payment";
-            if (msg.indexOf("DONATION_UPI_VPA") !== -1 || msg.indexOf("UPI payment QR") !== -1) {
-              msg =
-                "Payment QR is not configured on the server. " +
-                "Ask the admin to set DONATION_UPI_VPA in Railway (Razorpay merchant UPI ID).";
-            }
-            donateErr.textContent = msg;
+            donateErr.textContent = err.message || "Could not initialize payment";
             donateErr.hidden = false;
           }
           if (paymentWaitingEl) paymentWaitingEl.hidden = true;

@@ -535,6 +535,19 @@ logger = logging.getLogger("qumanity")
 config.log_warnings()
 
 
+def _log_payment_env_status() -> None:
+    vpa = (os.environ.get("DONATION_UPI_VPA") or config.DONATION_UPI_VPA or "").strip()
+    logger.info(
+        "Payment env: RAZORPAY_KEY_ID=%s RAZORPAY_KEY_SECRET=%s DONATION_UPI_VPA=%s",
+        "set" if config.RAZORPAY_KEY_ID else "MISSING",
+        "set" if config.RAZORPAY_KEY_SECRET else "MISSING",
+        f"set ({len(vpa)} chars)" if vpa else "MISSING",
+    )
+
+
+_log_payment_env_status()
+
+
 def _language_geo_helpers() -> dict[str, Any]:
     return {
         "geo_path_to_state_path": geo_path_to_state_path,
@@ -8604,6 +8617,23 @@ def _create_razorpay_order(amount_rupees: int, *, receipt: str = "") -> dict[str
 _MERCHANT_UPI_VPA_CACHE: str = ""
 
 
+def _clean_env_value(value: str) -> str:
+    """Strip whitespace and surrounding quotes from env values."""
+    v = (value or "").strip()
+    while len(v) >= 2 and v[0] == v[-1] and v[0] in ('"', "'"):
+        v = v[1:-1].strip()
+    return v
+
+
+def _mask_secret(value: str, visible: int = 4) -> str:
+    v = (value or "").strip()
+    if not v:
+        return ""
+    if len(v) <= visible:
+        return "*" * len(v)
+    return v[:visible] + "…" + f"({len(v)} chars)"
+
+
 def _parse_upi_vpa_from_uri(upi_uri: str) -> str:
     uri = (upi_uri or "").strip()
     if not uri or "?" not in uri:
@@ -8642,8 +8672,6 @@ def _discover_razorpay_upi_vpa(client: Any) -> str:
 def _get_donation_upi_vpa(client: Any | None = None) -> str:
     """Resolve merchant UPI VPA from env/config or Razorpay API."""
     global _MERCHANT_UPI_VPA_CACHE
-    if _MERCHANT_UPI_VPA_CACHE:
-        return _MERCHANT_UPI_VPA_CACHE
 
     for env_name in (
         "DONATION_UPI_VPA",
@@ -8651,16 +8679,19 @@ def _get_donation_upi_vpa(client: Any | None = None) -> str:
         "UPI_VPA",
         "MERCHANT_UPI_VPA",
     ):
-        vpa = os.environ.get(env_name, "").strip()
+        vpa = _clean_env_value(os.environ.get(env_name, ""))
         if vpa:
-            app.logger.info("Using %s from environment", env_name)
+            app.logger.info("Using %s from environment (%d chars)", env_name, len(vpa))
             _MERCHANT_UPI_VPA_CACHE = vpa
             return vpa
 
-    vpa = getattr(config, "DONATION_UPI_VPA", "").strip()
+    vpa = _clean_env_value(getattr(config, "DONATION_UPI_VPA", ""))
     if vpa:
         _MERCHANT_UPI_VPA_CACHE = vpa
         return vpa
+
+    if _MERCHANT_UPI_VPA_CACHE:
+        return _MERCHANT_UPI_VPA_CACHE
 
     if client is None:
         client = _razorpay_client()
@@ -8671,6 +8702,32 @@ def _get_donation_upi_vpa(client: Any | None = None) -> str:
             return discovered
 
     return ""
+
+
+def _generate_upi_qr_base64(upi_uri: str) -> str:
+    """Generate PNG QR as base64; raises with actionable error if libraries missing."""
+    qr_b64 = referral_core.generate_qr_base64(upi_uri)
+    if qr_b64:
+        return qr_b64
+    try:
+        import base64
+        from io import BytesIO
+
+        import qrcode
+
+        qr = qrcode.QRCode(version=1, box_size=8, border=2)
+        qr.add_data(upi_uri)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white")
+        buf = BytesIO()
+        img.save(buf, format="PNG")
+        return base64.b64encode(buf.getvalue()).decode("ascii")
+    except Exception as exc:
+        app.logger.exception("UPI QR image generation failed")
+        raise ValueError(
+            f"Could not generate QR image: {exc}. "
+            "Ensure Pillow is installed (requirements: Pillow, qrcode[pil])."
+        ) from exc
 
 
 def _build_upi_pay_uri(
@@ -8784,11 +8841,7 @@ def _create_direct_upi_qr_for_donation(
     if not upi_vpa:
         upi_vpa = _parse_upi_vpa_from_uri(upi_uri)
 
-    qr_b64 = referral_core.generate_qr_base64(upi_uri)
-    if not qr_b64:
-        raise ValueError(
-            "Could not generate QR image. Ensure the qrcode Python package is installed."
-        )
+    qr_b64 = _generate_upi_qr_base64(upi_uri)
 
     return {
         "qr_id": qr_id,
@@ -9213,7 +9266,12 @@ def api_upgrade_user():
 def api_donation_create_order():
     pending = session.get("pending_registration")
     if not pending and not getattr(g, "current_user", None):
-        return jsonify({"error": "Complete registration or log in first"}), 401
+        return jsonify(
+            {
+                "error": "Complete registration or log in first",
+                "code": "no_pending_registration",
+            }
+        ), 401
     payload = request.get_json(silent=True) or {}
     try:
         amount = int(payload.get("amount", 0))
@@ -9221,11 +9279,23 @@ def api_donation_create_order():
         return jsonify({"error": "amount must be an integer"}), 400
     if amount < 1 or amount > 200:
         return jsonify({"error": "Donation must be between ₹1 and ₹200"}), 400
+
+    order_id = ""
+    order_currency = "INR"
     try:
-        order = _create_razorpay_order(amount)
-    except ValueError as exc:
-        return jsonify({"error": str(exc)}), 503
-    order_id = str(order.get("id") or "").strip()
+        if _razorpay_client() is not None:
+            order = _create_razorpay_order(amount)
+            order_id = str(order.get("id") or "").strip()
+            order_currency = str(order.get("currency") or "INR")
+        else:
+            app.logger.warning(
+                "Razorpay keys not configured; using static UPI QR only"
+            )
+    except Exception as exc:
+        app.logger.warning(
+            "Razorpay order create failed; continuing with static UPI QR: %s", exc
+        )
+
     conn = get_db()
     session_marker = secrets.token_hex(8)
     donation_id = sita_platform_core.record_donation(
@@ -9236,18 +9306,25 @@ def api_donation_create_order():
         payment_method="qr_code",
         status="pending",
         payment_status="pending",
-        razorpay_order_id=order_id,
+        razorpay_order_id=order_id or None,
         amount_paise=amount * 100,
     )
     try:
-        qr_payload = _create_direct_upi_qr_for_donation(order_id, amount * 100, donation_id)
+        qr_payload = _create_direct_upi_qr_for_donation(
+            order_id or f"local-{donation_id}",
+            amount * 100,
+            donation_id,
+        )
     except ValueError as exc:
         conn.rollback()
-        return jsonify({"error": str(exc)}), 503
+        app.logger.error("UPI QR build failed for donation %s: %s", donation_id, exc)
+        return jsonify({"error": str(exc), "code": "qr_build_failed"}), 503
     except Exception as exc:
         conn.rollback()
         app.logger.exception("Failed to create UPI QR for donation %s", donation_id)
-        return jsonify({"error": f"Could not generate payment QR: {exc}"}), 503
+        return jsonify(
+            {"error": f"Could not generate payment QR: {exc}", "code": "qr_exception"}
+        ), 503
     txn_ref = str(qr_payload.get("transaction_ref") or f"QUM{donation_id}").strip()
     conn.execute(
         "UPDATE donations SET transaction_id = ? WHERE id = ?",
@@ -9278,6 +9355,63 @@ def api_donation_create_order():
             "qr_image_base64": qr_payload.get("qr_image_base64"),
             "upi_vpa": upi_vpa,
             "upi_uri": qr_payload.get("upi_uri"),
+        }
+    )
+
+
+@app.get("/api/diagnose-config")
+def api_diagnose_config():
+    """Debug payment configuration (masked secrets)."""
+    secret = (os.environ.get("DIAGNOSTIC_SECRET") or "").strip()
+    if secret:
+        provided = (request.headers.get("X-Diagnostic-Secret") or "").strip()
+        if not provided or not hmac.compare_digest(provided, secret):
+            return jsonify({"error": "Forbidden"}), 403
+
+    env_names = [
+        "DONATION_UPI_VPA",
+        "RAZORPAY_UPI_VPA",
+        "UPI_VPA",
+        "MERCHANT_UPI_VPA",
+        "RAZORPAY_KEY_ID",
+        "RAZORPAY_KEY_SECRET",
+        "RAZORPAY_WEBHOOK_SECRET",
+    ]
+    env_report: dict[str, Any] = {}
+    for name in env_names:
+        raw = os.environ.get(name)
+        cleaned = _clean_env_value(raw or "")
+        env_report[name] = {
+            "exists": raw is not None,
+            "length": len(cleaned),
+            "preview": _mask_secret(cleaned, 6),
+            "has_at_sign": "@" in cleaned,
+        }
+
+    vpa_resolved = _get_donation_upi_vpa()
+    qr_ok = False
+    qr_error = ""
+    if vpa_resolved:
+        try:
+            test_uri = _build_upi_pay_uri(vpa_resolved, 1.0, transaction_ref="QUMTEST")
+            qr_ok = bool(_generate_upi_qr_base64(test_uri))
+        except Exception as exc:
+            qr_error = str(exc)
+
+    return jsonify(
+        {
+            "ok": True,
+            "config_module": {
+                "DONATION_UPI_VPA": _mask_secret(config.DONATION_UPI_VPA, 6),
+                "RAZORPAY_KEY_ID": _mask_secret(config.RAZORPAY_KEY_ID, 8),
+                "RAZORPAY_KEY_SECRET": "set" if config.RAZORPAY_KEY_SECRET else "missing",
+            },
+            "environment": env_report,
+            "resolved_upi_vpa": _mask_secret(vpa_resolved, 6),
+            "qr_generation_test": qr_ok,
+            "qr_generation_error": qr_error,
+            "session_pending_registration": bool(session.get("pending_registration")),
+            "razorpay_client": _razorpay_client() is not None,
         }
     )
 

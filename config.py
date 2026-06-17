@@ -86,7 +86,10 @@ RAZORPAY_WEBHOOK_SECRET: str = os.environ.get("RAZORPAY_WEBHOOK_SECRET", "").str
 # Also accepts RAZORPAY_UPI_VPA / UPI_VPA / MERCHANT_UPI_VPA for deploy flexibility.
 def _first_env(*names: str) -> str:
     for name in names:
-        value = os.environ.get(name, "").strip()
+        raw = os.environ.get(name, "")
+        value = raw.strip()
+        while len(value) >= 2 and value[0] == value[-1] and value[0] in ('"', "'"):
+            value = value[1:-1].strip()
         if value:
             return value
     return ""
