@@ -22,6 +22,7 @@ from datetime import date, datetime, timedelta, timezone
 from functools import wraps
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 import bcrypt
 
 import config  # loads .env at import time; single source of truth for settings
@@ -8600,6 +8601,31 @@ def _create_razorpay_order(amount_rupees: int, *, receipt: str = "") -> dict[str
     return client.order.create(data=order_data)
 
 
+def _build_upi_pay_uri(
+    vpa: str,
+    amount_rupees: float,
+    *,
+    payee_name: str = "Qumanity",
+    transaction_note: str = "",
+    transaction_ref: str = "",
+) -> str:
+    """Build a UPI deep link that opens the payer's UPI app directly (no web redirect)."""
+    vpa = (vpa or "").strip()
+    if not vpa:
+        raise ValueError("UPI VPA is required")
+    params = [
+        f"pa={quote(vpa, safe='')}",
+        f"pn={quote(payee_name, safe='')}",
+        f"am={amount_rupees:.2f}",
+        "cu=INR",
+    ]
+    if transaction_note:
+        params.append(f"tn={quote(transaction_note, safe='')}")
+    if transaction_ref:
+        params.append(f"tr={quote(transaction_ref, safe='')}")
+    return "upi://pay?" + "&".join(params)
+
+
 def _parse_upi_vpa_from_qr_response(qr: dict[str, Any]) -> str:
     """Extract merchant VPA from Razorpay QR `image_content` UPI URI."""
     content = str(qr.get("image_content") or "").strip()
@@ -8612,67 +8638,81 @@ def _parse_upi_vpa_from_qr_response(qr: dict[str, Any]) -> str:
     return ""
 
 
-def _create_razorpay_upi_qr_for_order(
+def _create_direct_upi_qr_for_donation(
     order_id: str,
     amount_paise: int,
     donation_id: int,
 ) -> dict[str, Any]:
-    """Create a Razorpay UPI QR (scan-only; no checkout popup)."""
+    """
+    Direct UPI QR — encodes upi://pay in a local QR image.
+    Never uses Razorpay short URLs (rzp.io) which redirect to checkout pages.
+    """
+    amount_rupees = int(amount_paise) / 100.0
+    txn_ref = f"QUM{donation_id}"
+    txn_note = f"Qumanity donation {donation_id}"
+    upi_uri = ""
+    upi_vpa = getattr(config, "DONATION_UPI_VPA", "").strip()
+    qr_id = ""
+
     client = _razorpay_client()
-    if client is None:
-        raise ValueError("Payment gateway is not configured")
-    # Razorpay requires close_by at least 15 minutes ahead.
-    close_by = int(time.time()) + 900
-    notes = {
-        "donation_id": str(donation_id),
-        "order_id": str(order_id),
-    }
-    qr_data = {
-        "type": "upi_qr",
-        "name": "QumanityDonation",
-        "usage": "single_use",
-        "fixed_amount": True,
-        "payment_amount": int(amount_paise),
-        "description": f"Donation for order {order_id}",
-        "close_by": close_by,
-        "notes": notes,
-    }
-    try:
-        qr = client.qrcode.create(qr_data)
-        upi_vpa = _parse_upi_vpa_from_qr_response(qr) or getattr(config, "DONATION_UPI_VPA", "")
-        image_url = str(qr.get("image_url") or "").strip()
-        return {
-            "qr_id": str(qr.get("id") or "").strip(),
-            "image_url": image_url,
-            "qr_image_base64": None,
-            "upi_vpa": upi_vpa,
-        }
-    except Exception as exc:
-        app.logger.warning("Razorpay UPI QR create failed, trying payment link: %s", exc)
+    if client is not None:
         try:
-            plink = client.payment_link.create(
+            qr = client.qrcode.create(
                 {
-                    "amount": int(amount_paise),
-                    "currency": "INR",
-                    "description": "Qumanity registration donation",
-                    "notes": notes,
+                    "type": "upi_qr",
+                    "name": "QumanityDonation",
+                    "usage": "single_use",
+                    "fixed_amount": True,
+                    "payment_amount": int(amount_paise),
+                    "description": txn_note,
+                    "close_by": int(time.time()) + 900,
+                    "notes": {
+                        "donation_id": str(donation_id),
+                        "order_id": str(order_id),
+                    },
                 }
             )
-            short_url = str(plink.get("short_url") or "").strip()
-            qr_b64 = referral_core.generate_qr_base64(short_url) if short_url else None
-            if not qr_b64:
-                raise ValueError("Payment link created but QR image could not be generated")
-            return {
-                "qr_id": str(plink.get("id") or "").strip(),
-                "image_url": None,
-                "qr_image_base64": qr_b64,
-                "short_url": short_url,
-                "upi_vpa": getattr(config, "DONATION_UPI_VPA", ""),
-            }
-        except Exception as plink_exc:
-            raise ValueError(
-                f"Could not generate payment QR: {plink_exc}"
-            ) from plink_exc
+            qr_id = str(qr.get("id") or "").strip()
+            content = str(qr.get("image_content") or "").strip()
+            if content.startswith("upi://"):
+                upi_uri = content
+                parsed_vpa = _parse_upi_vpa_from_qr_response(qr)
+                if parsed_vpa:
+                    upi_vpa = parsed_vpa
+        except Exception as exc:
+            app.logger.warning(
+                "Razorpay QR metadata create failed for donation %s: %s",
+                donation_id,
+                exc,
+            )
+
+    if not upi_vpa:
+        raise ValueError(
+            "DONATION_UPI_VPA is not configured. Set your Razorpay merchant UPI ID "
+            "(e.g. merchant@razorpay) in Railway environment variables."
+        )
+
+    if not upi_uri:
+        upi_uri = _build_upi_pay_uri(
+            upi_vpa,
+            amount_rupees,
+            transaction_note=txn_note,
+            transaction_ref=txn_ref,
+        )
+
+    qr_b64 = referral_core.generate_qr_base64(upi_uri)
+    if not qr_b64:
+        raise ValueError(
+            "Could not generate QR image. Ensure the qrcode Python package is installed."
+        )
+
+    return {
+        "qr_id": qr_id,
+        "qr_image_base64": qr_b64,
+        "upi_vpa": upi_vpa,
+        "upi_uri": upi_uri,
+        "transaction_ref": txn_ref,
+    }
 
 
 def _verify_razorpay_payment(
@@ -9116,7 +9156,7 @@ def api_donation_create_order():
         amount_paise=amount * 100,
     )
     try:
-        qr_payload = _create_razorpay_upi_qr_for_order(order_id, amount * 100, donation_id)
+        qr_payload = _create_direct_upi_qr_for_donation(order_id, amount * 100, donation_id)
     except ValueError as exc:
         conn.rollback()
         return jsonify({"error": str(exc)}), 503
@@ -9124,6 +9164,11 @@ def api_donation_create_order():
         conn.rollback()
         app.logger.exception("Failed to create UPI QR for donation %s", donation_id)
         return jsonify({"error": f"Could not generate payment QR: {exc}"}), 503
+    txn_ref = str(qr_payload.get("transaction_ref") or f"QUM{donation_id}").strip()
+    conn.execute(
+        "UPDATE donations SET transaction_id = ? WHERE id = ?",
+        (txn_ref, int(donation_id)),
+    )
     qr_id = str(qr_payload.get("qr_id") or "").strip()
     if qr_id:
         conn.execute(
@@ -9146,9 +9191,9 @@ def api_donation_create_order():
             "order_id": order_id,
             "amount": amount,
             "currency": order.get("currency", "INR"),
-            "qr_image_url": qr_payload.get("image_url"),
             "qr_image_base64": qr_payload.get("qr_image_base64"),
             "upi_vpa": upi_vpa,
+            "upi_uri": qr_payload.get("upi_uri"),
         }
     )
 

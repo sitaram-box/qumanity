@@ -653,19 +653,20 @@
 
     function displayQrPayment(data) {
       if (!data) return;
-      if (qrAmountEl && data.amount != null) {
-        qrAmountEl.textContent = formatRupee(data.amount);
+      if (qrAmountEl) {
+        qrAmountEl.textContent =
+          data.amount != null ? formatRupee(data.amount) : formatRupee(getSelectedAmount());
       }
-      if (qrUpiEl && data.upi_vpa) {
-        qrUpiEl.textContent = data.upi_vpa;
+      if (qrUpiEl) {
+        qrUpiEl.textContent = data.upi_vpa || "—";
       }
       if (!qrImageEl) return;
-      if (data.qr_image_url) {
-        qrImageEl.src = data.qr_image_url;
-        qrImageEl.hidden = false;
-      } else if (data.qr_image_base64) {
+      // Only embed local base64 QR (upi:// URI). Never use Razorpay short URLs — they redirect to checkout.
+      if (data.qr_image_base64) {
         qrImageEl.src = "data:image/png;base64," + data.qr_image_base64;
         qrImageEl.hidden = false;
+      } else {
+        qrImageEl.hidden = true;
       }
     }
 
@@ -735,6 +736,9 @@
         })
         .then(function (x) {
           if (!x.ok) throw new Error((x.b && x.b.error) || "Could not create payment order");
+          if (!x.b.qr_image_base64) {
+            throw new Error("Direct UPI QR was not generated. Check DONATION_UPI_VPA configuration.");
+          }
           pendingDonationId = x.b.donation_id;
           displayQrPayment(x.b);
           checkDonationStatus(pendingDonationId);

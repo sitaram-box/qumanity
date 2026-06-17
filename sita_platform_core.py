@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import io
 import json
+import re
 import sqlite3
 from datetime import date, datetime, timezone
 from typing import Any, Callable
@@ -282,6 +283,113 @@ def _find_donation_for_qr_id(conn: sqlite3.Connection, qr_id: str) -> sqlite3.Ro
     ).fetchone()
 
 
+def _find_donation_for_payment_notes(
+    conn: sqlite3.Connection,
+    payment: dict[str, Any],
+) -> sqlite3.Row | None:
+    notes = payment.get("notes") or {}
+    if not isinstance(notes, dict):
+        return None
+    donation_id = str(notes.get("donation_id") or "").strip()
+    if donation_id.isdigit():
+        return conn.execute(
+            "SELECT * FROM donations WHERE id = ?",
+            (int(donation_id),),
+        ).fetchone()
+    order_ref = str(notes.get("order_id") or "").strip()
+    if order_ref:
+        return conn.execute(
+            "SELECT * FROM donations WHERE razorpay_order_id = ?",
+            (order_ref,),
+        ).fetchone()
+    return None
+
+
+def _find_donation_by_payment_reference(
+    conn: sqlite3.Connection,
+    payment: dict[str, Any],
+) -> sqlite3.Row | None:
+    """Match static UPI payments via transaction ref / description text."""
+    chunks = [
+        str(payment.get("description") or ""),
+        str(payment.get("email") or ""),
+        str(payment.get("contact") or ""),
+        str(payment.get("error_description") or ""),
+    ]
+    notes = payment.get("notes") or {}
+    if isinstance(notes, dict):
+        chunks.extend(str(v) for v in notes.values())
+    text = " ".join(chunks)
+    for pattern in (
+        r"QUM(\d+)",
+        r"Qumanity\s+donation\s+(\d+)",
+        r"donation\s+(\d+)",
+    ):
+        match = re.search(pattern, text, re.I)
+        if match:
+            row = conn.execute(
+                "SELECT * FROM donations WHERE id = ?",
+                (int(match.group(1)),),
+            ).fetchone()
+            if row is not None:
+                return row
+    txn_ref = str(payment.get("transaction_id") or payment.get("acquirer_data", {}).get("rrn") or "").strip()
+    if txn_ref:
+        row = conn.execute(
+            "SELECT * FROM donations WHERE transaction_id = ?",
+            (txn_ref,),
+        ).fetchone()
+        if row is not None:
+            return row
+    return None
+
+
+def _find_pending_donation_by_amount(
+    conn: sqlite3.Connection,
+    amount_paise: int,
+    *,
+    window_minutes: int = 90,
+) -> sqlite3.Row | None:
+    if amount_paise <= 0:
+        return None
+    return conn.execute(
+        """
+        SELECT * FROM donations
+        WHERE payment_status = 'pending'
+          AND status IN ('pending', 'authorized')
+          AND amount_paise = ?
+          AND datetime(created_at) >= datetime('now', '-' || ? || ' minutes')
+        ORDER BY id DESC
+        LIMIT 1
+        """,
+        (int(amount_paise), int(window_minutes)),
+    ).fetchone()
+
+
+def _resolve_donation_for_payment(
+    conn: sqlite3.Connection,
+    payment: dict[str, Any],
+) -> sqlite3.Row | None:
+    payment_id = str(payment.get("id") or "").strip()
+    order_id = str(payment.get("order_id") or "").strip()
+    row = _find_donation_for_razorpay(conn, order_id=order_id, payment_id=payment_id)
+    if row is not None:
+        return row
+    row = _find_donation_for_payment_notes(conn, payment)
+    if row is not None:
+        return row
+    row = _find_donation_by_payment_reference(conn, payment)
+    if row is not None:
+        return row
+    qr_ref = str(payment.get("qr_code_id") or payment.get("qr_code") or "").strip()
+    if qr_ref:
+        row = _find_donation_for_qr_id(conn, qr_ref)
+        if row is not None:
+            return row
+    amount_paise = int(payment.get("amount") or 0)
+    return _find_pending_donation_by_amount(conn, amount_paise)
+
+
 def confirm_donation_from_razorpay(
     conn: sqlite3.Connection,
     donation_id: int,
@@ -357,7 +465,7 @@ def process_razorpay_webhook(
         order_id = str(payment.get("order_id") or "").strip()
         if not payment_id and not order_id:
             return False
-        row = _find_donation_for_razorpay(conn, order_id=order_id, payment_id=payment_id)
+        row = _resolve_donation_for_payment(conn, payment)
         if row is None:
             return False
         conn.execute(
@@ -385,7 +493,7 @@ def process_razorpay_webhook(
         amount_paise = int(payment.get("amount") or 0)
         if not payment_id:
             return False
-        row = _find_donation_for_razorpay(conn, order_id=order_id, payment_id=payment_id)
+        row = _resolve_donation_for_payment(conn, payment)
         if row is None:
             return False
         conn.execute(
@@ -451,6 +559,8 @@ def process_razorpay_webhook(
         row = _find_donation_for_razorpay(conn, order_id=order_id, payment_id=payment_id)
         if row is None and qr_id:
             row = _find_donation_for_qr_id(conn, qr_id)
+        if row is None:
+            row = _resolve_donation_for_payment(conn, payment)
         if row is None:
             return False
         conn.execute(

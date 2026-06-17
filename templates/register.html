@@ -659,8 +659,8 @@
         </label>
         <div id="reg-qr-placeholder" class="qr-placeholder mt-2" hidden>
           <p class="small mb-2">
-            Scan this UPI QR with Google Pay, PhonePe, Paytm, or any UPI app.
-            Payment is confirmed automatically — no card details or OTP on this page.
+            Scan with Google Pay, PhonePe, Paytm, or any UPI app.
+            Payment opens directly in your app — no Razorpay website or card details.
           </p>
           <div class="qb-qr-payment-box" id="reg-qr-container">
             <img
@@ -736,6 +736,6 @@
   };
 </script>
 <script src="{{ url_for('static', filename='register_geo.js') }}?v=6" defer></script>
-<script src="{{ url_for('static', filename='register.js') }}?v=16" defer></script>
+<script src="{{ url_for('static', filename='register.js') }}?v=18" defer></script>
 {% endif %}
 {% endblock %}
