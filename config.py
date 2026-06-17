@@ -83,7 +83,21 @@ RAZORPAY_KEY_ID: str = os.environ.get("RAZORPAY_KEY_ID", "").strip()
 RAZORPAY_KEY_SECRET: str = os.environ.get("RAZORPAY_KEY_SECRET", "").strip()
 RAZORPAY_WEBHOOK_SECRET: str = os.environ.get("RAZORPAY_WEBHOOK_SECRET", "").strip()
 # Display on registration QR screen (merchant UPI VPA from Razorpay dashboard).
-DONATION_UPI_VPA: str = os.environ.get("DONATION_UPI_VPA", "").strip()
+# Also accepts RAZORPAY_UPI_VPA / UPI_VPA / MERCHANT_UPI_VPA for deploy flexibility.
+def _first_env(*names: str) -> str:
+    for name in names:
+        value = os.environ.get(name, "").strip()
+        if value:
+            return value
+    return ""
+
+
+DONATION_UPI_VPA: str = _first_env(
+    "DONATION_UPI_VPA",
+    "RAZORPAY_UPI_VPA",
+    "UPI_VPA",
+    "MERCHANT_UPI_VPA",
+)
 
 MAIL_SERVER: str = os.environ.get("MAIL_SERVER", "").strip()
 MAIL_PORT: int = int(os.environ.get("MAIL_PORT", "587") or "587")
@@ -129,6 +143,11 @@ def validate() -> list[str]:
         warnings.append(
             "DATABASE_URL points at SQLite in production. Consider PostgreSQL "
             "for concurrent writes and durability."
+        )
+    if RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET and not DONATION_UPI_VPA:
+        warnings.append(
+            "DONATION_UPI_VPA is not set; the app will try to discover your "
+            "merchant UPI VPA from Razorpay when generating payment QR codes."
         )
     return warnings
 

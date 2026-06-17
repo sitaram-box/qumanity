@@ -745,7 +745,13 @@
         })
         .catch(function (err) {
           if (donateErr) {
-            donateErr.textContent = err.message || "Could not initialize payment";
+            var msg = err.message || "Could not initialize payment";
+            if (msg.indexOf("DONATION_UPI_VPA") !== -1 || msg.indexOf("UPI payment QR") !== -1) {
+              msg =
+                "Payment QR is not configured on the server. " +
+                "Ask the admin to set DONATION_UPI_VPA in Railway (Razorpay merchant UPI ID).";
+            }
+            donateErr.textContent = msg;
             donateErr.hidden = false;
           }
           if (paymentWaitingEl) paymentWaitingEl.hidden = true;

@@ -22,7 +22,7 @@ from datetime import date, datetime, timedelta, timezone
 from functools import wraps
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote
+from urllib.parse import quote, unquote
 import bcrypt
 
 import config  # loads .env at import time; single source of truth for settings
@@ -8601,6 +8601,78 @@ def _create_razorpay_order(amount_rupees: int, *, receipt: str = "") -> dict[str
     return client.order.create(data=order_data)
 
 
+_MERCHANT_UPI_VPA_CACHE: str = ""
+
+
+def _parse_upi_vpa_from_uri(upi_uri: str) -> str:
+    uri = (upi_uri or "").strip()
+    if not uri or "?" not in uri:
+        return ""
+    query = uri.split("?", 1)[1]
+    for part in query.split("&"):
+        if part.startswith("pa="):
+            return unquote(part[3:]).strip()
+    return ""
+
+
+def _discover_razorpay_upi_vpa(client: Any) -> str:
+    """Create a probe QR via Razorpay and read merchant VPA from image_content."""
+    try:
+        qr = client.qrcode.create(
+            {
+                "type": "upi_qr",
+                "name": "QumanityProbe",
+                "usage": "single_use",
+                "fixed_amount": True,
+                "payment_amount": 100,
+                "description": "UPI VPA discovery",
+                "close_by": int(time.time()) + 900,
+            }
+        )
+        content = str(qr.get("image_content") or "").strip()
+        vpa = _parse_upi_vpa_from_qr_response(qr) or _parse_upi_vpa_from_uri(content)
+        if vpa:
+            app.logger.info("Discovered merchant UPI VPA from Razorpay: %s", vpa)
+        return vpa
+    except Exception as exc:
+        app.logger.warning("Could not discover UPI VPA from Razorpay: %s", exc)
+        return ""
+
+
+def _get_donation_upi_vpa(client: Any | None = None) -> str:
+    """Resolve merchant UPI VPA from env/config or Razorpay API."""
+    global _MERCHANT_UPI_VPA_CACHE
+    if _MERCHANT_UPI_VPA_CACHE:
+        return _MERCHANT_UPI_VPA_CACHE
+
+    for env_name in (
+        "DONATION_UPI_VPA",
+        "RAZORPAY_UPI_VPA",
+        "UPI_VPA",
+        "MERCHANT_UPI_VPA",
+    ):
+        vpa = os.environ.get(env_name, "").strip()
+        if vpa:
+            app.logger.info("Using %s from environment", env_name)
+            _MERCHANT_UPI_VPA_CACHE = vpa
+            return vpa
+
+    vpa = getattr(config, "DONATION_UPI_VPA", "").strip()
+    if vpa:
+        _MERCHANT_UPI_VPA_CACHE = vpa
+        return vpa
+
+    if client is None:
+        client = _razorpay_client()
+    if client is not None:
+        discovered = _discover_razorpay_upi_vpa(client)
+        if discovered:
+            _MERCHANT_UPI_VPA_CACHE = discovered
+            return discovered
+
+    return ""
+
+
 def _build_upi_pay_uri(
     vpa: str,
     amount_rupees: float,
@@ -8634,7 +8706,7 @@ def _parse_upi_vpa_from_qr_response(qr: dict[str, Any]) -> str:
     query = content.split("?", 1)[1]
     for part in query.split("&"):
         if part.startswith("pa="):
-            return part[3:].strip()
+            return unquote(part[3:]).strip()
     return ""
 
 
@@ -8651,7 +8723,7 @@ def _create_direct_upi_qr_for_donation(
     txn_ref = f"QUM{donation_id}"
     txn_note = f"Qumanity donation {donation_id}"
     upi_uri = ""
-    upi_vpa = getattr(config, "DONATION_UPI_VPA", "").strip()
+    upi_vpa = ""
     qr_id = ""
 
     client = _razorpay_client()
@@ -8676,29 +8748,41 @@ def _create_direct_upi_qr_for_donation(
             content = str(qr.get("image_content") or "").strip()
             if content.startswith("upi://"):
                 upi_uri = content
-                parsed_vpa = _parse_upi_vpa_from_qr_response(qr)
-                if parsed_vpa:
-                    upi_vpa = parsed_vpa
+            parsed_vpa = _parse_upi_vpa_from_qr_response(qr) or _parse_upi_vpa_from_uri(content)
+            if parsed_vpa:
+                upi_vpa = parsed_vpa
+                global _MERCHANT_UPI_VPA_CACHE
+                _MERCHANT_UPI_VPA_CACHE = parsed_vpa
         except Exception as exc:
             app.logger.warning(
-                "Razorpay QR metadata create failed for donation %s: %s",
+                "Razorpay QR create failed for donation %s: %s",
                 donation_id,
                 exc,
             )
 
     if not upi_vpa:
-        raise ValueError(
-            "DONATION_UPI_VPA is not configured. Set your Razorpay merchant UPI ID "
-            "(e.g. merchant@razorpay) in Railway environment variables."
-        )
+        upi_vpa = _get_donation_upi_vpa(client)
 
-    if not upi_uri:
+    if not upi_vpa and upi_uri:
+        upi_vpa = _parse_upi_vpa_from_uri(upi_uri)
+
+    if not upi_uri and upi_vpa:
         upi_uri = _build_upi_pay_uri(
             upi_vpa,
             amount_rupees,
             transaction_note=txn_note,
             transaction_ref=txn_ref,
         )
+
+    if not upi_uri:
+        raise ValueError(
+            "Could not build UPI payment QR. Set DONATION_UPI_VPA in Railway "
+            "(your Razorpay merchant UPI ID, e.g. merchant@razorpay) and ensure "
+            "RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET are valid with UPI enabled."
+        )
+
+    if not upi_vpa:
+        upi_vpa = _parse_upi_vpa_from_uri(upi_uri)
 
     qr_b64 = referral_core.generate_qr_base64(upi_uri)
     if not qr_b64:
@@ -8709,7 +8793,7 @@ def _create_direct_upi_qr_for_donation(
     return {
         "qr_id": qr_id,
         "qr_image_base64": qr_b64,
-        "upi_vpa": upi_vpa,
+        "upi_vpa": upi_vpa or "—",
         "upi_uri": upi_uri,
         "transaction_ref": txn_ref,
     }
