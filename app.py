@@ -8669,6 +8669,71 @@ def _discover_razorpay_upi_vpa(client: Any) -> str:
         return ""
 
 
+def _resolve_merchant_upi_vpa() -> tuple[str, str]:
+    """Return merchant UPI VPA and source label. Always returns a usable VPA."""
+    global _MERCHANT_UPI_VPA_CACHE
+    for env_name in (
+        "DONATION_UPI_VPA",
+        "RAZORPAY_UPI_VPA",
+        "UPI_VPA",
+        "MERCHANT_UPI_VPA",
+    ):
+        vpa = _clean_env_value(os.environ.get(env_name, ""))
+        if vpa and "@" in vpa:
+            return vpa, env_name
+
+    vpa = _clean_env_value(getattr(config, "DONATION_UPI_VPA", ""))
+    if vpa and "@" in vpa:
+        return vpa, "config_module"
+
+    if _MERCHANT_UPI_VPA_CACHE and "@" in _MERCHANT_UPI_VPA_CACHE:
+        return _MERCHANT_UPI_VPA_CACHE, "cache"
+
+    client = _razorpay_client()
+    if client is not None:
+        discovered = _discover_razorpay_upi_vpa(client)
+        if discovered and "@" in discovered:
+            _MERCHANT_UPI_VPA_CACHE = discovered
+            return discovered, "razorpay_discover"
+
+    fallback = _clean_env_value(getattr(config, "UPI_VPA_FALLBACK", ""))
+    if fallback and "@" in fallback:
+        app.logger.warning("Using UPI_VPA_FALLBACK: %s", fallback)
+        return fallback, "fallback_env"
+
+    app.logger.error(
+        "No DONATION_UPI_VPA found in environment — using built-in default. "
+        "Set DONATION_UPI_VPA in Railway to your real merchant UPI ID."
+    )
+    return "merchant@razorpay", "builtin_default"
+
+
+def _generate_upi_qr_simple(amount_rupees: float, donation_id: int) -> dict[str, Any]:
+    """
+    Direct static UPI QR — no Razorpay checkout, no redirect URLs.
+    Encodes upi://pay locally so UPI apps open directly.
+    """
+    vpa, vpa_source = _resolve_merchant_upi_vpa()
+    txn_ref = f"QUM{donation_id}"
+    txn_note = f"Qumanity donation {donation_id}"
+    upi_uri = _build_upi_pay_uri(
+        vpa,
+        amount_rupees,
+        transaction_note=txn_note,
+        transaction_ref=txn_ref,
+    )
+    qr_b64 = _generate_upi_qr_base64(upi_uri)
+    return {
+        "qr_id": "",
+        "qr_image_base64": qr_b64,
+        "upi_vpa": vpa,
+        "upi_uri": upi_uri,
+        "transaction_ref": txn_ref,
+        "vpa_source": vpa_source,
+        "amount": amount_rupees,
+    }
+
+
 def _get_donation_upi_vpa(client: Any | None = None) -> str:
     """Resolve merchant UPI VPA from env/config or Razorpay API."""
     global _MERCHANT_UPI_VPA_CACHE
@@ -8772,84 +8837,9 @@ def _create_direct_upi_qr_for_donation(
     amount_paise: int,
     donation_id: int,
 ) -> dict[str, Any]:
-    """
-    Direct UPI QR — encodes upi://pay in a local QR image.
-    Never uses Razorpay short URLs (rzp.io) which redirect to checkout pages.
-    """
-    amount_rupees = int(amount_paise) / 100.0
-    txn_ref = f"QUM{donation_id}"
-    txn_note = f"Qumanity donation {donation_id}"
-    upi_uri = ""
-    upi_vpa = ""
-    qr_id = ""
-
-    client = _razorpay_client()
-    if client is not None:
-        try:
-            qr = client.qrcode.create(
-                {
-                    "type": "upi_qr",
-                    "name": "QumanityDonation",
-                    "usage": "single_use",
-                    "fixed_amount": True,
-                    "payment_amount": int(amount_paise),
-                    "description": txn_note,
-                    "close_by": int(time.time()) + 900,
-                    "notes": {
-                        "donation_id": str(donation_id),
-                        "order_id": str(order_id),
-                    },
-                }
-            )
-            qr_id = str(qr.get("id") or "").strip()
-            content = str(qr.get("image_content") or "").strip()
-            if content.startswith("upi://"):
-                upi_uri = content
-            parsed_vpa = _parse_upi_vpa_from_qr_response(qr) or _parse_upi_vpa_from_uri(content)
-            if parsed_vpa:
-                upi_vpa = parsed_vpa
-                global _MERCHANT_UPI_VPA_CACHE
-                _MERCHANT_UPI_VPA_CACHE = parsed_vpa
-        except Exception as exc:
-            app.logger.warning(
-                "Razorpay QR create failed for donation %s: %s",
-                donation_id,
-                exc,
-            )
-
-    if not upi_vpa:
-        upi_vpa = _get_donation_upi_vpa(client)
-
-    if not upi_vpa and upi_uri:
-        upi_vpa = _parse_upi_vpa_from_uri(upi_uri)
-
-    if not upi_uri and upi_vpa:
-        upi_uri = _build_upi_pay_uri(
-            upi_vpa,
-            amount_rupees,
-            transaction_note=txn_note,
-            transaction_ref=txn_ref,
-        )
-
-    if not upi_uri:
-        raise ValueError(
-            "Could not build UPI payment QR. Set DONATION_UPI_VPA in Railway "
-            "(your Razorpay merchant UPI ID, e.g. merchant@razorpay) and ensure "
-            "RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET are valid with UPI enabled."
-        )
-
-    if not upi_vpa:
-        upi_vpa = _parse_upi_vpa_from_uri(upi_uri)
-
-    qr_b64 = _generate_upi_qr_base64(upi_uri)
-
-    return {
-        "qr_id": qr_id,
-        "qr_image_base64": qr_b64,
-        "upi_vpa": upi_vpa or "—",
-        "upi_uri": upi_uri,
-        "transaction_ref": txn_ref,
-    }
+    """Backward-compatible wrapper — always uses simple static UPI QR."""
+    del order_id  # Razorpay order is optional; QR does not depend on it.
+    return _generate_upi_qr_simple(int(amount_paise) / 100.0, donation_id)
 
 
 def _verify_razorpay_payment(
@@ -9310,20 +9300,15 @@ def api_donation_create_order():
         amount_paise=amount * 100,
     )
     try:
-        qr_payload = _create_direct_upi_qr_for_donation(
-            order_id or f"local-{donation_id}",
-            amount * 100,
-            donation_id,
-        )
-    except ValueError as exc:
-        conn.rollback()
-        app.logger.error("UPI QR build failed for donation %s: %s", donation_id, exc)
-        return jsonify({"error": str(exc), "code": "qr_build_failed"}), 503
+        qr_payload = _generate_upi_qr_simple(float(amount), donation_id)
     except Exception as exc:
         conn.rollback()
-        app.logger.exception("Failed to create UPI QR for donation %s", donation_id)
+        app.logger.exception("UPI QR generation failed for donation %s", donation_id)
         return jsonify(
-            {"error": f"Could not generate payment QR: {exc}", "code": "qr_exception"}
+            {
+                "error": f"Failed to generate QR: {exc}",
+                "code": "qr_exception",
+            }
         ), 503
     txn_ref = str(qr_payload.get("transaction_ref") or f"QUM{donation_id}").strip()
     conn.execute(
@@ -9339,11 +9324,6 @@ def api_donation_create_order():
     session["pending_donation_id"] = donation_id
     session["pending_donation_marker"] = session_marker
     conn.commit()
-    upi_vpa = (
-        str(qr_payload.get("upi_vpa") or "").strip()
-        or getattr(config, "DONATION_UPI_VPA", "")
-        or "—"
-    )
     return jsonify(
         {
             "ok": True,
@@ -9351,10 +9331,80 @@ def api_donation_create_order():
             "donation_id": donation_id,
             "order_id": order_id,
             "amount": amount,
-            "currency": order.get("currency", "INR"),
+            "currency": order_currency,
             "qr_image_base64": qr_payload.get("qr_image_base64"),
-            "upi_vpa": upi_vpa,
+            "upi_vpa": qr_payload.get("upi_vpa"),
             "upi_uri": qr_payload.get("upi_uri"),
+            "vpa_source": qr_payload.get("vpa_source"),
+        }
+    )
+
+
+@app.get("/api/test-qr")
+def api_test_qr():
+    """Smoke-test UPI QR generation (no session required)."""
+    try:
+        payload = _generate_upi_qr_simple(1.0, 0)
+        b64 = str(payload.get("qr_image_base64") or "")
+        return jsonify(
+            {
+                "success": True,
+                "ok": True,
+                "upi_vpa": payload.get("upi_vpa"),
+                "upi_uri": payload.get("upi_uri"),
+                "vpa_source": payload.get("vpa_source"),
+                "qr_base64_length": len(b64),
+                "qr_base64_preview": (b64[:80] + "…") if len(b64) > 80 else b64,
+            }
+        )
+    except Exception as exc:
+        app.logger.exception("api_test_qr failed")
+        return jsonify({"success": False, "ok": False, "error": str(exc)}), 500
+
+
+@app.get("/api/check-env")
+def api_check_env():
+    """Report payment-related environment variables (values shown for VPA only)."""
+    env_names = [
+        "DONATION_UPI_VPA",
+        "RAZORPAY_UPI_VPA",
+        "UPI_VPA",
+        "MERCHANT_UPI_VPA",
+        "FALLBACK_DONATION_UPI_VPA",
+        "RAZORPAY_KEY_ID",
+        "RAZORPAY_KEY_SECRET",
+    ]
+    env_vars: dict[str, Any] = {}
+    for key in env_names:
+        raw = os.environ.get(key)
+        cleaned = _clean_env_value(raw or "")
+        if key.endswith("_SECRET") or key == "RAZORPAY_KEY_ID":
+            env_vars[key] = {
+                "exists": raw is not None,
+                "length": len(cleaned),
+                "preview": _mask_secret(cleaned, 6),
+            }
+        else:
+            env_vars[key] = {
+                "exists": raw is not None,
+                "value": cleaned or None,
+                "length": len(cleaned),
+                "has_at_sign": "@" in cleaned,
+            }
+    try:
+        import qrcode  # noqa: F401
+
+        qrcode_available = True
+    except ImportError:
+        qrcode_available = False
+    vpa, source = _resolve_merchant_upi_vpa()
+    return jsonify(
+        {
+            "environment_variables": env_vars,
+            "config_DONATION_UPI_VPA": config.DONATION_UPI_VPA or None,
+            "resolved_vpa": vpa,
+            "resolved_vpa_source": source,
+            "qrcode_available": qrcode_available,
         }
     )
 
@@ -9388,7 +9438,7 @@ def api_diagnose_config():
             "has_at_sign": "@" in cleaned,
         }
 
-    vpa_resolved = _get_donation_upi_vpa()
+    vpa_resolved, vpa_source = _resolve_merchant_upi_vpa()
     qr_ok = False
     qr_error = ""
     if vpa_resolved:
@@ -9408,6 +9458,7 @@ def api_diagnose_config():
             },
             "environment": env_report,
             "resolved_upi_vpa": _mask_secret(vpa_resolved, 6),
+            "resolved_vpa_source": vpa_source,
             "qr_generation_test": qr_ok,
             "qr_generation_error": qr_error,
             "session_pending_registration": bool(session.get("pending_registration")),
