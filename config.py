@@ -81,6 +81,9 @@ PUBLIC_BASE_URL: str = os.environ.get("PUBLIC_BASE_URL", "").strip().rstrip("/")
 # ── Razorpay (online donations) ──────────────────────────────────────────────
 RAZORPAY_KEY_ID: str = os.environ.get("RAZORPAY_KEY_ID", "").strip()
 RAZORPAY_KEY_SECRET: str = os.environ.get("RAZORPAY_KEY_SECRET", "").strip()
+RAZORPAY_WEBHOOK_SECRET: str = os.environ.get("RAZORPAY_WEBHOOK_SECRET", "").strip()
+# Display on registration QR screen (merchant UPI VPA from Razorpay dashboard).
+DONATION_UPI_VPA: str = os.environ.get("DONATION_UPI_VPA", "").strip()
 
 MAIL_SERVER: str = os.environ.get("MAIL_SERVER", "").strip()
 MAIL_PORT: int = int(os.environ.get("MAIL_PORT", "587") or "587")

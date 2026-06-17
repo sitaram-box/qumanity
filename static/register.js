@@ -572,21 +572,23 @@
     var previewRequestId = 0;
     var qrPaymentConfirmed = false;
     var paymentWaitingEl = document.getElementById("reg-payment-waiting");
-    var razorpayPayBtn = document.getElementById("reg-razorpay-pay-btn");
     var webhookStatusEl = document.getElementById("reg-qr-webhook-status");
+    var qrImageEl = document.getElementById("reg-qr-image");
+    var qrAmountEl = document.getElementById("reg-qr-amount");
+    var qrUpiEl = document.getElementById("reg-qr-upi-id");
     var pendingDonationId = null;
-    var pendingOrderId = null;
-    var pendingRazorpayKey = "";
     var donationPollTimer = null;
+    var PAYMENT_SUCCESS_MSG =
+      "Payment Successful! Your registration is now complete.";
 
     function setDonationSubmitEnabled(enabled) {
       if (!donateSubmit) return;
       donateSubmit.disabled = !enabled;
       if (enabled) {
         donateSubmit.classList.remove("qb-btn-neutral");
-        donateSubmit.classList.add("qb-btn-primary");
+        donateSubmit.classList.add("qb-btn-primary", "active");
       } else {
-        donateSubmit.classList.remove("qb-btn-primary");
+        donateSubmit.classList.remove("qb-btn-primary", "active");
         donateSubmit.classList.add("qb-btn-neutral");
       }
     }
@@ -594,20 +596,24 @@
     function resetQrPaymentState() {
       qrPaymentConfirmed = false;
       pendingDonationId = null;
-      pendingOrderId = null;
       if (donationPollTimer) {
         clearInterval(donationPollTimer);
         donationPollTimer = null;
       }
+      if (qrImageEl) {
+        qrImageEl.hidden = true;
+        qrImageEl.removeAttribute("src");
+      }
+      if (qrAmountEl) qrAmountEl.textContent = "—";
+      if (qrUpiEl) qrUpiEl.textContent = "—";
       if (paymentWaitingEl) {
-        paymentWaitingEl.hidden = false;
-        paymentWaitingEl.textContent = "Waiting for payment confirmation…";
+        paymentWaitingEl.hidden = true;
+        paymentWaitingEl.textContent = "Waiting for payment…";
       }
       if (webhookStatusEl) {
         webhookStatusEl.hidden = true;
         webhookStatusEl.textContent = "";
       }
-      if (razorpayPayBtn) razorpayPayBtn.hidden = true;
       setDonationSubmitEnabled(false);
     }
 
@@ -616,7 +622,7 @@
       setDonationSubmitEnabled(true);
       if (paymentWaitingEl) paymentWaitingEl.hidden = true;
       if (webhookStatusEl) {
-        webhookStatusEl.textContent = message || "Payment Successful ✓ You can submit registration.";
+        webhookStatusEl.textContent = message || PAYMENT_SUCCESS_MSG;
         webhookStatusEl.hidden = false;
       }
       if (donationPollTimer) {
@@ -624,10 +630,42 @@
         donationPollTimer = null;
       }
       if (window.qbToast) {
-        window.qbToast(
-          message || "Payment confirmed! You can now submit your registration.",
-          "success"
-        );
+        window.qbToast(message || PAYMENT_SUCCESS_MSG, "success");
+      }
+    }
+
+    function showPaymentFailed(message) {
+      if (donationPollTimer) {
+        clearInterval(donationPollTimer);
+        donationPollTimer = null;
+      }
+      if (paymentWaitingEl) paymentWaitingEl.hidden = true;
+      if (webhookStatusEl) {
+        webhookStatusEl.textContent = message || "Payment failed. Please try again.";
+        webhookStatusEl.hidden = false;
+        webhookStatusEl.classList.remove("text-success");
+        webhookStatusEl.classList.add("text-danger");
+      }
+      if (window.qbToast) {
+        window.qbToast(message || "Payment failed. Please try again.", "error");
+      }
+    }
+
+    function displayQrPayment(data) {
+      if (!data) return;
+      if (qrAmountEl && data.amount != null) {
+        qrAmountEl.textContent = formatRupee(data.amount);
+      }
+      if (qrUpiEl && data.upi_vpa) {
+        qrUpiEl.textContent = data.upi_vpa;
+      }
+      if (!qrImageEl) return;
+      if (data.qr_image_url) {
+        qrImageEl.src = data.qr_image_url;
+        qrImageEl.hidden = false;
+      } else if (data.qr_image_base64) {
+        qrImageEl.src = "data:image/png;base64," + data.qr_image_base64;
+        qrImageEl.hidden = false;
       }
     }
 
@@ -636,6 +674,10 @@
       var attempts = 0;
       var maxAttempts = 60;
       if (donationPollTimer) clearInterval(donationPollTimer);
+      if (paymentWaitingEl) {
+        paymentWaitingEl.textContent = "Waiting for payment…";
+        paymentWaitingEl.hidden = false;
+      }
       donationPollTimer = setInterval(function () {
         fetch("/api/registration/status/" + encodeURIComponent(donationId), {
           credentials: "same-origin",
@@ -645,17 +687,17 @@
             return r.json();
           })
           .then(function (data) {
-            if (data.status === "authorized" && paymentWaitingEl) {
-              paymentWaitingEl.textContent =
-                "Payment authorized — confirming capture…";
+            if (data.paymentStatus === "authorized" && paymentWaitingEl) {
+              paymentWaitingEl.textContent = "Payment authorized — confirming…";
               paymentWaitingEl.hidden = false;
             }
-            if (data.can_submit || data.status === "confirmed" || data.paymentStatus === "completed") {
-              markDonationVerified(
-                data.webhook_verified
-                  ? "Payment received automatically! You can submit registration."
-                  : "Payment confirmed! You can submit registration."
-              );
+            if (data.paymentStatus === "completed" || data.can_submit) {
+              markDonationVerified(PAYMENT_SUCCESS_MSG);
+              return;
+            }
+            if (data.paymentStatus === "failed") {
+              showPaymentFailed("Payment failed. Please try again.");
+              return;
             }
             attempts++;
             if (attempts >= maxAttempts && !qrPaymentConfirmed) {
@@ -663,7 +705,7 @@
               donationPollTimer = null;
               if (paymentWaitingEl) {
                 paymentWaitingEl.textContent =
-                  "Still waiting for payment. Use Pay via Razorpay or try again.";
+                  "Still waiting for payment. Scan the QR and pay via your UPI app.";
                 paymentWaitingEl.hidden = false;
               }
             }
@@ -672,70 +714,14 @@
       }, 3000);
     }
 
-    function verifyRegistrationPayment(paymentResponse) {
-      return fetch("/api/donation/verify-registration", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({
-          donation_id: pendingDonationId,
-          razorpay_payment_id: paymentResponse.razorpay_payment_id,
-          razorpay_order_id: paymentResponse.razorpay_order_id,
-          razorpay_signature: paymentResponse.razorpay_signature,
-        }),
-      }).then(function (r) {
-        return r.json().then(function (b) {
-          return { ok: r.ok, b: b };
-        });
-      });
-    }
-
-    function openRazorpayCheckout(amount) {
-      if (!pendingOrderId || !pendingRazorpayKey || !window.Razorpay) {
-        if (donateErr) {
-          donateErr.textContent = "Payment gateway not ready. Refresh and try again.";
-          donateErr.hidden = false;
-        }
-        return;
-      }
-      var options = {
-        key: pendingRazorpayKey,
-        amount: amount * 100,
-        currency: "INR",
-        name: "SITA Foundation",
-        description: "Qumanity registration donation",
-        order_id: pendingOrderId,
-        handler: function (response) {
-          if (paymentWaitingEl) {
-            paymentWaitingEl.textContent = "Verifying payment…";
-            paymentWaitingEl.hidden = false;
-          }
-          verifyRegistrationPayment(response)
-            .then(function (x) {
-              if (!x.ok) throw new Error((x.b && x.b.error) || "Verification failed");
-              markDonationVerified("Payment Successful ✓ You can submit registration.");
-            })
-            .catch(function () {
-              markDonationVerified("Payment submitted — confirming automatically…");
-              checkDonationStatus(pendingDonationId);
-            });
-        },
-        modal: {
-          ondismiss: function () {
-            if (!qrPaymentConfirmed && paymentWaitingEl) {
-              paymentWaitingEl.textContent =
-                "Payment window closed. Click Pay via Razorpay to try again.";
-            }
-          },
-        },
-      };
-      var rzp = new window.Razorpay(options);
-      rzp.open();
-    }
-
     function initRegistrationDonationOrder(amount) {
       if (!amount || amount <= 0) return;
       setDonationSubmitEnabled(false);
+      if (donateErr) donateErr.hidden = true;
+      if (paymentWaitingEl) {
+        paymentWaitingEl.textContent = "Generating QR code…";
+        paymentWaitingEl.hidden = false;
+      }
       fetch("/api/donation/create-order", {
         method: "POST",
         credentials: "same-origin",
@@ -750,34 +736,16 @@
         .then(function (x) {
           if (!x.ok) throw new Error((x.b && x.b.error) || "Could not create payment order");
           pendingDonationId = x.b.donation_id;
-          pendingOrderId = x.b.order_id;
-          pendingRazorpayKey = x.b.key_id || "";
-          if (razorpayPayBtn && pendingRazorpayKey && window.Razorpay) {
-            razorpayPayBtn.hidden = false;
-          }
+          displayQrPayment(x.b);
           checkDonationStatus(pendingDonationId);
-          if (pendingRazorpayKey && window.Razorpay) {
-            openRazorpayCheckout(amount);
-          }
         })
         .catch(function (err) {
           if (donateErr) {
             donateErr.textContent = err.message || "Could not initialize payment";
             donateErr.hidden = false;
           }
+          if (paymentWaitingEl) paymentWaitingEl.hidden = true;
         });
-    }
-
-    if (razorpayPayBtn) {
-      razorpayPayBtn.addEventListener("click", function () {
-        var amount = getSelectedAmount();
-        if (!amount || amount <= 0) return;
-        if (!pendingOrderId) {
-          initRegistrationDonationOrder(amount);
-          return;
-        }
-        openRazorpayCheckout(amount);
-      });
     }
 
     function currentCountryId() {
@@ -1008,6 +976,13 @@
         selectedAmount = amount;
         updatePaymentMethodsVisibility(amount);
         fetchDonationPreview(amount);
+        var qrRadio = document.querySelector(
+          'input[name="reg-donate-method"][value="qr"]'
+        );
+        if (qrRadio && qrRadio.checked && amount > 0) {
+          resetQrPaymentState();
+          initRegistrationDonationOrder(amount);
+        }
       });
     }
 
@@ -1144,7 +1119,7 @@
         if (amount > 0 && method === "qr" && !qrPaymentConfirmed) {
           if (donateErr) {
             donateErr.textContent =
-              "Please complete payment via Razorpay. Submit will unlock automatically when payment is confirmed.";
+              "Please scan the QR and pay via your UPI app. Submit unlocks automatically when payment is confirmed.";
             donateErr.hidden = false;
           }
           return;

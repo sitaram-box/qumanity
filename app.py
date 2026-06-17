@@ -6,6 +6,7 @@ Geography reads from indiaq.db; app users live in the same database `users` tabl
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import logging
 import os
@@ -3300,6 +3301,8 @@ def _before_request() -> None:
     if request.path == "/health":
         return
     if request.path == "/setup":
+        return
+    if request.path == "/webhook/donation":
         return
     # Public diagnostic — no DB so /debug/check works even if migrations fail.
     if request.path == "/debug/check":
@@ -8597,6 +8600,57 @@ def _create_razorpay_order(amount_rupees: int, *, receipt: str = "") -> dict[str
     return client.order.create(data=order_data)
 
 
+def _create_razorpay_upi_qr_for_order(
+    order_id: str,
+    amount_paise: int,
+    donation_id: int,
+) -> dict[str, Any]:
+    """Create a Razorpay UPI QR linked to an order (scan-only flow, no checkout popup)."""
+    client = _razorpay_client()
+    if client is None:
+        raise ValueError("Payment gateway is not configured")
+    close_by = int(time.time()) + 3600
+    notes = {"donation_id": str(donation_id)}
+    try:
+        qr = client.qrcode.create(
+            {
+                "type": "upi_qr",
+                "name": f"Qumanity donation {donation_id}",
+                "usage": "single_use",
+                "fixed_amount": True,
+                "payment_amount": int(amount_paise),
+                "description": "Qumanity registration donation",
+                "order_id": order_id,
+                "close_by": close_by,
+                "notes": notes,
+            }
+        )
+        return {
+            "qr_id": str(qr.get("id") or "").strip(),
+            "image_url": str(qr.get("image_url") or "").strip(),
+            "qr_image_base64": None,
+        }
+    except Exception as exc:
+        app.logger.warning("Razorpay UPI QR create failed, using payment link: %s", exc)
+        plink = client.payment_link.create(
+            {
+                "amount": int(amount_paise),
+                "currency": "INR",
+                "description": "Qumanity registration donation",
+                "order_id": order_id,
+                "notes": notes,
+            }
+        )
+        short_url = str(plink.get("short_url") or "").strip()
+        qr_b64 = referral_core.generate_qr_base64(short_url) if short_url else None
+        return {
+            "qr_id": str(plink.get("id") or "").strip(),
+            "image_url": None,
+            "qr_image_base64": qr_b64,
+            "short_url": short_url,
+        }
+
+
 def _verify_razorpay_payment(
     payment_id: str, order_id: str, signature: str
 ) -> None:
@@ -9023,13 +9077,49 @@ def api_donation_create_order():
         order = _create_razorpay_order(amount)
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 503
+    order_id = str(order.get("id") or "").strip()
+    conn = get_db()
+    session_marker = secrets.token_hex(8)
+    donation_id = sita_platform_core.record_donation(
+        conn,
+        user_private_id=f"{sita_platform_core.PENDING_USER_PREFIX}{session_marker}",
+        user_public_id="PENDING",
+        amount=amount,
+        payment_method="qr_code",
+        status="pending",
+        payment_status="pending",
+        razorpay_order_id=order_id,
+        amount_paise=amount * 100,
+    )
+    try:
+        qr_payload = _create_razorpay_upi_qr_for_order(order_id, amount * 100, donation_id)
+    except ValueError as exc:
+        conn.rollback()
+        return jsonify({"error": str(exc)}), 503
+    except Exception as exc:
+        conn.rollback()
+        app.logger.exception("Failed to create UPI QR for donation %s", donation_id)
+        return jsonify({"error": f"Could not generate payment QR: {exc}"}), 503
+    qr_id = str(qr_payload.get("qr_id") or "").strip()
+    if qr_id:
+        conn.execute(
+            "UPDATE donations SET razorpay_qr_id = ? WHERE id = ?",
+            (qr_id, int(donation_id)),
+        )
+    session["pending_donation_id"] = donation_id
+    session["pending_donation_marker"] = session_marker
+    conn.commit()
+    upi_vpa = getattr(config, "DONATION_UPI_VPA", "") or ""
     return jsonify(
         {
             "ok": True,
-            "order_id": order.get("id"),
+            "donation_id": donation_id,
+            "order_id": order_id,
             "amount": amount,
             "currency": order.get("currency", "INR"),
-            "key_id": getattr(config, "RAZORPAY_KEY_ID", ""),
+            "qr_image_url": qr_payload.get("image_url"),
+            "qr_image_base64": qr_payload.get("qr_image_base64"),
+            "upi_vpa": upi_vpa,
         }
     )
 
@@ -12466,17 +12556,28 @@ def _finalize_registration_with_donation(
                 amount_rupees=int(donation_rupees),
             )
     if donation_rupees > 0:
-        pay_method = "qr_code" if method == "qr" else "cash"
-        donation_status = "pending" if pay_method == "qr_code" else "confirmed"
-        sita_platform_core.record_donation(
-            conn,
-            user_private_id=private_id,
-            user_public_id=public_id,
-            amount=int(donation_rupees),
-            payment_method=pay_method,
-            referral_id=agent_private_id or referrer_private_id or None,
-            status=donation_status,
-        )
+        pending_donation_id = session.get("pending_donation_id")
+        if pending_donation_id:
+            sita_platform_core.link_donation_to_user(
+                conn,
+                int(pending_donation_id),
+                private_id,
+                public_id,
+            )
+        else:
+            pay_method = "qr_code" if method == "qr" else "cash"
+            donation_status = "pending" if pay_method == "qr_code" else "confirmed"
+            sita_platform_core.record_donation(
+                conn,
+                user_private_id=private_id,
+                user_public_id=public_id,
+                amount=int(donation_rupees),
+                payment_method=pay_method,
+                referral_id=agent_private_id or referrer_private_id or None,
+                status=donation_status,
+            )
+    session.pop("pending_donation_id", None)
+    session.pop("pending_donation_marker", None)
     conn.commit()
     return private_id, public_id
 
@@ -12576,6 +12677,102 @@ def api_register_donate():
 @app.route("/sita-foundation")
 def sita_foundation_page():
     return render_template("sita_foundation.html")
+
+
+@app.post("/webhook/donation")
+def donation_webhook():
+    """Razorpay webhook — confirms donations when payment.captured fires."""
+    payload_bytes = request.get_data()
+    webhook_signature = (request.headers.get("X-Razorpay-Signature") or "").strip()
+    secret = getattr(config, "RAZORPAY_WEBHOOK_SECRET", "") or ""
+    if secret:
+        expected_signature = hmac.new(
+            secret.encode("utf-8"),
+            payload_bytes,
+            hashlib.sha256,
+        ).hexdigest()
+        if not webhook_signature or not hmac.compare_digest(
+            expected_signature, webhook_signature
+        ):
+            return jsonify({"error": "Invalid signature"}), 401
+    try:
+        data = json.loads(payload_bytes.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return jsonify({"error": "Invalid JSON"}), 400
+    event = str(data.get("event") or "").strip()
+    conn = get_db()
+    handled = sita_platform_core.process_razorpay_webhook(conn, event, data)
+    conn.commit()
+    if event in ("payment.captured", "payment.failed", "payment.authorized", "qr_code.credited") and not handled:
+        app.logger.warning("Webhook: no matching pending donation for event %s", event)
+    return jsonify({"status": "success"}), 200
+
+
+@app.get("/api/registration/status/<int:donation_id>")
+def api_registration_status(donation_id: int):
+    """Alias for registration payment polling (same as donation status)."""
+    return api_donation_status(donation_id)
+
+
+@app.get("/api/donation/status/<int:donation_id>")
+def api_donation_status(donation_id: int):
+    """Poll donation status during registration (session-bound) or for logged-in owner."""
+    conn = get_db()
+    row = sita_platform_core.get_donation(conn, donation_id)
+    if not row:
+        return jsonify({"error": "Not found"}), 404
+    allowed = False
+    if session.get("pending_donation_id") == donation_id:
+        allowed = True
+    elif getattr(g, "current_user", None):
+        if str(g.current_user["private_id"]) == str(row["user_private_id"]):
+            allowed = True
+        elif str(row["user_private_id"]).startswith(sita_platform_core.PENDING_USER_PREFIX):
+            marker = session.get("pending_donation_marker")
+            if marker and str(row["user_private_id"]) == (
+                f"{sita_platform_core.PENDING_USER_PREFIX}{marker}"
+            ):
+                allowed = True
+    if not allowed:
+        return jsonify({"error": "Forbidden"}), 403
+    return jsonify(sita_platform_core.get_donation_status_payload(conn, donation_id))
+
+
+@app.post("/api/donation/verify-registration")
+def api_donation_verify_registration():
+    """Verify Razorpay payment client-side and confirm pending registration donation."""
+    if not session.get("pending_registration"):
+        return jsonify({"error": "No pending registration"}), 400
+    data = request.get_json(silent=True) or {}
+    donation_id = session.get("pending_donation_id") or data.get("donation_id")
+    payment_id = str(data.get("razorpay_payment_id") or data.get("payment_id") or "").strip()
+    order_id = str(data.get("razorpay_order_id") or data.get("order_id") or "").strip()
+    signature = str(data.get("razorpay_signature") or data.get("signature") or "").strip()
+    if not donation_id:
+        return jsonify({"error": "donation_id required"}), 400
+    if not all([payment_id, order_id, signature]):
+        return jsonify({"error": "payment_id, order_id, and signature are required"}), 400
+    try:
+        _verify_razorpay_payment(payment_id, order_id, signature)
+    except Exception as exc:
+        return jsonify({"error": f"Payment verification failed: {exc}"}), 400
+    conn = get_db()
+    ok = sita_platform_core.confirm_donation_from_razorpay(
+        conn,
+        int(donation_id),
+        razorpay_payment_id=payment_id,
+        razorpay_order_id=order_id,
+        confirmed_by="razorpay_client",
+    )
+    if not ok:
+        return jsonify({"error": "Donation not found"}), 404
+    conn.commit()
+    return jsonify(
+        {
+            "ok": True,
+            **sita_platform_core.get_donation_status_payload(conn, int(donation_id)),
+        }
+    )
 
 
 @app.post("/api/donation/record")
@@ -12768,6 +12965,64 @@ def api_edit_admin_reject():
         return jsonify({"error": "Request not found or not pending"}), 404
     conn.commit()
     return jsonify({"ok": True})
+
+
+@app.get("/api/admin/donations")
+@login_required
+def api_admin_donations_alias():
+    if not is_admin_user(g.current_user):
+        return jsonify({"error": "Admin only"}), 403
+    conn = get_db()
+    return jsonify(sita_platform_core.admin_donation_list(conn))
+
+
+@app.post("/api/admin/donation/confirm/<int:donation_id>")
+@login_required
+def api_admin_donation_confirm_alias(donation_id: int):
+    if not is_admin_user(g.current_user):
+        return jsonify({"error": "Admin only"}), 403
+    conn = get_db()
+    ok = sita_platform_core.confirm_donation(
+        conn, donation_id, str(g.current_user["private_id"])
+    )
+    if not ok:
+        return jsonify({"error": "Donation not found or already confirmed"}), 404
+    conn.commit()
+    return jsonify({"success": True})
+
+
+@app.post("/api/admin/donation/reject/<int:donation_id>")
+@login_required
+def api_admin_donation_reject_alias(donation_id: int):
+    if not is_admin_user(g.current_user):
+        return jsonify({"error": "Admin only"}), 403
+    data = request.get_json(silent=True) or {}
+    reason = str(data.get("reason") or "").strip()
+    conn = get_db()
+    ok = sita_platform_core.reject_donation(
+        conn, donation_id, str(g.current_user["private_id"]), reason
+    )
+    if not ok:
+        return jsonify({"error": "Donation not found"}), 404
+    conn.commit()
+    return jsonify({"success": True})
+
+
+@app.get("/api/admin/donation/export")
+@login_required
+def api_admin_donation_export_alias():
+    if not is_admin_user(g.current_user):
+        return jsonify({"error": "Admin only"}), 403
+    conn = get_db()
+    csv_data = sita_platform_core.donations_csv(conn)
+    return (
+        csv_data,
+        200,
+        {
+            "Content-Type": "text/csv; charset=utf-8",
+            "Content-Disposition": "attachment; filename=donations.csv",
+        },
+    )
 
 
 RECOVERY_VERIFY_FAIL_MSG = (
@@ -13675,5 +13930,5 @@ def setup_database():
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8080))
-    app.run(host="0.0.0.0", port=port)
+    port = int(os.environ.get("FLASK_RUN_PORT", os.environ.get("PORT", 5001)))
+    app.run(debug=True, host="0.0.0.0", port=port)

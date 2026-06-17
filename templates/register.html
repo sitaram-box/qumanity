@@ -3,7 +3,7 @@
 {% block title %}Register — Qumanity{% endblock %}
 
 {% block head_extra %}
-<link rel="stylesheet" href="{{ url_for('static', filename='register.css') }}?v=6" />
+<link rel="stylesheet" href="{{ url_for('static', filename='register.css') }}?v=7" />
 {% endblock %}
 
 {# Registration is English-only — no language dropdown (dashboard only). #}
@@ -659,21 +659,29 @@
         </label>
         <div id="reg-qr-placeholder" class="qr-placeholder mt-2" hidden>
           <p class="small mb-2">
-            Scan the SITA Foundation QR below, then complete payment via Razorpay for
-            <strong>automatic confirmation</strong> (no manual steps).
+            Scan this UPI QR with Google Pay, PhonePe, Paytm, or any UPI app.
+            Payment is confirmed automatically — no card details or OTP on this page.
           </p>
-          <img
-            src="{{ url_for('static', filename='images/SitaFoundation Donate.jpg') }}"
-            alt="SITA Foundation donation QR code"
-            class="qb-donation-qr-img"
-            width="220"
-            height="220"
-          />
-          <button type="button" class="qb-btn qb-btn-primary btn-sm mt-2" id="reg-razorpay-pay-btn" hidden>
-            Pay via Razorpay (UPI / Card)
-          </button>
+          <div class="qb-qr-payment-box" id="reg-qr-container">
+            <img
+              id="reg-qr-image"
+              src=""
+              alt="UPI payment QR code"
+              class="qb-donation-qr-img"
+              width="220"
+              height="220"
+              hidden
+            />
+            <p class="small mb-1 mt-2">
+              <strong>Amount:</strong> <span id="reg-qr-amount">—</span>
+            </p>
+            <p class="small mb-0">
+              <strong>UPI ID:</strong>
+              <span id="reg-qr-upi-id" class="font-monospace">—</span>
+            </p>
+          </div>
           <p class="small text-muted mt-2 mb-0" id="reg-payment-waiting">
-            Waiting for payment confirmation…
+            Waiting for payment…
           </p>
           <p class="small text-success mt-1 mb-0 qb-payment-success" id="reg-qr-webhook-status" hidden></p>
         </div>
@@ -727,8 +735,7 @@
     }
   };
 </script>
-<script src="https://checkout.razorpay.com/v1/checkout.js" defer></script>
 <script src="{{ url_for('static', filename='register_geo.js') }}?v=6" defer></script>
-<script src="{{ url_for('static', filename='register.js') }}?v=15" defer></script>
+<script src="{{ url_for('static', filename='register.js') }}?v=16" defer></script>
 {% endif %}
 {% endblock %}
