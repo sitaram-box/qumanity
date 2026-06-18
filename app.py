@@ -682,7 +682,9 @@ def inject_council_context() -> dict[str, Any]:
 def inject_donation_display() -> dict[str, str]:
     return {
         "donation_bank_name": getattr(config, "DONATION_BANK_NAME", "SITA Foundation"),
-        "donation_upi_display": getattr(config, "DONATION_UPI_DISPLAY", ""),
+        "donation_upi_display": getattr(config, "DONATION_UPI_DISPLAY", "sitafoundation@upi"),
+        "donation_bank_account": getattr(config, "DONATION_BANK_ACCOUNT", ""),
+        "donation_ifsc": getattr(config, "DONATION_IFSC", ""),
     }
 
 
@@ -9398,9 +9400,9 @@ def api_upgrade_user():
     )
 
 
-@app.post("/api/donation/confirm-bank-qr")
-def api_donation_confirm_bank_qr():
-    """User-confirmed bank QR payment during registration (static QR, no Razorpay)."""
+@app.post("/api/donation/init-bank-qr")
+def api_donation_init_bank_qr():
+    """Create a pending bank-QR donation when user selects QR payment."""
     pending = session.get("pending_registration")
     if not pending:
         return jsonify(
@@ -9425,22 +9427,18 @@ def api_donation_confirm_bank_qr():
         user_public_id="PENDING",
         amount=amount,
         payment_method="bank_qr",
-        status="confirmed",
-        payment_status="completed",
+        status="pending",
+        payment_status="pending",
         amount_paise=amount * 100,
     )
     txn_ref = f"QUM{donation_id}"
     conn.execute(
-        """
-        UPDATE donations
-        SET transaction_id = ?, confirmed_at = ?, confirmed_by = 'user_confirmed'
-        WHERE id = ?
-        """,
-        (txn_ref, sita_platform_core._now(), int(donation_id)),
+        "UPDATE donations SET transaction_id = ? WHERE id = ?",
+        (txn_ref, int(donation_id)),
     )
     session["pending_donation_id"] = donation_id
     session["pending_donation_marker"] = session_marker
-    session["bank_qr_payment_confirmed"] = True
+    session.pop("bank_qr_payment_confirmed", None)
     conn.commit()
     return jsonify(
         {
@@ -9448,7 +9446,138 @@ def api_donation_confirm_bank_qr():
             "success": True,
             "donation_id": donation_id,
             "amount": amount,
-            "payment_status": "completed",
+            "payment_status": "pending",
+        }
+    )
+
+
+def _validate_upi_txn_reference(txn_reference: str) -> bool:
+    ref = (txn_reference or "").strip()
+    if len(ref) < 10 or len(ref) > 30:
+        return False
+    return bool(re.match(r"^[A-Za-z0-9]+$", ref))
+
+
+def _donation_session_allowed(row: dict[str, Any] | sqlite3.Row) -> bool:
+    donation_id = int(row["id"])
+    if session.get("pending_donation_id") == donation_id:
+        return True
+    if getattr(g, "current_user", None):
+        if str(g.current_user["private_id"]) == str(row["user_private_id"]):
+            return True
+        if str(row["user_private_id"]).startswith(sita_platform_core.PENDING_USER_PREFIX):
+            marker = session.get("pending_donation_marker")
+            if marker and str(row["user_private_id"]) == (
+                f"{sita_platform_core.PENDING_USER_PREFIX}{marker}"
+            ):
+                return True
+    return False
+
+
+def _notify_admins_pending_qr_verification(
+    conn: sqlite3.Connection,
+    donation_id: int,
+    txn_reference: str,
+    amount_rupees: int,
+) -> None:
+    body = (
+        f"A registration donation needs payment verification.\n\n"
+        f"Donation ID: {donation_id}\n"
+        f"Amount: ₹{amount_rupees}\n"
+        f"UPI reference: {txn_reference}\n\n"
+        "Verify against your bank statement and confirm in Admin → Donations."
+    )
+    for row in conn.execute(
+        "SELECT private_id FROM users WHERE COALESCE(is_admin, 0) = 1",
+    ):
+        send_system_message(
+            conn,
+            str(row["private_id"]),
+            "QR donation pending verification",
+            body,
+        )
+
+
+@app.post("/api/donation/verify-qr-payment")
+def api_donation_verify_qr_payment():
+    """Submit UPI transaction reference for admin verification."""
+    payload = request.get_json(silent=True) or {}
+    donation_id = payload.get("donation_id") or session.get("pending_donation_id")
+    txn_reference = str(
+        payload.get("txn_reference") or payload.get("txn_ref") or ""
+    ).strip()
+    if not donation_id:
+        return jsonify({"success": False, "error": "donation_id required"}), 400
+    if not _validate_upi_txn_reference(txn_reference):
+        return jsonify(
+            {
+                "success": False,
+                "error": (
+                    "Invalid transaction reference. Enter the 10–30 character "
+                    "UPI reference from your payment app."
+                ),
+            }
+        ), 400
+    conn = get_db()
+    row = sita_platform_core.get_donation(conn, int(donation_id))
+    if not row:
+        return jsonify({"success": False, "error": "Donation not found"}), 404
+    if not _donation_session_allowed(row):
+        return jsonify({"success": False, "error": "Forbidden"}), 403
+    ok = sita_platform_core.submit_bank_qr_txn_reference(
+        conn, int(donation_id), txn_reference
+    )
+    if not ok:
+        return jsonify(
+            {"success": False, "error": "Could not submit transaction reference"}
+        ), 400
+    amount_rupees = sita_platform_core.donation_amount_rupees(row)
+    _notify_admins_pending_qr_verification(
+        conn, int(donation_id), txn_reference, amount_rupees
+    )
+    conn.commit()
+    return jsonify(
+        {
+            "ok": True,
+            "success": True,
+            "message": "Transaction reference submitted for verification",
+            "donation_id": int(donation_id),
+            "payment_status": "pending_verification",
+        }
+    )
+
+
+@app.get("/api/donation/check-verification/<int:donation_id>")
+def api_donation_check_verification(donation_id: int):
+    """Poll whether admin has verified a bank-QR donation."""
+    conn = get_db()
+    row = sita_platform_core.get_donation(conn, donation_id)
+    if not row:
+        return jsonify({"error": "Donation not found"}), 404
+    if not _donation_session_allowed(row):
+        return jsonify({"error": "Forbidden"}), 403
+    return jsonify(sita_platform_core.get_verification_check_payload(conn, donation_id))
+
+
+@app.post("/api/donation/admin-verify/<int:donation_id>")
+def api_donation_admin_verify(donation_id: int):
+    """Admin API key endpoint to verify a bank-QR donation."""
+    admin_key = (request.headers.get("X-Admin-Key") or "").strip()
+    expected = getattr(config, "ADMIN_API_KEY", "") or ""
+    if not expected or not admin_key or admin_key != expected:
+        return jsonify({"error": "Unauthorized"}), 401
+    conn = get_db()
+    ok = sita_platform_core.confirm_donation(conn, donation_id, "admin_api_key")
+    if not ok:
+        return jsonify({"error": "Donation not found or already confirmed"}), 404
+    conn.commit()
+    return jsonify(
+        {
+            "ok": True,
+            "success": True,
+            "message": "Payment verified successfully",
+            "donation_id": donation_id,
+            "verified": True,
         }
     )
 
@@ -13263,13 +13392,11 @@ def api_register_donate():
         else:
             return jsonify({"error": "Referral ID is required for cash payments"}), 400
     elif method == "qr" and amount > 0:
-        if not session.get("bank_qr_payment_confirmed"):
-            return jsonify(
-                {"error": "Confirm payment after scanning the bank QR code."}
-            ), 400
         pending_donation_id = session.get("pending_donation_id")
         if not pending_donation_id:
-            return jsonify({"error": "Payment not confirmed. Click I've Completed Payment."}), 400
+            return jsonify(
+                {"error": "Submit your UPI transaction reference after paying."}
+            ), 400
         donation_row = sita_platform_core.get_donation(conn, int(pending_donation_id))
         if not donation_row:
             return jsonify({"error": "Payment record not found."}), 400
@@ -13277,7 +13404,10 @@ def api_register_donate():
         if pay_status != "completed":
             return jsonify(
                 {
-                    "error": "Payment not confirmed yet.",
+                    "error": (
+                        "Payment not verified yet. Wait for admin confirmation "
+                        "after submitting your UPI reference."
+                    ),
                     "payment_status": pay_status,
                 }
             ), 400
@@ -13296,7 +13426,6 @@ def api_register_donate():
         conn.rollback()
         return jsonify({"error": str(exc)}), 400
     session.pop("pending_registration", None)
-    session.pop("bank_qr_payment_confirmed", None)
     session.pop("pending_donation_id", None)
     session.pop("pending_donation_marker", None)
     return jsonify(

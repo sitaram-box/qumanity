@@ -563,7 +563,10 @@
     var cashFields = document.getElementById("reg-donate-cash-fields");
     var cashReferralInput = document.getElementById("reg-donate-referral-id");
     var cashReferralError = document.getElementById("reg-cash-referral-error");
-    var qrConfirmBtn = document.getElementById("reg-qr-confirm-btn");
+    var qrInstructionsEl = document.getElementById("reg-qr-payment-instructions");
+    var qrTxnInput = document.getElementById("reg-qr-txn-ref");
+    var qrTxnSubmit = document.getElementById("reg-qr-txn-submit");
+    var qrTxnError = document.getElementById("reg-qr-txn-error");
     var previewBox = document.getElementById("reg-distribution-preview");
     var previewList = document.getElementById("reg-distribution-list");
     var previewTotal = document.getElementById("reg-distribution-total");
@@ -576,6 +579,8 @@
     var qrPaymentConfirmed = false;
     var cashReferralValid = false;
     var cashReferralTimer = null;
+    var pendingDonationId = null;
+    var verificationPollTimer = null;
     var paymentWaitingEl = document.getElementById("reg-payment-waiting");
     var webhookStatusEl = document.getElementById("reg-qr-webhook-status");
     var qrImageEl = document.getElementById("reg-qr-image");
@@ -599,19 +604,28 @@
     function resetPaymentState() {
       qrPaymentConfirmed = false;
       cashReferralValid = false;
+      pendingDonationId = null;
       if (cashReferralTimer) {
         clearTimeout(cashReferralTimer);
         cashReferralTimer = null;
       }
+      if (verificationPollTimer) {
+        clearInterval(verificationPollTimer);
+        verificationPollTimer = null;
+      }
       if (qrAmountEl) qrAmountEl.textContent = "—";
       if (paymentWaitingEl) {
         paymentWaitingEl.hidden = false;
-        paymentWaitingEl.textContent = "Scan the QR and pay, then confirm below.";
+        paymentWaitingEl.textContent =
+          "Scan the QR and pay. Then enter your UPI transaction reference.";
       }
-      if (qrConfirmBtn) {
-        qrConfirmBtn.hidden = true;
-        qrConfirmBtn.disabled = false;
+      if (qrInstructionsEl) qrInstructionsEl.hidden = true;
+      if (qrTxnInput) {
+        qrTxnInput.value = "";
+        qrTxnInput.disabled = false;
       }
+      if (qrTxnSubmit) qrTxnSubmit.disabled = true;
+      if (qrTxnError) qrTxnError.hidden = true;
       if (webhookStatusEl) {
         webhookStatusEl.hidden = true;
         webhookStatusEl.textContent = "";
@@ -628,18 +642,159 @@
 
     function showStaticBankQr(amount) {
       qrPaymentConfirmed = false;
+      pendingDonationId = null;
       if (donateErr) donateErr.hidden = true;
       if (qrAmountEl) qrAmountEl.textContent = formatRupee(amount);
       if (paymentWaitingEl) {
-        paymentWaitingEl.textContent = "Scan the QR and pay, then confirm below.";
+        paymentWaitingEl.textContent = "Preparing payment…";
         paymentWaitingEl.hidden = false;
       }
-      if (qrConfirmBtn) {
-        qrConfirmBtn.hidden = false;
-        qrConfirmBtn.disabled = false;
-      }
+      if (qrInstructionsEl) qrInstructionsEl.hidden = true;
       if (webhookStatusEl) webhookStatusEl.hidden = true;
       setDonationSubmitEnabled(false);
+      fetch("/api/donation/init-bank-qr", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ amount: amount }),
+      })
+        .then(function (r) {
+          return parseJsonResponse(r).then(function (b) {
+            return { ok: r.ok, b: b };
+          });
+        })
+        .then(function (x) {
+          if (!x.ok) {
+            throw new Error((x.b && x.b.error) || "Could not start QR payment");
+          }
+          pendingDonationId = x.b.donation_id;
+          if (paymentWaitingEl) {
+            paymentWaitingEl.textContent =
+              "Scan the QR and pay. Then enter your UPI transaction reference.";
+            paymentWaitingEl.hidden = false;
+          }
+          if (qrInstructionsEl) qrInstructionsEl.hidden = false;
+          if (qrTxnSubmit) qrTxnSubmit.disabled = false;
+        })
+        .catch(function (err) {
+          if (donateErr) {
+            donateErr.textContent = err.message || "Could not initialize payment";
+            donateErr.hidden = false;
+          }
+          if (paymentWaitingEl) paymentWaitingEl.hidden = true;
+        });
+    }
+
+    function pollVerificationStatus() {
+      if (!pendingDonationId) return;
+      if (verificationPollTimer) clearInterval(verificationPollTimer);
+      var attempts = 0;
+      verificationPollTimer = setInterval(function () {
+        fetch(
+          "/api/donation/check-verification/" + encodeURIComponent(pendingDonationId),
+          { credentials: "same-origin", headers: { Accept: "application/json" } }
+        )
+          .then(function (r) {
+            return r.json();
+          })
+          .then(function (data) {
+            if (data.verified || data.payment_status === "completed") {
+              clearInterval(verificationPollTimer);
+              verificationPollTimer = null;
+              qrPaymentConfirmed = true;
+              if (paymentWaitingEl) paymentWaitingEl.hidden = true;
+              if (webhookStatusEl) {
+                webhookStatusEl.textContent = PAYMENT_SUCCESS_MSG;
+                webhookStatusEl.hidden = false;
+              }
+              setDonationSubmitEnabled(true);
+              if (window.qbToast) {
+                window.qbToast("Payment verified! Submit your registration.", "success");
+              }
+            }
+            attempts++;
+            if (attempts >= 60 && !qrPaymentConfirmed) {
+              clearInterval(verificationPollTimer);
+              verificationPollTimer = null;
+              if (paymentWaitingEl) {
+                paymentWaitingEl.textContent =
+                  "Verification is taking longer than expected. Our team will confirm soon.";
+                paymentWaitingEl.hidden = false;
+              }
+            }
+          })
+          .catch(function () {});
+      }, 5000);
+    }
+
+    function submitQrTxnReference() {
+      if (!pendingDonationId) return;
+      var txnRef = qrTxnInput ? qrTxnInput.value.trim() : "";
+      if (!txnRef || txnRef.length < 10) {
+        if (qrTxnError) {
+          qrTxnError.textContent =
+            "Enter a valid UPI transaction reference (at least 10 characters).";
+          qrTxnError.hidden = false;
+        }
+        return;
+      }
+      if (qrTxnSubmit) qrTxnSubmit.disabled = true;
+      if (qrTxnError) qrTxnError.hidden = true;
+      if (paymentWaitingEl) {
+        paymentWaitingEl.textContent = "Submitting transaction reference…";
+        paymentWaitingEl.hidden = false;
+      }
+      fetch("/api/donation/verify-qr-payment", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          donation_id: pendingDonationId,
+          txn_reference: txnRef,
+        }),
+      })
+        .then(function (r) {
+          return parseJsonResponse(r).then(function (b) {
+            return { ok: r.ok, b: b };
+          });
+        })
+        .then(function (x) {
+          if (!x.ok) {
+            throw new Error(
+              (x.b && x.b.error) || "Failed to submit transaction reference"
+            );
+          }
+          if (qrTxnInput) qrTxnInput.disabled = true;
+          if (paymentWaitingEl) {
+            paymentWaitingEl.textContent =
+              "Payment submitted for verification. Waiting for confirmation…";
+            paymentWaitingEl.hidden = false;
+          }
+          if (webhookStatusEl) {
+            webhookStatusEl.textContent =
+              "Transaction submitted. We'll verify your payment shortly.";
+            webhookStatusEl.hidden = false;
+          }
+          pollVerificationStatus();
+        })
+        .catch(function (err) {
+          if (qrTxnSubmit) qrTxnSubmit.disabled = false;
+          if (qrTxnError) {
+            qrTxnError.textContent = err.message || "Could not submit reference";
+            qrTxnError.hidden = false;
+          }
+        });
+    }
+
+    if (qrTxnSubmit) {
+      qrTxnSubmit.addEventListener("click", submitQrTxnReference);
+    }
+    if (qrTxnInput) {
+      qrTxnInput.addEventListener("input", function () {
+        var val = qrTxnInput.value.replace(/\s+/g, "");
+        qrTxnInput.value = val;
+        if (qrTxnError) qrTxnError.hidden = true;
+      });
     }
 
     function validateCashReferral() {
@@ -688,55 +843,6 @@
       }, 400);
     }
 
-    function confirmBankQrPayment() {
-      var amount = getSelectedAmount();
-      if (!amount || amount <= 0) return;
-      if (qrConfirmBtn) qrConfirmBtn.disabled = true;
-      if (paymentWaitingEl) {
-        paymentWaitingEl.textContent = "Verifying payment…";
-        paymentWaitingEl.hidden = false;
-      }
-      fetch("/api/donation/confirm-bank-qr", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ amount: amount }),
-      })
-        .then(function (r) {
-          return parseJsonResponse(r).then(function (b) {
-            return { ok: r.ok, b: b };
-          });
-        })
-        .then(function (x) {
-          if (!x.ok) {
-            throw new Error((x.b && x.b.error) || "Could not confirm payment");
-          }
-          qrPaymentConfirmed = true;
-          if (paymentWaitingEl) paymentWaitingEl.hidden = true;
-          if (webhookStatusEl) {
-            webhookStatusEl.textContent = PAYMENT_SUCCESS_MSG;
-            webhookStatusEl.hidden = false;
-          }
-          setDonationSubmitEnabled(true);
-          if (window.qbToast) {
-            window.qbToast("Payment confirmed! Submit your registration.", "success");
-          }
-        })
-        .catch(function (err) {
-          if (qrConfirmBtn) qrConfirmBtn.disabled = false;
-          if (paymentWaitingEl) paymentWaitingEl.hidden = true;
-          if (donateErr) {
-            donateErr.textContent = err.message || "Could not confirm payment";
-            donateErr.hidden = false;
-            donateErr.classList.remove("text-warning");
-            donateErr.classList.add("text-danger");
-          }
-        });
-    }
-
-    if (qrConfirmBtn) {
-      qrConfirmBtn.addEventListener("click", confirmBankQrPayment);
-    }
     if (cashReferralInput) {
       cashReferralInput.addEventListener("input", function () {
         cashReferralInput.value = cashReferralInput.value.toUpperCase();
@@ -1114,10 +1220,14 @@
           }
           return;
         }
-        if (amount > 0 && method === "qr" && !qrPaymentConfirmed) {
+        if (
+          amount > 0 &&
+          method === "qr" &&
+          !qrPaymentConfirmed
+        ) {
           if (donateErr) {
             donateErr.textContent =
-              "Complete payment first. Submit unlocks automatically when payment is confirmed.";
+              "Complete payment verification first (submit UPI reference and wait for approval).";
             donateErr.hidden = false;
           }
           return;

@@ -104,7 +104,15 @@ DONATION_UPI_VPA: str = _first_env(
 # Optional explicit fallback when primary VPA env vars are missing.
 UPI_VPA_FALLBACK: str = _first_env("FALLBACK_DONATION_UPI_VPA", "DEFAULT_UPI_VPA")
 DONATION_BANK_NAME: str = _first_env("DONATION_BANK_NAME") or "SITA Foundation"
-DONATION_UPI_DISPLAY: str = _first_env("DONATION_UPI_DISPLAY", "DONATION_UPI_ID") or DONATION_UPI_VPA
+# Bank UPI for static QR display — never use Razorpay test VPAs here.
+DONATION_UPI_DISPLAY: str = (
+    _first_env("DONATION_UPI_DISPLAY", "DONATION_UPI_ID") or "sitafoundation@upi"
+)
+DONATION_BANK_ACCOUNT: str = _first_env(
+    "DONATION_BANK_ACCOUNT", "DONATION_BANK_ACCOUNT_NO"
+) or ""
+DONATION_IFSC: str = _first_env("DONATION_IFSC", "DONATION_BANK_IFSC") or ""
+ADMIN_API_KEY: str = _first_env("ADMIN_KEY", "ADMIN_API_KEY") or ""
 
 MAIL_SERVER: str = os.environ.get("MAIL_SERVER", "").strip()
 MAIL_PORT: int = int(os.environ.get("MAIL_PORT", "587") or "587")

@@ -684,21 +684,45 @@
             <p class="small mb-0">
               <strong>Organisation:</strong> {{ donation_bank_name|default('SITA Foundation') }}
             </p>
-            {% if donation_upi_display %}
             <p class="small mb-0">
               <strong>UPI:</strong>
-              <span id="reg-qr-upi-id" class="font-monospace">{{ donation_upi_display }}</span>
+              <span id="reg-qr-upi-id" class="font-monospace">{{ donation_upi_display|default('sitafoundation@upi') }}</span>
             </p>
-            {% else %}
-            <span id="reg-qr-upi-id" hidden></span>
+            {% if donation_bank_account %}
+            <p class="small mb-0">
+              <strong>Account:</strong> <span class="font-monospace">{{ donation_bank_account }}</span>
+            </p>
+            {% endif %}
+            {% if donation_ifsc %}
+            <p class="small mb-0">
+              <strong>IFSC:</strong> <span class="font-monospace">{{ donation_ifsc }}</span>
+            </p>
             {% endif %}
           </div>
-          <p class="small text-muted mt-2 mb-2" id="reg-payment-waiting">
-            Scan the QR and pay, then confirm below.
+          <div id="reg-qr-payment-instructions" class="qb-panel p-2 mt-2" hidden>
+            <p class="small fw-medium mb-2">After payment</p>
+            <ol class="small mb-2 ps-3">
+              <li>Enter your UPI transaction reference number below</li>
+              <li>Our team will verify your payment against the bank statement</li>
+              <li>Submit Registration unlocks after verification</li>
+            </ol>
+            <label class="form-label small" for="reg-qr-txn-ref">UPI transaction reference</label>
+            <input
+              type="text"
+              class="form-control form-control-sm font-monospace mb-2"
+              id="reg-qr-txn-ref"
+              placeholder="e.g. 123456789012"
+              autocomplete="off"
+              maxlength="30"
+            />
+            <button type="button" class="qb-btn qb-btn-secondary btn-sm" id="reg-qr-txn-submit" disabled>
+              Submit for verification
+            </button>
+            <small class="text-danger d-block mt-1" id="reg-qr-txn-error" hidden></small>
+          </div>
+          <p class="small text-muted mt-2 mb-0" id="reg-payment-waiting">
+            Scan the QR and pay. Then enter your UPI transaction reference.
           </p>
-          <button type="button" class="qb-btn qb-btn-secondary" id="reg-qr-confirm-btn" hidden>
-            I've Completed Payment
-          </button>
           <p class="small text-success mt-2 mb-0 qb-payment-success" id="reg-qr-webhook-status" hidden></p>
         </div>
       </div>
@@ -752,6 +776,6 @@
   };
 </script>
 <script src="{{ url_for('static', filename='register_geo.js') }}?v=7" defer></script>
-<script src="{{ url_for('static', filename='register.js') }}?v=24" defer></script>
+<script src="{{ url_for('static', filename='register.js') }}?v=25" defer></script>
 {% endif %}
 {% endblock %}
