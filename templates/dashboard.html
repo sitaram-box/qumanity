@@ -13,7 +13,7 @@
 />
 <link
   rel="stylesheet"
-  href="{{ url_for('static', filename='dashboard.css') }}?v=16"
+  href="{{ url_for('static', filename='dashboard.css') }}?v=17"
 />
 {% endblock %}
 
@@ -157,29 +157,35 @@
           <button type="button" class="qb-btn qb-btn-outline btn-sm" id="qb-my-account-ids-btn" title="All public Account IDs">
             My Account IDs
           </button>
-          <button type="button" class="qb-karma-wallet-btn" id="qb-karma-wallet-btn" title="Karma Points Wallet">
-            <span class="qb-karma-wallet-symbol" aria-hidden="true">₹</span>
-            <span class="qb-karma-wallet-label">Karma Points Wallet</span>
+          <button
+            type="button"
+            class="qb-icon-btn"
+            id="qb-karma-wallet-btn"
+            data-tooltip="Karma Points Wallet"
+            aria-label="Karma Points Wallet"
+          >
+            <span aria-hidden="true">₹</span>
           </button>
           <button
             type="button"
-            class="qb-birth-chart-btn"
+            class="qb-icon-btn"
             id="qb-birth-chart-btn"
-            title="Lagna birth chart"
-            aria-label="Birth chart"
+            data-tooltip="Lagna Chart"
+            aria-label="Lagna Chart"
           >
-            <span class="qb-birth-chart-icon" aria-hidden="true">☉</span>
+            <span aria-hidden="true">☉</span>
           </button>
           <div class="qb-private-msg-wrap" id="qb-private-msg-wrap">
             <button
               type="button"
-              class="qb-private-msg-btn"
+              class="qb-icon-btn"
               id="qb-private-msg-btn"
+              data-tooltip="Messages"
               aria-label="Messages"
               aria-expanded="false"
               aria-haspopup="true"
             >
-              <span class="qb-private-msg-icon" aria-hidden="true">✉</span>
+              <span aria-hidden="true">✉</span>
               <span class="qb-private-msg-badge" id="qb-private-msg-badge" hidden>0</span>
             </button>
             <div class="qb-private-msg-menu" id="qb-private-msg-menu" hidden role="menu">
@@ -194,25 +200,39 @@
 
         <div class="qb-panel mb-3 qb-private-profile">
           <h3 class="h6 text-secondary text-uppercase small">Profile</h3>
-          <p class="mb-1">
-            <strong>Name:</strong> {{ user.first_name }} {{ user.last_name }}
-            {% if account_badges %}
-            <span class="qb-account-badges ms-1">
-              {% for badge in account_badges %}
-              <span class="badge bg-info text-dark qb-account-badge">{{ badge }}</span>
-              {% endfor %}
-            </span>
-            {% endif %}
-          </p>
-          <p class="mb-1"><strong>Public ID:</strong> <span class="font-monospace">{{ user.public_id }}</span></p>
-          <p class="mb-1"><strong>Private ID:</strong> <span class="font-monospace">{{ user.private_id|mask_private_id }}</span></p>
+          <div class="qb-profile-header d-flex flex-wrap justify-content-between align-items-start gap-3 mb-2">
+            <div class="qb-profile-left">
+              <div class="qb-profile-name d-flex flex-wrap align-items-center gap-2 mb-2">
+                <h4 class="h5 mb-0">{{ user.first_name }} {{ user.last_name }}</h4>
+                {% if account_badges %}
+                <span class="qb-account-badges">
+                  {% for badge in account_badges %}
+                  <span class="badge bg-info text-dark qb-account-badge">{{ badge }}</span>
+                  {% endfor %}
+                </span>
+                {% endif %}
+              </div>
+              <div class="qb-profile-ids small">
+                <p class="mb-1"><strong>Public ID:</strong> <span class="font-monospace">{{ user.public_id }}</span></p>
+                <p class="mb-1">
+                  <strong>Private ID:</strong>
+                  <span class="private-id font-monospace">
+                    {% set masked_id = user.private_id|mask_private_id %}
+                    <span class="hidden-digits">{{ masked_id[:6] }}</span><span class="visible-digits">{{ masked_id[6:] }}</span>
+                  </span>
+                </p>
+              </div>
+            </div>
+            <div class="qb-profile-right flex-shrink-0">
+              <button type="button" class="qb-btn qb-btn-outline btn-sm" id="qb-edit-request-open">
+                Request Profile Edit
+              </button>
+            </div>
+          </div>
           <p class="small text-muted mb-2">
             Your full Private ID was provided during registration. Please keep it safe.
-            If you have forgotten it, use the Edit Request feature below.
+            If you have forgotten it, use the Edit Request feature.
           </p>
-          <button type="button" class="qb-btn qb-btn-outline btn-sm mb-2" id="qb-edit-request-open">
-            Request Profile Edit
-          </button>
           <p class="mb-1"><strong>Gender:</strong> {{ user.gender }}</p>
           <p class="mb-1"><strong>Age:</strong> {{ user.age }}</p>
           <p class="mb-1"><strong>Age group:</strong> {{ user_life_stage }}</p>
@@ -270,6 +290,15 @@
           <ul class="list-unstyled small mb-0" id="qb-user-donation-list"></ul>
           <p class="small text-muted mb-0 mt-2" id="qb-user-donation-empty" hidden>No donations recorded yet.</p>
         </section>
+
+        {% if 'is_admin' in user.keys() and user.is_admin %}
+        <section class="qb-panel mb-3" id="qb-user-donation-admin-link">
+          <h3 class="h6 text-secondary text-uppercase small mb-2">Donation Management</h3>
+          <a href="{{ url_for('admin_verifications_page') }}" class="qb-btn qb-btn-primary btn-sm">
+            Donation Verifications
+          </a>
+        </section>
+        {% endif %}
 
         <div id="qb-edit-request-modal" class="qb-modal-backdrop" hidden role="dialog" aria-modal="true" aria-labelledby="qb-edit-request-title">
           <div class="qb-modal qb-panel p-3">
@@ -474,208 +503,6 @@
         </details>
 
         <p class="small text-muted mb-3">Use the ✉ icon (top right) for Inbox, Sent, Drafts, and Compose. Karma Point balance and weekly statements stay in your wallet button above.</p>
-
-        {% if show_upgrade_panel %}
-        <section class="qb-panel mb-3" id="qb-admin-upgrade-users">
-          <h3 class="h6 text-secondary text-uppercase small mb-2">Upgrade User Accounts</h3>
-          <p class="small text-muted mb-2">
-            Search a Human User by public ID or name, then assign Volunteer, Agent, or Manager{% if user.is_admin %}, Leader, or Mentor{% endif %}.
-          </p>
-          <label class="form-label small" for="qb-admin-upgrade-search">User (public ID or name)</label>
-          <input
-            type="text"
-            class="form-control form-control-sm mb-2"
-            id="qb-admin-upgrade-search"
-            placeholder="Search user…"
-            autocomplete="off"
-          />
-          <ul class="list-unstyled small mb-2" id="qb-admin-upgrade-suggest" hidden></ul>
-          <p class="small mb-2" id="qb-admin-upgrade-selected" hidden></p>
-          <label class="form-label small" for="qb-admin-upgrade-type">New account type</label>
-          <select id="qb-admin-upgrade-type" class="form-select form-select-sm mb-2">
-            <option value="">Select type…</option>
-            <option value="Volunteer">Volunteer</option>
-            <option value="Agent">Agent</option>
-            <option value="Manager">Manager</option>
-            <option value="Leader"{% if not user.is_admin %} disabled{% endif %}>Leader{% if not user.is_admin %} (Admin only){% endif %}</option>
-            <option value="Mentor"{% if not user.is_admin %} disabled{% endif %}>Mentor{% if not user.is_admin %} (Admin only){% endif %}</option>
-          </select>
-          <button type="button" class="qb-btn qb-btn-primary btn-sm" id="qb-admin-upgrade-submit" disabled>
-            Upgrade
-          </button>
-          <p class="small text-info mt-2 mb-0" id="qb-admin-upgrade-flash" role="status" aria-live="polite"></p>
-        </section>
-        {% endif %}
-
-        {% if is_mentor %}
-        <section class="qb-panel mb-3" id="qb-mentor-mark-deceased">
-          <h3 class="h6 text-secondary text-uppercase small mb-2">Ākāśa — Mark User Deceased</h3>
-          <p class="small text-muted mb-2">Move a user into Space (Ancestors). Archives posts and freezes wallet.</p>
-          <label class="form-label small" for="qb-deceased-private-id">User private ID</label>
-          <input type="text" class="form-control form-control-sm mb-2 font-monospace" id="qb-deceased-private-id" placeholder="H_U_…" />
-          <label class="form-label small" for="qb-deceased-date">Date of death</label>
-          <input type="date" class="form-control form-control-sm mb-2" id="qb-deceased-date" />
-          <label class="form-label small" for="qb-deceased-heir">Heir private ID (optional)</label>
-          <input type="text" class="form-control form-control-sm mb-2 font-monospace" id="qb-deceased-heir" placeholder="Transfer remaining Karma Points" />
-          <label class="form-label small" for="qb-deceased-obituary">Obituary (optional)</label>
-          <textarea class="form-control form-control-sm mb-2" id="qb-deceased-obituary" rows="2"></textarea>
-          <button type="button" class="qb-btn qb-btn-danger btn-sm" id="qb-deceased-submit">Mark as Deceased</button>
-          <p class="small mt-2 mb-0" id="qb-deceased-status" role="status" aria-live="polite"></p>
-        </section>
-        {% endif %}
-
-        {% if user.is_admin %}
-        {% include 'admin_dashboard.html' %}
-        <section class="qb-panel mb-3 qb-private-admin-tools" id="qb-private-admin-tools">
-          <h3 class="h6 text-secondary text-uppercase small mb-2">Administration</h3>
-          <p class="small text-muted mb-2">
-            Review pending family removal requests from users (approve or reject).
-          </p>
-          <button
-            type="button"
-            class="qb-btn qb-btn-outline btn-sm"
-            id="qb-admin-removals-open"
-            title="Review pending family removal requests"
-          >
-            Family member removal request queue
-          </button>
-        </section>
-
-        <section class="qb-panel mb-3" id="qb-admin-employment-requests">
-          <h3 class="h6 text-secondary text-uppercase small mb-2">Volunteer Applications</h3>
-          <p class="small text-muted mb-2">Approve or reject volunteer applications.</p>
-          <button type="button" class="qb-btn qb-btn-outline btn-sm mb-2" id="qb-admin-employment-refresh">Refresh requests</button>
-          <ul class="list-unstyled small mb-0" id="qb-admin-employment-list"></ul>
-        </section>
-
-        <section class="qb-panel mb-3" id="qb-admin-karma-economy">
-          <h3 class="h6 text-secondary text-uppercase small mb-2">Karma Points Economy (Council)</h3>
-          <p class="small text-muted mb-2">Pending transactions settle every Sunday 23:59 IST.</p>
-          <button type="button" class="qb-btn qb-btn-outline btn-sm mb-2" id="qb-admin-settlement-btn">Run off-cycle settlement</button>
-          <p class="small mb-2" id="qb-admin-settlement-flash" role="status"></p>
-          <div class="mb-2">
-            <h4 class="h6 small text-secondary">Karma action types</h4>
-            <ul class="list-unstyled small mb-2" id="qb-admin-karma-types-list"></ul>
-            <div class="row g-2 align-items-end">
-              <div class="col-md-4">
-                <label class="form-label small" for="qb-admin-karma-code">Code</label>
-                <input type="text" class="form-control form-control-sm" id="qb-admin-karma-code" placeholder="plant_tree" />
-              </div>
-              <div class="col-md-4">
-                <label class="form-label small" for="qb-admin-karma-label">Label</label>
-                <input type="text" class="form-control form-control-sm" id="qb-admin-karma-label" />
-              </div>
-              <div class="col-md-2">
-                <label class="form-label small" for="qb-admin-karma-value">₹</label>
-                <input type="number" class="form-control form-control-sm" id="qb-admin-karma-value" min="1" />
-              </div>
-              <div class="col-md-2">
-                <button type="button" class="qb-btn qb-btn-primary btn-sm w-100" id="qb-admin-karma-save">Save</button>
-              </div>
-            </div>
-          </div>
-          <p class="small mb-0" id="qb-admin-pending-summary"></p>
-          <p class="small mb-0 mt-2" id="qb-admin-circulation-summary"></p>
-          <ul class="list-unstyled small mb-0 mt-2" id="qb-admin-nested-wallets"></ul>
-        </section>
-
-        <section class="qb-panel mb-3" id="qb-admin-donation-reports">
-          <h3 class="h6 text-secondary text-uppercase small mb-2">Donation Reports</h3>
-          <label class="form-label small" for="qb-admin-village-search">Village ID or name</label>
-          <input
-            type="text"
-            class="form-control form-control-sm mb-2"
-            id="qb-admin-village-search"
-            placeholder="Search village…"
-            autocomplete="off"
-          />
-          <ul class="list-unstyled small mb-2" id="qb-admin-village-suggest" hidden></ul>
-          <button type="button" class="qb-btn qb-btn-primary btn-sm" id="qb-admin-donation-report-btn">Get Report</button>
-          <div class="mt-3 small" id="qb-admin-donation-report-out" hidden>
-            <p class="mb-1"><strong>Village:</strong> <span id="qb-admin-report-village-label"></span></p>
-            <p class="mb-1"><strong>Total Karma Points (village):</strong> <span id="qb-admin-report-total-qoins"></span></p>
-            <p class="mb-2"><strong>Total ₹ value:</strong> <span id="qb-admin-report-total-rupees"></span></p>
-            <h4 class="h6 text-secondary small">Recent village donations</h4>
-            <ul class="list-unstyled mb-0" id="qb-admin-report-recent"></ul>
-          </div>
-          <p class="small text-muted mb-0" id="qb-admin-donation-report-flash" role="status"></p>
-        </section>
-
-        <section class="qb-panel mb-3" id="qb-admin-donation-mgmt">
-          <h3 class="h6 text-secondary text-uppercase small mb-2">Donation Management</h3>
-          <div class="row g-2 mb-3 qb-admin-donation-stats">
-            <div class="col-6 col-md-3">
-              <div class="qb-panel p-2 small">
-                <strong>Total Donations</strong>
-                <div id="qb-admin-donation-count">0</div>
-              </div>
-            </div>
-            <div class="col-6 col-md-3">
-              <div class="qb-panel p-2 small">
-                <strong>Total Amount</strong>
-                <div>₹<span id="qb-admin-donation-total">0</span></div>
-              </div>
-            </div>
-            <div class="col-6 col-md-3">
-              <div class="qb-panel p-2 small">
-                <strong>Pending</strong>
-                <div id="qb-admin-donation-pending">0</div>
-              </div>
-            </div>
-            <div class="col-6 col-md-3">
-              <div class="qb-panel p-2 small">
-                <strong>Confirmed</strong>
-                <div id="qb-admin-donation-confirmed">0</div>
-              </div>
-            </div>
-          </div>
-          <div class="d-flex flex-wrap gap-2 mb-2">
-            <button type="button" class="qb-btn qb-btn-outline btn-sm" id="qb-admin-donations-refresh">Refresh</button>
-            <a href="/api/admin/donation/export" class="qb-btn qb-btn-secondary btn-sm" id="qb-admin-donations-export">Export CSV</a>
-          </div>
-          <div class="table-responsive">
-            <table class="table table-sm table-striped small mb-0" id="qb-admin-donations-table">
-              <thead>
-                <tr>
-                  <th>User</th>
-                  <th>Txn Reference</th>
-                  <th>Amount (₹)</th>
-                  <th>Method</th>
-                  <th>Status</th>
-                  <th>Date</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody id="qb-admin-donations-tbody"></tbody>
-            </table>
-          </div>
-          <p class="small text-muted mb-0 mt-2" id="qb-admin-donations-empty" hidden>No donations yet.</p>
-        </section>
-
-        <section class="qb-panel mb-3" id="qb-admin-edit-requests">
-          <h3 class="h6 text-secondary text-uppercase small mb-2">Edit Requests</h3>
-          <button type="button" class="qb-btn qb-btn-outline btn-sm mb-2" id="qb-admin-edit-refresh">Refresh</button>
-          <ul class="list-unstyled small mb-0" id="qb-admin-edit-list"></ul>
-          <p class="small text-muted mb-0 mt-2" id="qb-admin-edit-empty" hidden>No pending edit requests.</p>
-        </section>
-
-        <section class="qb-panel mb-3" id="qb-private-manage-elections">
-          <h3 class="h6 text-secondary text-uppercase small mb-2">Manage Elections</h3>
-          <div class="qb-private-election-village qb-panel p-2 mb-0">
-            <h4 class="h6 mb-2 font-monospace small">{{ quantum_punch_village_id }}</h4>
-            <p class="small mb-1" id="qb-private-election-cycle-line" role="status">Loading election cycle…</p>
-            <p class="small text-muted mb-2" id="qb-private-election-phase-line"></p>
-            <div class="d-flex flex-wrap gap-2">
-              <button type="button" class="qb-btn qb-btn-outline btn-sm" id="qb-admin-manage-nominations-btn">
-                Manage Nominations
-              </button>
-              <button type="button" class="qb-btn qb-btn-outline btn-sm" id="qb-admin-election-history-btn">
-                Election History
-              </button>
-            </div>
-          </div>
-        </section>
-        {% endif %}
 
       </section>
 

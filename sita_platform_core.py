@@ -180,10 +180,14 @@ def migrate_sita_platform_schema(conn: sqlite3.Connection) -> None:
 
 
 def mask_private_id(private_id: str) -> str:
+    """Mask Private ID as six asterisks plus the last three digits (9-digit body)."""
     s = str(private_id or "").strip()
-    if len(s) <= 3:
-        return "***"
-    return f"***{s[-3:]}"
+    digits = "".join(ch for ch in s if ch.isdigit())
+    if len(digits) >= 3:
+        return f"******{digits[-3:]}"
+    if len(s) >= 3:
+        return f"******{s[-3:]}"
+    return "******"
 
 
 def _payment_status_for_row(row: dict[str, Any] | sqlite3.Row) -> str:

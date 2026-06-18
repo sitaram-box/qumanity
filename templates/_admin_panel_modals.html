@@ -1,0 +1,139 @@
+<div class="qb-modal-backdrop" id="qb-admin-nominations-modal" hidden>
+  <div class="qb-modal-dialog qb-modal-dialog--wide" role="dialog" aria-modal="true" aria-labelledby="qb-admin-nominations-title">
+    <div class="qb-modal-head">
+      <h2 class="h5 mb-0" id="qb-admin-nominations-title">Manage Nominations</h2>
+      <button type="button" class="qb-modal-close" data-qb-close-modal="qb-admin-nominations-modal" aria-label="Close">×</button>
+    </div>
+    <p class="small text-muted mb-2" id="qb-admin-nominations-cycle-line"></p>
+    <p class="small text-info mb-2" id="qb-admin-nominations-flash" role="status" aria-live="polite"></p>
+    <h3 class="h6 text-secondary text-uppercase small mt-2 mb-2">Pending</h3>
+    <ul class="list-unstyled small mb-3" id="qb-admin-nominations-pending"></ul>
+    <p class="small text-muted mb-3" id="qb-admin-nominations-pending-empty" hidden>No pending nominations.</p>
+    <h3 class="h6 text-secondary text-uppercase small mb-2">Approved</h3>
+    <ul class="list-unstyled small mb-0" id="qb-admin-nominations-approved"></ul>
+    <p class="small text-muted mb-0" id="qb-admin-nominations-approved-empty" hidden>No approved nominations yet.</p>
+  </div>
+</div>
+
+<div class="qb-modal-backdrop" id="qb-admin-reject-modal" hidden>
+  <div class="qb-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="qb-admin-reject-title">
+    <div class="qb-modal-head">
+      <h2 class="h5 mb-0" id="qb-admin-reject-title">Reject nomination</h2>
+      <button type="button" class="qb-modal-close" data-qb-close-modal="qb-admin-reject-modal" aria-label="Close">×</button>
+    </div>
+    <p class="small mb-2" id="qb-admin-reject-candidate-line"></p>
+    <label class="form-label small" for="qb-admin-reject-reason">Reason (required)</label>
+    <textarea id="qb-admin-reject-reason" class="form-control form-control-sm mb-3" rows="4" required maxlength="2000"></textarea>
+    <div class="qb-modal-actions">
+      <button type="button" class="qb-btn qb-btn-danger btn-sm" id="qb-admin-reject-confirm">Reject nomination</button>
+      <button type="button" class="qb-btn qb-btn-outline btn-sm" data-qb-close-modal="qb-admin-reject-modal">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="qb-modal-backdrop" id="qb-admin-edit-manifest-modal" hidden>
+  <div class="qb-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="qb-admin-edit-manifest-title">
+    <div class="qb-modal-head">
+      <h2 class="h5 mb-0" id="qb-admin-edit-manifest-title">Edit manifest</h2>
+      <button type="button" class="qb-modal-close" data-qb-close-modal="qb-admin-edit-manifest-modal" aria-label="Close">×</button>
+    </div>
+    <p class="small mb-2" id="qb-admin-edit-manifest-candidate-line"></p>
+    <label class="form-label small" for="qb-admin-edit-why">Reason to fight (why stand)</label>
+    <textarea id="qb-admin-edit-why" class="form-control form-control-sm mb-2" rows="3" maxlength="4000"></textarea>
+    <label class="form-label small" for="qb-admin-edit-changes">Changes you will bring</label>
+    <textarea id="qb-admin-edit-changes" class="form-control form-control-sm mb-3" rows="3" maxlength="4000"></textarea>
+    <div class="qb-modal-actions">
+      <button type="button" class="qb-btn qb-btn-primary btn-sm" id="qb-admin-edit-manifest-save">Save manifest</button>
+      <button type="button" class="qb-btn qb-btn-outline btn-sm" data-qb-close-modal="qb-admin-edit-manifest-modal">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="qb-modal-backdrop" id="qb-admin-private-details-modal" hidden>
+  <div class="qb-modal-dialog qb-modal-dialog--wide" role="dialog" aria-modal="true" aria-labelledby="qb-admin-private-details-title">
+    <div class="qb-modal-head">
+      <h2 class="h5 mb-0" id="qb-admin-private-details-title">Private account details</h2>
+      <button type="button" class="qb-modal-close" data-qb-close-modal="qb-admin-private-details-modal" aria-label="Close">×</button>
+    </div>
+    <p class="small text-info mb-2" id="qb-admin-private-details-flash" role="status" aria-live="polite"></p>
+    <div id="qb-admin-private-details-body" class="qb-admin-private-details-body small"></div>
+  </div>
+</div>
+<div class="qb-modal-backdrop" id="qb-election-history-modal" hidden>
+  <div class="qb-modal-dialog qb-modal-dialog--wide qb-modal-dialog--scroll" role="dialog" aria-modal="true" aria-labelledby="qb-election-history-title">
+    <div class="qb-modal-head">
+      <h2 class="h5 mb-0" id="qb-election-history-title">Election History</h2>
+      <button type="button" class="qb-modal-close" data-qb-close-modal="qb-election-history-modal" aria-label="Close">×</button>
+    </div>
+    <p class="small text-muted mb-3">Past village council elections (prototype — first cycle in progress).</p>
+    <section class="mb-3">
+      <h3 class="h6 text-secondary text-uppercase small">Past nominations</h3>
+      <p class="small text-muted mb-0" id="qb-election-history-nominations">No data available</p>
+    </section>
+    <section class="mb-3">
+      <h3 class="h6 text-secondary text-uppercase small">Past voting results</h3>
+      <p class="small text-muted mb-0" id="qb-election-history-votes">No data available</p>
+    </section>
+    <section class="mb-0">
+      <h3 class="h6 text-secondary text-uppercase small">Past winners &amp; timelines</h3>
+      <p class="small text-muted mb-0" id="qb-election-history-winners">No data available</p>
+    </section>
+  </div>
+</div>
+
+<div class="qb-modal-backdrop" id="qb-admin-village-members-modal" hidden>
+  <div class="qb-modal-dialog qb-modal-dialog--wide qb-modal-dialog--scroll" role="dialog" aria-modal="true" aria-labelledby="qb-admin-village-members-title">
+    <div class="qb-modal-head">
+      <h2 class="h5 mb-0" id="qb-admin-village-members-title">All Village Members</h2>
+      <button type="button" class="qb-modal-close" data-qb-close-modal="qb-admin-village-members-modal" aria-label="Close">×</button>
+    </div>
+    <p class="small text-muted mb-2" id="qb-admin-village-members-subtitle"></p>
+    <p class="small text-info mb-2" id="qb-admin-village-members-flash" role="status" aria-live="polite"></p>
+    <div class="table-responsive qb-admin-members-table-wrap">
+      <table class="table table-sm table-dark table-borderless align-middle mb-0" id="qb-admin-village-members-table">
+        <thead>
+          <tr class="text-secondary small text-uppercase">
+            <th scope="col">Name</th>
+            <th scope="col">Gender</th>
+            <th scope="col">Age</th>
+            <th scope="col">Age group</th>
+            <th scope="col">Zodiac</th>
+            <th scope="col">Private ID</th>
+            <th scope="col">Public ID</th>
+            <th scope="col">Birth location</th>
+            <th scope="col">Current location</th>
+          </tr>
+        </thead>
+        <tbody id="qb-admin-village-members-tbody"></tbody>
+      </table>
+    </div>
+    <p class="small text-muted mb-0" id="qb-admin-village-members-empty" hidden>No members in this village.</p>
+  </div>
+</div>
+
+{% if show_dashboard_post_form %}
+<div class="qb-modal-backdrop" id="qb-new-post-modal" hidden>
+  <div class="qb-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="qb-new-post-title">
+    <div class="qb-modal-head">
+<!-- Admin: family removal request queue -->
+<div class="qb-modal-backdrop" id="qb-admin-removals-modal" hidden>
+  <div class="qb-modal-dialog qb-modal-dialog--wide" role="dialog" aria-modal="true" aria-labelledby="qb-admin-removals-title">
+    <div class="qb-modal-head">
+      <h2 class="h5 mb-0" id="qb-admin-removals-title">Family removal requests</h2>
+      <button type="button" class="qb-modal-close" data-qb-close-modal="qb-admin-removals-modal" aria-label="Close">×</button>
+    </div>
+    <p class="small text-muted mb-2">
+      Approve or reject each request. Approving deletes the family member
+      from the requesting user&rsquo;s family list and notifies them. Rejecting
+      keeps the member and notifies the user with your admin note.
+    </p>
+    <ul id="qb-admin-removal-list" class="list-unstyled small mb-0 qb-admin-removal-list"></ul>
+    <p id="qb-admin-removal-empty" class="small text-muted mb-0" hidden>
+      No pending removal requests.
+    </p>
+    <div class="qb-modal-actions">
+      <button type="button" class="qb-btn qb-btn-outline" data-qb-close-modal="qb-admin-removals-modal">Close</button>
+      <span class="small text-muted" id="qb-admin-removal-status" aria-live="polite"></span>
+    </div>
+  </div>
+</div>

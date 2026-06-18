@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Panel — Qumanity{% endblock %}
+
+{% block body_class %}qb-page-admin-panel{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}?v=17" />
+{% endblock %}
+
+{% block body %}
+<div class="container py-4 qb-admin-panel-page">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <div>
+      <h1 class="h4 mb-1">Admin Panel</h1>
+      <p class="small text-muted mb-0">Platform administration tools</p>
+    </div>
+    <a href="{{ url_for('dashboard') }}" class="qb-btn qb-btn-neutral btn-sm">Back to Dashboard</a>
+  </div>
+
+  <script type="application/json" id="qb-dash-config-json">
+    {{ dash_client_config | tojson }}
+  </script>
+
+  {% include '_admin_panel_sections.html' %}
+</div>
+
+{% include '_admin_panel_modals.html' %}
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='dashboard.js') }}?v=15"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    if (location.hash && location.hash.length > 1) {
+      var target = document.getElementById(location.hash.slice(1));
+      if (target) {
+        window.setTimeout(function () {
+          target.scrollIntoView({ behavior: "smooth", block: "start" });
+        }, 120);
+      }
+    }
+  });
+</script>
+{% endblock %}

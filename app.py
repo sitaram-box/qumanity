@@ -848,9 +848,10 @@ def inject_council_context() -> dict[str, Any]:
         return {
             "is_council_member": is_council_member(conn, user_row),
             "is_mentor": deceased_core.is_mentor_user(conn, user_row),
+            "is_admin": is_admin_user(user_row),
         }
     except Exception:
-        return {"is_council_member": False, "is_mentor": False}
+        return {"is_council_member": False, "is_mentor": False, "is_admin": False}
 
 
 @app.context_processor
@@ -14216,6 +14217,54 @@ def api_donation_admin_list():
         return jsonify({"error": "Admin only"}), 403
     conn = get_db()
     return jsonify(sita_platform_core.admin_donation_list(conn))
+
+
+@app.route("/admin/panel")
+@login_required
+def admin_panel():
+    """Standalone admin tools page (moved from private account dashboard)."""
+    conn = get_db()
+    user_row = g.current_user
+    is_council = is_council_member(conn, user_row)
+    is_mentor = deceased_core.is_mentor_user(conn, user_row)
+    is_admin = is_admin_user(user_row)
+    if not (is_admin or is_council or is_mentor):
+        flash("Admin access required.", "error")
+        return redirect(url_for("dashboard"))
+
+    preferred_lang = active_ui_language(conn, user_row)
+    current_hierarchy, default_vid = public_hierarchy_for_user(
+        conn, user_row, language_code=preferred_lang
+    )
+    geo_displays = user_dashboard_geo_displays(conn, user_row)
+    show_upgrade_panel = is_admin or is_council
+
+    dash_client_config: dict[str, Any] = {
+        "userHierarchy": [dict(item) for item in current_hierarchy],
+        "defaultVillageId": default_vid or "",
+        "quantumPunchVillageId": election_scheduler.TARGET_VILLAGE_ID,
+        "isAdmin": is_admin,
+        "isCouncilMember": is_council,
+        "showUpgradePanel": show_upgrade_panel,
+        "canUpgradeRoles": sorted(UPGRADE_ACCOUNT_TYPES)
+        if is_admin
+        else sorted(COUNCIL_UPGRADE_TYPES)
+        if is_council
+        else [],
+        "userPrivateId": str(user_row["private_id"] or ""),
+        "preferredLanguage": preferred_lang,
+        "uiStrings": get_dashboard_ui_strings(preferred_lang),
+        "electionsEnabled": elections_are_enabled(),
+    }
+
+    return render_template(
+        "admin_panel.html",
+        user=user_row,
+        dash_client_config=dash_client_config,
+        quantum_punch_village_id=election_scheduler.TARGET_VILLAGE_ID,
+        show_upgrade_panel=show_upgrade_panel,
+        is_mentor=is_mentor,
+    )
 
 
 @app.route("/admin/verifications")
