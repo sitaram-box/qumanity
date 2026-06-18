@@ -7,6 +7,7 @@ from __future__ import annotations
 import importlib.util
 import sqlite3
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +20,17 @@ ADMIN_EMAIL = "sekyorintantra@gmail.com"
 ADMIN_PHONE = "8287696616"
 ADMIN_PASSWORD = "P@y#umans123"
 LEGACY_ADMIN_PRIVATE_ID = "H_U_ADMIN"
+
+# Backup admin — 9-digit HU- ID (login OTP: 999000001)
+BACKUP_PRIVATE_ID = "HU-999000001"
+BACKUP_PUBLIC_ID = "BACKUP-PUBLIC"
+BACKUP_EMAIL = "backup@qumanity.com"
+BACKUP_PHONE = "9999999999"
+BACKUP_PASSWORD = "AdminBackup@2024"
+
+# Throttle lightweight self-heal (seconds between full checks).
+_ADMIN_HEAL_INTERVAL_SEC = 60.0
+_last_admin_heal_monotonic: float = 0.0
 
 
 def _load_migrate_module() -> Any | None:
@@ -74,6 +86,21 @@ def diagnose_admin(conn: sqlite3.Connection) -> dict[str, Any]:
     }
 
 
+def verify_admin_password(conn: sqlite3.Connection, password: str = ADMIN_PASSWORD) -> bool:
+    row = conn.execute(
+        "SELECT password_hash FROM users WHERE private_id = ? COLLATE NOCASE",
+        (ADMIN_PRIVATE_ID,),
+    ).fetchone()
+    if not row or not row["password_hash"]:
+        return False
+    stored = row["password_hash"]
+    stored_b = stored.encode("utf-8") if isinstance(stored, str) else stored
+    try:
+        return bcrypt.checkpw(password.encode("utf-8"), stored_b)
+    except (ValueError, TypeError):
+        return False
+
+
 def simulate_admin_login(conn: sqlite3.Connection) -> bool:
     """Exercise the same lookup + password path as the web login form."""
     try:
@@ -88,19 +115,166 @@ def simulate_admin_login(conn: sqlite3.Connection) -> bool:
         return False
 
 
-def verify_admin_password(conn: sqlite3.Connection, password: str = ADMIN_PASSWORD) -> bool:
-    row = conn.execute(
-        "SELECT password_hash FROM users WHERE private_id = ? COLLATE NOCASE",
+def _repair_primary_admin(conn: sqlite3.Connection) -> None:
+    """Create or update primary admin without deleting other users."""
+    import admin_bootstrap
+
+    admin_bootstrap.create_admin_user(
+        conn,
+        email=ADMIN_EMAIL,
+        phone=ADMIN_PHONE,
+        first_name="Admin",
+        last_name="User",
+        password=ADMIN_PASSWORD,
+        private_id=ADMIN_PRIVATE_ID,
+        public_id=ADMIN_PUBLIC_ID,
+        reset_password=True,
+        migrate=False,
+    )
+    repair_null_user_ids(conn)
+    conn.execute(
+        """
+        UPDATE users SET is_admin = 1, is_active = 1, account_status = 'active',
+               temp_access = 0
+        WHERE private_id = ? COLLATE NOCASE
+        """,
         (ADMIN_PRIVATE_ID,),
+    )
+    conn.commit()
+
+
+def ensure_backup_admin(conn: sqlite3.Connection) -> bool:
+    """Ensure backup admin exists with known credentials."""
+    import admin_bootstrap
+
+    row = conn.execute(
+        "SELECT id FROM users WHERE private_id = ? COLLATE NOCASE",
+        (BACKUP_PRIVATE_ID,),
     ).fetchone()
-    if not row or not row["password_hash"]:
+    if row:
+        conn.execute(
+            """
+            UPDATE users SET is_admin = 1, is_active = 1, account_status = 'active',
+                   temp_access = 0, password_hash = ?
+            WHERE private_id = ? COLLATE NOCASE AND password_hash IS NULL
+            """,
+            (admin_bootstrap._password_hash(BACKUP_PASSWORD), BACKUP_PRIVATE_ID),
+        )
+        conn.commit()
         return False
-    stored = row["password_hash"]
-    stored_b = stored.encode("utf-8") if isinstance(stored, str) else stored
+
+    admin_bootstrap.create_admin_user(
+        conn,
+        email=BACKUP_EMAIL,
+        phone=BACKUP_PHONE,
+        first_name="Backup",
+        last_name="Admin",
+        password=BACKUP_PASSWORD,
+        private_id=BACKUP_PRIVATE_ID,
+        public_id=BACKUP_PUBLIC_ID,
+        reset_password=True,
+        migrate=False,
+    )
+    repair_null_user_ids(conn)
+    conn.execute(
+        """
+        UPDATE users SET is_admin = 1, is_active = 1, account_status = 'active'
+        WHERE private_id = ? COLLATE NOCASE
+        """,
+        (BACKUP_PRIVATE_ID,),
+    )
+    conn.commit()
+    return True
+
+
+def ensure_admin_healthy(
+    conn: sqlite3.Connection,
+    *,
+    force: bool = False,
+) -> dict[str, Any]:
+    """
+    Self-heal primary + backup admin accounts (throttled unless ``force``).
+
+    Repairs NULL user ids, resets corrupt password hashes, and recreates
+    missing admins using the full app schema (not raw SQL).
+    """
+    global _last_admin_heal_monotonic
+
+    now = time.monotonic()
+    if not force and (now - _last_admin_heal_monotonic) < _ADMIN_HEAL_INTERVAL_SEC:
+        return {"skipped": True, "ok": True, "throttled": True}
+
+    _last_admin_heal_monotonic = now
+    actions: list[str] = []
+
     try:
-        return bcrypt.checkpw(password.encode("utf-8"), stored_b)
-    except (ValueError, TypeError):
-        return False
+        null_fixed = repair_null_user_ids(conn)
+        if null_fixed:
+            actions.append(f"repaired_null_ids:{null_fixed}")
+
+        healthy = verify_admin_password(conn) and simulate_admin_login(conn)
+        if not healthy:
+            _repair_primary_admin(conn)
+            actions.append("repaired_primary_admin")
+            healthy = verify_admin_password(conn) and simulate_admin_login(conn)
+
+        backup_created = ensure_backup_admin(conn)
+        if backup_created:
+            actions.append("created_backup_admin")
+        else:
+            actions.append("backup_admin_exists")
+
+        return {
+            "skipped": False,
+            "ok": healthy,
+            "login_verified": verify_admin_password(conn),
+            "login_simulated": simulate_admin_login(conn),
+            "backup_private_id": BACKUP_PRIVATE_ID,
+            "backup_login_digits": BACKUP_PRIVATE_ID[len("HU-"):],
+            "actions": actions,
+        }
+    except Exception as exc:
+        return {
+            "skipped": False,
+            "ok": False,
+            "error": str(exc),
+            "actions": actions,
+        }
+
+
+def test_admin_login_status(conn: sqlite3.Connection) -> dict[str, Any]:
+    """Public diagnostic payload for /test-admin-login."""
+    diag = diagnose_admin(conn)
+    target = diag.get("target")
+    null_ids = conn.execute(
+        "SELECT COUNT(*) FROM users WHERE id IS NULL"
+    ).fetchone()[0]
+    pwd_ok = verify_admin_password(conn)
+    sim_ok = simulate_admin_login(conn)
+    backup = conn.execute(
+        """
+        SELECT id, private_id, email FROM users
+        WHERE private_id = ? COLLATE NOCASE
+        """,
+        (BACKUP_PRIVATE_ID,),
+    ).fetchone()
+    return {
+        "exists": target is not None,
+        "user_id": target.get("id") if target else None,
+        "private_id": ADMIN_PRIVATE_ID,
+        "login_digits": ADMIN_PRIVATE_ID[len("HU-"):],
+        "password_valid": pwd_ok,
+        "login_simulated": sim_ok,
+        "users_with_null_id": int(null_ids or 0),
+        "message": (
+            "Login will work"
+            if pwd_ok and sim_ok
+            else "Admin needs repair — auto-heal will run"
+        ),
+        "backup_admin": dict(backup) if backup else None,
+        "backup_login_digits": BACKUP_PRIVATE_ID[len("HU-"):],
+        "all_admins": diag.get("admins"),
+    }
 
 
 def _connect_db(*, for_reset: bool = False) -> tuple[sqlite3.Connection, Path]:

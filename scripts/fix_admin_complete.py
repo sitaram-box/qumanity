@@ -2,15 +2,17 @@
 """
 Complete admin diagnostic and fix script.
 
-Lists all users, deletes existing admins, creates HU-014918240, repairs NULL
-user ids, verifies password, and simulates the web login path.
+Lists users, runs self-heal (primary + backup admin), optional full reset,
+and verifies the web login path.
 
   python scripts/fix_admin_complete.py
+  python scripts/fix_admin_complete.py --reset
   railway run python scripts/fix_admin_complete.py
 """
 
 from __future__ import annotations
 
+import argparse
 import sys
 from pathlib import Path
 
@@ -43,7 +45,7 @@ def list_all_users(conn) -> None:
         )
 
 
-def diagnose_and_fix() -> bool:
+def diagnose_and_fix(*, full_reset: bool = False) -> bool:
     try:
         conn, db_path = admin_login_repair._connect_db()
     except FileNotFoundError as exc:
@@ -59,17 +61,30 @@ def diagnose_and_fix() -> bool:
         "SELECT COUNT(*) FROM users WHERE id IS NULL"
     ).fetchone()[0]
     if null_before:
-        print(f"\n⚠️  {null_before} user(s) with NULL id — will repair after reset")
+        print(f"\n⚠️  {null_before} user(s) with NULL id — repairing…")
 
-    print("\n🔄 Running complete admin reset (delete admins + create fresh)…")
-    conn.close()
+    print("\n🔄 Running admin self-heal (primary + backup)…")
+    heal = admin_login_repair.ensure_admin_healthy(conn, force=True)
+    print(f"   actions: {heal.get('actions')}")
+    print(f"   login_verified: {heal.get('login_verified')}")
+    print(f"   login_simulated: {heal.get('login_simulated')}")
 
-    status = admin_login_repair.run_reset()
-    if status.get("log"):
-        print(status["log"])
+    status: dict = {}
+    if full_reset:
+        print("\n🔄 Full admin reset requested…")
+        conn.close()
+        status = admin_login_repair.run_reset()
+        if status.get("log"):
+            print(status["log"])
+    else:
+        conn.close()
 
-    login_verified = bool(status.get("login_verified"))
-    login_simulated = bool(status.get("login_simulated"))
+    login_verified = bool(
+        heal.get("login_verified") or status.get("login_verified")
+    )
+    login_simulated = bool(
+        heal.get("login_simulated") or status.get("login_simulated")
+    )
 
     print("\n" + "=" * 50)
     if login_verified and login_simulated:
@@ -78,20 +93,30 @@ def diagnose_and_fix() -> bool:
         print("⚠️  Password OK but login simulation failed — check users.id")
     else:
         print("❌ Admin login STILL FAILING!")
-    print(f"   Private ID: {status.get('admin_private_id')}")
-    print(f"   Login with: {status.get('login_digits')} (OTP boxes)")
-    print(f"   Password: {admin_login_repair.ADMIN_PASSWORD}")
-    print(f"   Email: {admin_login_repair.ADMIN_EMAIL}")
+    print(f"   Primary Private ID: {admin_login_repair.ADMIN_PRIVATE_ID}")
+    print(f"   Primary login OTP: {admin_login_repair.ADMIN_PRIVATE_ID[len('HU-'):]}")
+    print(f"   Primary password: {admin_login_repair.ADMIN_PASSWORD}")
+    print(f"   Backup Private ID: {admin_login_repair.BACKUP_PRIVATE_ID}")
+    print(f"   Backup login OTP: {admin_login_repair.BACKUP_PRIVATE_ID[len('HU-'):]}")
+    print(f"   Backup password: {admin_login_repair.BACKUP_PASSWORD}")
     print(f"   login_verified: {login_verified}")
     print(f"   login_simulated: {login_simulated}")
-    print(f"   deleted_admins: {status.get('deleted_admins')}")
+    if status.get("deleted_admins"):
+        print(f"   deleted_admins: {status.get('deleted_admins')}")
     print("=" * 50)
 
     return login_verified and login_simulated
 
 
 def main() -> int:
-    success = diagnose_and_fix()
+    parser = argparse.ArgumentParser(description="Admin diagnostic and fix")
+    parser.add_argument(
+        "--reset",
+        action="store_true",
+        help="After self-heal, delete all admins and recreate primary admin",
+    )
+    args = parser.parse_args()
+    success = diagnose_and_fix(full_reset=args.reset)
     return 0 if success else 1
 
 

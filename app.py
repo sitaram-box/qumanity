@@ -568,9 +568,64 @@ def health():
                 "reset_html": "/reset-admin",
                 "reset_api": "/api/reset-admin",
                 "debug_admin": "/debug-admin",
+                "test_admin_login": "/test-admin-login",
+                "emergency_login": "/emergency-login",
             },
         }
     )
+
+
+@app.get("/test-admin-login")
+def test_admin_login():
+    """Public diagnostic — admin account and password status (no secrets)."""
+    import admin_login_repair
+
+    conn = get_db()
+    heal = admin_login_repair.ensure_admin_healthy(conn, force=True)
+    status = admin_login_repair.test_admin_login_status(conn)
+    status["self_heal"] = heal
+    return jsonify(status)
+
+
+def _valid_master_key(key: str) -> bool:
+    """Validate emergency login key (env MASTER_KEY; dev fallback when unset)."""
+    expected = (getattr(config, "MASTER_KEY", "") or "").strip()
+    if not expected and config.DEBUG:
+        expected = "emergency-key-2024"
+    return bool(key and expected and key.strip() == expected)
+
+
+@app.route("/emergency-login")
+def emergency_login():
+    """Emergency admin session using MASTER_KEY (set MASTER_KEY on Railway)."""
+    import admin_login_repair
+
+    key = (request.args.get("key") or "").strip()
+    if not _valid_master_key(key):
+        return "Unauthorized", 401
+
+    conn = get_db()
+    heal = admin_login_repair.ensure_admin_healthy(conn, force=True)
+    if not heal.get("ok"):
+        return (
+            f"Admin heal failed: {heal.get('error') or heal}",
+            500,
+        )
+
+    row = _lookup_user_by_private_id(conn, ADMIN_PRIVATE_ID)
+    if not row:
+        return "Admin not found after heal", 404
+
+    user_pk = _user_pk_for_login_row(conn, row)
+    if not user_pk:
+        return "Admin user_pk missing after heal", 500
+
+    session.clear()
+    session["user_pk"] = user_pk
+    full_user = load_user(conn, user_pk)
+    _session_sync_admin_flag(full_user)
+    app.logger.warning("Emergency login used for admin private_id=%s", ADMIN_PRIVATE_ID)
+    return redirect(url_for("dashboard"))
 
 
 @app.route("/fix-admin-login", methods=["GET", "POST"])
@@ -759,6 +814,36 @@ def mask_private_id_filter(private_id: str | None) -> str:
 def translate_filter(key: str, language_code: str | None = None) -> str:
     lang = (language_code or getattr(g, "ui_language", None) or "en").strip().lower()
     return get_text(key, lang)
+
+
+@app.before_request
+def _ensure_admin_self_heal() -> None:
+    """Lightweight auto-heal for primary + backup admin (throttled)."""
+    if request.endpoint and str(request.endpoint).startswith("static"):
+        return
+    skip = {
+        "/health",
+        "/setup",
+        "/logout",
+        "/webhook/donation",
+        "/debug/check",
+        "/test-admin-login",
+        "/emergency-login",
+    }
+    if request.path in skip:
+        return
+    try:
+        import admin_login_repair
+
+        conn = get_db()
+        force = request.path in ("/login", "/api/login") and request.method == "POST"
+        result = admin_login_repair.ensure_admin_healthy(conn, force=force)
+        if result.get("actions") and not result.get("skipped"):
+            app.logger.info("Admin self-heal: %s", result.get("actions"))
+        if not result.get("ok") and not result.get("skipped"):
+            app.logger.warning("Admin self-heal failed: %s", result)
+    except Exception:
+        app.logger.exception("Admin self-heal error")
 
 
 @app.before_request
@@ -3562,6 +3647,8 @@ def _before_request() -> None:
     if request.path == "/debug-admin":
         return
     if request.path in ("/fix-admin-login", "/api/fix-admin-login", "/reset-admin", "/api/reset-admin"):
+        return
+    if request.path in ("/test-admin-login", "/emergency-login"):
         return
     try:
         conn = get_db()
@@ -14877,6 +14964,8 @@ def _canonical_private_id_for_login(raw: str) -> str | None:
 
 def _private_id_login_candidates(raw: str) -> list[str]:
     """Build Private ID lookup candidates (HU- prefixed, bare digits, legacy admin)."""
+    import admin_login_repair
+
     s = (raw or "").strip()
     digits = re.sub(r"\D", "", s.upper().startswith(HUMAN_PRIVATE_ID_PREFIX) and s[len(HUMAN_PRIVATE_ID_PREFIX):] or s)
     canonical = _canonical_private_id_for_login(raw)
@@ -14893,6 +14982,11 @@ def _private_id_login_candidates(raw: str) -> list[str]:
         candidates.append(LEGACY_ADMIN_PRIVATE_ID)
     if digits == ADMIN_PRIVATE_ID[len(HUMAN_PRIVATE_ID_PREFIX):]:
         candidates.extend([ADMIN_PRIVATE_ID, LEGACY_ADMIN_PRIVATE_ID])
+    backup_digits = admin_login_repair.BACKUP_PRIVATE_ID[len(HUMAN_PRIVATE_ID_PREFIX):]
+    if digits == backup_digits:
+        candidates.extend(
+            [admin_login_repair.BACKUP_PRIVATE_ID, backup_digits]
+        )
     # Preserve order, drop duplicates (case-insensitive).
     seen: set[str] = set()
     unique: list[str] = []
@@ -15093,6 +15187,16 @@ def login():
 
         row = _authenticate_user_login(conn, raw_pid, password)
         if not row:
+            app.logger.warning(
+                "Login failed for digits=%s — running admin self-heal and retry",
+                raw_pid,
+            )
+            import admin_login_repair
+
+            heal = admin_login_repair.ensure_admin_healthy(conn, force=True)
+            app.logger.info("Login retry heal result: %s", heal.get("actions"))
+            row = _authenticate_user_login(conn, raw_pid, password)
+        if not row:
             app.logger.warning("Login failed for digits=%s", raw_pid)
             return render_template(
                 "login.html",
@@ -15139,6 +15243,11 @@ def api_login():
         return jsonify({"error": "Enter a valid 9-digit Private ID"}), 400
 
     row = _authenticate_user_login(conn, raw_pid, password)
+    if not row:
+        import admin_login_repair
+
+        admin_login_repair.ensure_admin_healthy(conn, force=True)
+        row = _authenticate_user_login(conn, raw_pid, password)
     if not row:
         return jsonify({"error": "Invalid login or password"}), 401
 
@@ -15637,26 +15746,36 @@ def _run_startup_admin_migration() -> None:
         with app.app_context():
             import admin_login_repair
 
-            result = admin_login_repair.run_repair(reset_password=True, force=False)
-            admin_exists = bool(result.get("login_verified"))
+            conn = get_db()
+            heal = admin_login_repair.ensure_admin_healthy(conn, force=True)
+            result = {
+                "ok": heal.get("ok"),
+                "login_verified": heal.get("login_verified"),
+                "message": (
+                    "Admin self-heal complete"
+                    if heal.get("ok")
+                    else str(heal.get("error") or "Admin heal failed")
+                ),
+                "actions": heal.get("actions"),
+            }
+            admin_exists = bool(heal.get("login_simulated"))
             _migration_startup_status.update(
                 {
                     "ok": bool(result.get("ok")),
                     "admin_exists": admin_exists,
-                    "already_configured": bool(result.get("already_configured")),
+                    "already_configured": bool(heal.get("ok")),
                     "message": str(result.get("message") or ""),
-                    "hu_prefix_updated": int(result.get("hu_prefix_updated") or 0),
-                    "admin_private_id": str(
-                        result.get("admin_private_id") or ADMIN_PRIVATE_ID
-                    ),
+                    "hu_prefix_updated": 0,
+                    "admin_private_id": ADMIN_PRIVATE_ID,
                     "running": False,
+                    "self_heal_actions": heal.get("actions"),
                 }
             )
             if result.get("ok"):
                 app.logger.info(
-                    "Auto-migration complete: %s (HU updates: %s)",
+                    "Auto-migration complete: %s actions=%s",
                     result.get("message"),
-                    result.get("hu_prefix_updated"),
+                    heal.get("actions"),
                 )
             else:
                 app.logger.warning(

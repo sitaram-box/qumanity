@@ -113,6 +113,8 @@ DONATION_BANK_ACCOUNT: str = (
 )
 DONATION_IFSC: str = _first_env("DONATION_IFSC", "DONATION_BANK_IFSC") or "SBIN0011551"
 ADMIN_API_KEY: str = _first_env("ADMIN_KEY", "ADMIN_API_KEY") or ""
+# Emergency admin login (`/emergency-login?key=...`). Set on Railway in production.
+MASTER_KEY: str = _first_env("MASTER_KEY", "EMERGENCY_MASTER_KEY") or ""
 
 MAIL_SERVER: str = os.environ.get("MAIL_SERVER", "").strip()
 MAIL_PORT: int = int(os.environ.get("MAIL_PORT", "587") or "587")
