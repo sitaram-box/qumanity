@@ -676,6 +676,16 @@ def inject_council_context() -> dict[str, Any]:
         }
     except Exception:
         return {"is_council_member": False, "is_mentor": False}
+
+
+@app.context_processor
+def inject_donation_display() -> dict[str, str]:
+    return {
+        "donation_bank_name": getattr(config, "DONATION_BANK_NAME", "SITA Foundation"),
+        "donation_upi_display": getattr(config, "DONATION_UPI_DISPLAY", ""),
+    }
+
+
 app.logger.setLevel(logging.INFO)
 _last_escalation_check = 0.0
 
@@ -8614,105 +8624,6 @@ def _create_razorpay_order(amount_rupees: int, *, receipt: str = "") -> dict[str
     return client.order.create(data=order_data)
 
 
-def _pending_registration_customer_info() -> dict[str, str]:
-    """Extract customer fields from session pending registration."""
-    pending = session.get("pending_registration") or {}
-    first = str(pending.get("first_name") or "").strip()
-    last = str(pending.get("last_name") or "").strip()
-    name = f"{first} {last}".strip() or "Qumanity User"
-    email = str(pending.get("email_raw") or "").strip()
-    phone = re.sub(r"\D", "", str(pending.get("phone_raw") or ""))
-    if len(phone) > 10:
-        phone = phone[-10:]
-    return {"name": name[:50], "email": email, "phone": phone}
-
-
-def _create_razorpay_payment_link(
-    amount_rupees: int,
-    donation_id: int,
-    *,
-    name: str = "Qumanity User",
-    email: str = "",
-    phone: str = "",
-) -> dict[str, Any]:
-    """Create Razorpay Payment Link — reliable UPI path for test and production."""
-    client = _razorpay_client()
-    if client is None:
-        raise ValueError("Payment gateway is not configured")
-    txn_ref = f"QUM{donation_id}"
-    customer: dict[str, str] = {"name": (name or "Qumanity User")[:50]}
-    if email:
-        customer["email"] = email[:100]
-    if phone:
-        customer["contact"] = phone[:15]
-    payment_link_data: dict[str, Any] = {
-        "amount": int(amount_rupees) * 100,
-        "currency": "INR",
-        "accept_partial": False,
-        "expire_by": int(time.time()) + 3600,
-        "reference_id": txn_ref,
-        "description": f"Qumanity Registration Donation {txn_ref}",
-        "customer": customer,
-        "notify": {"email": False, "sms": False},
-        "reminder_enable": False,
-        "notes": {
-            "donation_id": str(donation_id),
-            "donation_type": "registration",
-        },
-    }
-    return client.payment_link.create(payment_link_data)
-
-
-def _sync_donation_from_payment_link(
-    conn: sqlite3.Connection,
-    donation_id: int,
-    payment_link_id: str,
-) -> dict[str, Any] | None:
-    """Poll Razorpay payment link and mark donation completed when paid."""
-    client = _razorpay_client()
-    if client is None:
-        return sita_platform_core.get_donation(conn, donation_id)
-    try:
-        plink = client.payment_link.fetch(payment_link_id)
-    except Exception as exc:
-        app.logger.warning("Payment link fetch failed for %s: %s", payment_link_id, exc)
-        return sita_platform_core.get_donation(conn, donation_id)
-    status = str(plink.get("status") or "").strip().lower()
-    if status != "paid":
-        return sita_platform_core.get_donation(conn, donation_id)
-    payments = plink.get("payments") or []
-    payment_id = ""
-    order_id = ""
-    amount_paise = int(plink.get("amount") or 0)
-    if payments:
-        payment_id = str(payments[0] or "").strip()
-    if payment_id:
-        try:
-            payment = client.payment.fetch(payment_id)
-            order_id = str(payment.get("order_id") or "").strip()
-            amount_paise = int(payment.get("amount") or amount_paise)
-        except Exception:
-            pass
-    if payment_id:
-        sita_platform_core.confirm_donation_from_razorpay(
-            conn,
-            donation_id,
-            razorpay_payment_id=payment_id,
-            razorpay_order_id=order_id or None,
-            amount_paise=amount_paise or None,
-            confirmed_by="razorpay_payment_link_poll",
-        )
-        conn.execute(
-            """
-            UPDATE donations
-            SET razorpay_payment_link_id = COALESCE(razorpay_payment_link_id, ?)
-            WHERE id = ?
-            """,
-            (payment_link_id, int(donation_id)),
-        )
-    return sita_platform_core.get_donation(conn, donation_id)
-
-
 _MERCHANT_UPI_VPA_CACHE: str = ""
 
 
@@ -9487,6 +9398,61 @@ def api_upgrade_user():
     )
 
 
+@app.post("/api/donation/confirm-bank-qr")
+def api_donation_confirm_bank_qr():
+    """User-confirmed bank QR payment during registration (static QR, no Razorpay)."""
+    pending = session.get("pending_registration")
+    if not pending:
+        return jsonify(
+            {
+                "error": "Complete registration or log in first",
+                "code": "no_pending_registration",
+            }
+        ), 401
+    payload = request.get_json(silent=True) or {}
+    try:
+        amount = int(payload.get("amount", 0))
+    except (TypeError, ValueError):
+        return jsonify({"error": "amount must be an integer"}), 400
+    if amount < 1 or amount > 200:
+        return jsonify({"error": "Donation must be between ₹1 and ₹200"}), 400
+
+    conn = get_db()
+    session_marker = secrets.token_hex(8)
+    donation_id = sita_platform_core.record_donation(
+        conn,
+        user_private_id=f"{sita_platform_core.PENDING_USER_PREFIX}{session_marker}",
+        user_public_id="PENDING",
+        amount=amount,
+        payment_method="bank_qr",
+        status="confirmed",
+        payment_status="completed",
+        amount_paise=amount * 100,
+    )
+    txn_ref = f"QUM{donation_id}"
+    conn.execute(
+        """
+        UPDATE donations
+        SET transaction_id = ?, confirmed_at = ?, confirmed_by = 'user_confirmed'
+        WHERE id = ?
+        """,
+        (txn_ref, sita_platform_core._now(), int(donation_id)),
+    )
+    session["pending_donation_id"] = donation_id
+    session["pending_donation_marker"] = session_marker
+    session["bank_qr_payment_confirmed"] = True
+    conn.commit()
+    return jsonify(
+        {
+            "ok": True,
+            "success": True,
+            "donation_id": donation_id,
+            "amount": amount,
+            "payment_status": "completed",
+        }
+    )
+
+
 @app.post("/api/donation/create-order")
 def api_donation_create_order():
     pending = session.get("pending_registration")
@@ -9586,93 +9552,6 @@ def api_donation_create_order():
     )
 
 
-@app.post("/api/donation/create-payment-link")
-def api_donation_create_payment_link():
-    """Create Razorpay Payment Link — opens UPI apps reliably (test and production)."""
-    pending = session.get("pending_registration")
-    if not pending and not getattr(g, "current_user", None):
-        return jsonify(
-            {
-                "error": "Complete registration or log in first",
-                "code": "no_pending_registration",
-            }
-        ), 401
-    if _razorpay_client() is None:
-        return jsonify(
-            {
-                "error": "Payment gateway is not configured",
-                "code": "razorpay_not_configured",
-            }
-        ), 503
-    payload = request.get_json(silent=True) or {}
-    try:
-        amount = int(payload.get("amount", 0))
-    except (TypeError, ValueError):
-        return jsonify({"error": "amount must be an integer"}), 400
-    if amount < 1 or amount > 200:
-        return jsonify({"error": "Donation must be between ₹1 and ₹200"}), 400
-
-    customer = _pending_registration_customer_info()
-    name = str(payload.get("name") or customer["name"]).strip() or "Qumanity User"
-    email = str(payload.get("email") or customer["email"]).strip()
-    phone = str(payload.get("phone") or customer["phone"]).strip()
-
-    conn = get_db()
-    session_marker = secrets.token_hex(8)
-    donation_id = sita_platform_core.record_donation(
-        conn,
-        user_private_id=f"{sita_platform_core.PENDING_USER_PREFIX}{session_marker}",
-        user_public_id="PENDING",
-        amount=amount,
-        payment_method="payment_link",
-        status="pending",
-        payment_status="pending",
-        amount_paise=amount * 100,
-    )
-    txn_ref = f"QUM{donation_id}"
-    conn.execute(
-        "UPDATE donations SET transaction_id = ? WHERE id = ?",
-        (txn_ref, int(donation_id)),
-    )
-    try:
-        plink = _create_razorpay_payment_link(
-            amount,
-            donation_id,
-            name=name,
-            email=email,
-            phone=phone,
-        )
-    except Exception as exc:
-        conn.rollback()
-        app.logger.exception("Payment link create failed for donation %s", donation_id)
-        return jsonify({"error": f"Failed to create payment link: {exc}"}), 503
-
-    payment_link_id = str(plink.get("id") or "").strip()
-    short_url = str(plink.get("short_url") or plink.get("shorturl") or "").strip()
-    if not payment_link_id or not short_url:
-        conn.rollback()
-        return jsonify({"error": "Razorpay did not return a payment link URL"}), 503
-
-    conn.execute(
-        "UPDATE donations SET razorpay_payment_link_id = ? WHERE id = ?",
-        (payment_link_id, int(donation_id)),
-    )
-    session["pending_donation_id"] = donation_id
-    session["pending_donation_marker"] = session_marker
-    conn.commit()
-    return jsonify(
-        {
-            "ok": True,
-            "success": True,
-            "donation_id": donation_id,
-            "amount": amount,
-            "payment_link": short_url,
-            "payment_link_id": payment_link_id,
-            "payment_method": "payment_link",
-        }
-    )
-
-
 @app.get("/api/decode-qr-uri")
 def api_decode_qr_uri():
     """Return the UPI URI that would be encoded in a static donation QR."""
@@ -9699,7 +9578,7 @@ def api_decode_qr_uri():
             "contains_literal_at": "@" in upi_uri,
             "valid_format": upi_uri.startswith("upi://pay?pa="),
             "static_qr_warning": _static_qr_scan_warning(vpa, source, False),
-            "suggestion": "Copy upi_uri into a UPI app or use Pay with UPI Link on the registration page.",
+            "suggestion": "Copy upi_uri into a UPI app to test static QR payments.",
         }
     )
 
@@ -13364,18 +13243,13 @@ def api_register_donate():
     if amount < 0 or amount > 200:
         return jsonify({"error": "Donation must be between ₹0 and ₹200"}), 400
     method = str(payload.get("method") or payload.get("payment_method") or "qr").strip().lower()
-    allowed_methods = ("qr", "cash", "upi", "card", "netbanking", "link", "payment_link")
+    allowed_methods = ("qr", "cash")
     if method not in allowed_methods:
         return jsonify({"error": "method must be one of: " + ", ".join(allowed_methods)}), 400
-    if method in ("link", "payment_link"):
-        method = "qr"
     agent_private_id = str(
         payload.get("agent_private_id") or payload.get("agent_id") or ""
     ).strip()
     referral_code = str(payload.get("referral_code") or "").strip()
-    payment_id = str(payload.get("razorpay_payment_id") or payload.get("payment_id") or "").strip()
-    order_id = str(payload.get("razorpay_order_id") or payload.get("order_id") or "").strip()
-    signature = str(payload.get("razorpay_signature") or payload.get("signature") or "").strip()
     conn = get_db()
     if method == "cash":
         if referral_code:
@@ -13389,27 +13263,24 @@ def api_register_donate():
         else:
             return jsonify({"error": "Referral ID is required for cash payments"}), 400
     elif method == "qr" and amount > 0:
+        if not session.get("bank_qr_payment_confirmed"):
+            return jsonify(
+                {"error": "Confirm payment after scanning the bank QR code."}
+            ), 400
         pending_donation_id = session.get("pending_donation_id")
         if not pending_donation_id:
-            return jsonify({"error": "Complete QR payment first (scan the QR code)."}), 400
+            return jsonify({"error": "Payment not confirmed. Click I've Completed Payment."}), 400
         donation_row = sita_platform_core.get_donation(conn, int(pending_donation_id))
         if not donation_row:
-            return jsonify({"error": "Payment record not found. Scan the QR and pay again."}), 400
+            return jsonify({"error": "Payment record not found."}), 400
         pay_status = sita_platform_core._payment_status_for_row(donation_row)
         if pay_status != "completed":
             return jsonify(
                 {
-                    "error": "Payment not completed yet. Wait for confirmation after paying via UPI.",
+                    "error": "Payment not confirmed yet.",
                     "payment_status": pay_status,
                 }
             ), 400
-    elif method in ("upi", "card", "netbanking") and amount > 0:
-        if not all([payment_id, order_id, signature]):
-            return jsonify({"error": "Complete payment before verifying registration"}), 400
-        try:
-            _verify_razorpay_payment(payment_id, order_id, signature)
-        except Exception as exc:
-            return jsonify({"error": f"Payment verification failed: {exc}"}), 400
     try:
         private_id, public_id = _finalize_registration_with_donation(
             conn,
@@ -13425,6 +13296,9 @@ def api_register_donate():
         conn.rollback()
         return jsonify({"error": str(exc)}), 400
     session.pop("pending_registration", None)
+    session.pop("bank_qr_payment_confirmed", None)
+    session.pop("pending_donation_id", None)
+    session.pop("pending_donation_marker", None)
     return jsonify(
         {
             "ok": True,
@@ -13473,66 +13347,9 @@ def donation_webhook():
         "payment.failed",
         "payment.authorized",
         "qr_code.credited",
-        "payment_link.paid",
     ) and not handled:
         app.logger.warning("Webhook: no matching pending donation for event %s", event)
     return jsonify({"status": "success"}), 200
-
-
-@app.get("/api/check-payment-status/<payment_link_id>")
-def api_check_payment_status(payment_link_id: str):
-    """Poll Razorpay payment link status (registration donation flow)."""
-    payment_link_id = (payment_link_id or "").strip()
-    if not payment_link_id:
-        return jsonify({"error": "payment_link_id required"}), 400
-    conn = get_db()
-    row = conn.execute(
-        "SELECT * FROM donations WHERE razorpay_payment_link_id = ?",
-        (payment_link_id,),
-    ).fetchone()
-    if not row:
-        return jsonify({"error": "Not found"}), 404
-    donation_id = int(row["id"])
-    allowed = False
-    if session.get("pending_donation_id") == donation_id:
-        allowed = True
-    elif getattr(g, "current_user", None):
-        if str(g.current_user["private_id"]) == str(row["user_private_id"]):
-            allowed = True
-        elif str(row["user_private_id"]).startswith(sita_platform_core.PENDING_USER_PREFIX):
-            marker = session.get("pending_donation_marker")
-            if marker and str(row["user_private_id"]) == (
-                f"{sita_platform_core.PENDING_USER_PREFIX}{marker}"
-            ):
-                allowed = True
-    if not allowed:
-        return jsonify({"error": "Forbidden"}), 403
-
-    _sync_donation_from_payment_link(conn, donation_id, payment_link_id)
-    conn.commit()
-    payload = sita_platform_core.get_donation_status_payload(conn, donation_id)
-    plink_status = ""
-    client = _razorpay_client()
-    if client:
-        try:
-            plink = client.payment_link.fetch(payment_link_id)
-            plink_status = str(plink.get("status") or "").strip().lower()
-        except Exception:
-            pass
-    payment_status = str(payload.get("payment_status") or "pending")
-    status = "completed" if payment_status == "completed" else (
-        plink_status if plink_status else payment_status
-    )
-    return jsonify(
-        {
-            **payload,
-            "paymentStatus": payment_status,
-            "status": status,
-            "payment_link_status": plink_status,
-            "payment_link_id": payment_link_id,
-            "donation_id": donation_id,
-        }
-    )
 
 
 @app.get("/api/registration/status/<int:donation_id>")

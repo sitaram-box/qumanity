@@ -279,9 +279,12 @@
           required
           {% if not continents %}disabled{% endif %}
         >
-          <option value="" disabled {% if not form.birth_continent_id %}selected{% endif %}>Select…</option>
-          {% for c in continents %}
-          <option value="{{ c.id }}" {% if form.birth_continent_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+          {% set birth_continent = form.birth_continent_id or 'AS' %}
+          {% for c in continents if c.id == 'AS' %}
+          <option value="{{ c.id }}" {% if birth_continent == c.id %}selected{% endif %}>{{ c.name }}</option>
+          {% endfor %}
+          {% for c in continents if c.id != 'AS' %}
+          <option value="{{ c.id }}" {% if birth_continent == c.id %}selected{% endif %}>{{ c.name }}</option>
           {% endfor %}
         </select>
       </div>
@@ -292,7 +295,7 @@
           id="birth_country_id"
           name="birth_country_id"
           required
-          data-initial-country="{{ form.birth_country_id or '' }}"
+          data-initial-country="{{ form.birth_country_id or 'IND' }}"
           {% if not continents %}disabled{% endif %}
         >
           <option value="" selected disabled>Select continent first…</option>
@@ -407,9 +410,12 @@
           required
           {% if not continents %}disabled{% endif %}
         >
-          <option value="" disabled {% if not form.current_continent_id %}selected{% endif %}>Select…</option>
-          {% for c in continents %}
-          <option value="{{ c.id }}" {% if form.current_continent_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+          {% set current_continent = form.current_continent_id or 'AS' %}
+          {% for c in continents if c.id == 'AS' %}
+          <option value="{{ c.id }}" {% if current_continent == c.id %}selected{% endif %}>{{ c.name }}</option>
+          {% endfor %}
+          {% for c in continents if c.id != 'AS' %}
+          <option value="{{ c.id }}" {% if current_continent == c.id %}selected{% endif %}>{{ c.name }}</option>
           {% endfor %}
         </select>
       </div>
@@ -420,7 +426,7 @@
           id="current_country_id"
           name="current_country_id"
           required
-          data-initial-country="{{ form.current_country_id or '' }}"
+          data-initial-country="{{ form.current_country_id or 'IND' }}"
           {% if not continents %}disabled{% endif %}
         >
           <option value="" selected disabled>Select continent first…</option>
@@ -647,33 +653,10 @@
           <span>💵 Cash (via Referral ID)</span>
         </label>
         <div id="reg-donate-cash-fields" class="mt-2" hidden>
-          <label class="form-label small" for="reg-donate-referral-id">Referral ID</label>
+          <label class="form-label small" for="reg-donate-referral-id">Referral ID <span class="text-danger">*</span></label>
           <input type="text" class="form-control form-control-sm font-monospace" id="reg-donate-referral-id" placeholder="Enter Referral ID" autocomplete="off" />
-          <small class="text-muted">Enter the Referral ID of the volunteer who helped you</small>
-        </div>
-      </div>
-      <div class="payment-option mb-2">
-        <label class="payment-label small">
-          <input type="radio" name="reg-donate-method" value="link" class="reg-donate-method-radio" />
-          <span>🔗 Pay with UPI Link</span>
-        </label>
-        <div id="reg-payment-link-placeholder" class="mt-2" hidden>
-          <p class="small mb-2">
-            Opens Razorpay payment page with UPI — works reliably in test mode
-            (PhonePe, GPay, Paytm). Use <strong>success@razorpay</strong> when prompted in test.
-          </p>
-          <div class="qb-panel p-2">
-            <p class="small mb-2 mb-0">
-              <strong>Amount:</strong> <span id="reg-link-amount">—</span>
-            </p>
-            <button type="button" class="qb-btn qb-btn-primary mt-2" id="reg-open-payment-link" disabled>
-              Pay with UPI
-            </button>
-            <p class="small text-muted mt-2 mb-0" id="reg-link-payment-waiting" hidden>
-              Waiting for payment…
-            </p>
-            <p class="small text-success mt-1 mb-0 qb-payment-success" id="reg-link-webhook-status" hidden></p>
-          </div>
+          <small class="text-muted d-block">Required for cash payments. Enter the volunteer's Referral ID.</small>
+          <small class="text-danger d-block mt-1" id="reg-cash-referral-error" hidden></small>
         </div>
       </div>
       <div class="payment-option mb-2">
@@ -683,31 +666,40 @@
         </label>
         <div id="reg-qr-placeholder" class="qr-placeholder mt-2" hidden>
           <p class="small mb-2">
-            Scan with Google Pay, PhonePe, Paytm, or any UPI app.
-            If scan fails, use <strong>Pay with UPI Link</strong> above.
+            Scan with Google Pay, PhonePe, Paytm, or any UPI/banking app.
+            Pay directly to the SITA Foundation bank account.
           </p>
           <div class="qb-qr-payment-box" id="reg-qr-container">
             <img
               id="reg-qr-image"
-              src=""
-              alt="UPI payment QR code"
+              src="{{ url_for('static', filename='images/SitaFoundation Donate.jpg') }}"
+              alt="Bank donation QR code"
               class="qb-donation-qr-img"
               width="220"
               height="220"
-              hidden
             />
             <p class="small mb-1 mt-2">
               <strong>Amount:</strong> <span id="reg-qr-amount">—</span>
             </p>
             <p class="small mb-0">
-              <strong>UPI ID:</strong>
-              <span id="reg-qr-upi-id" class="font-monospace">—</span>
+              <strong>Organisation:</strong> {{ donation_bank_name|default('SITA Foundation') }}
             </p>
+            {% if donation_upi_display %}
+            <p class="small mb-0">
+              <strong>UPI:</strong>
+              <span id="reg-qr-upi-id" class="font-monospace">{{ donation_upi_display }}</span>
+            </p>
+            {% else %}
+            <span id="reg-qr-upi-id" hidden></span>
+            {% endif %}
           </div>
-          <p class="small text-muted mt-2 mb-0" id="reg-payment-waiting">
-            Waiting for payment…
+          <p class="small text-muted mt-2 mb-2" id="reg-payment-waiting">
+            Scan the QR and pay, then confirm below.
           </p>
-          <p class="small text-success mt-1 mb-0 qb-payment-success" id="reg-qr-webhook-status" hidden></p>
+          <button type="button" class="qb-btn qb-btn-secondary" id="reg-qr-confirm-btn" hidden>
+            I've Completed Payment
+          </button>
+          <p class="small text-success mt-2 mb-0 qb-payment-success" id="reg-qr-webhook-status" hidden></p>
         </div>
       </div>
     </div>
@@ -759,7 +751,7 @@
     }
   };
 </script>
-<script src="{{ url_for('static', filename='register_geo.js') }}?v=6" defer></script>
-<script src="{{ url_for('static', filename='register.js') }}?v=23" defer></script>
+<script src="{{ url_for('static', filename='register_geo.js') }}?v=7" defer></script>
+<script src="{{ url_for('static', filename='register.js') }}?v=24" defer></script>
 {% endif %}
 {% endblock %}

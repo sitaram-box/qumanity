@@ -319,6 +319,11 @@
       var rows = await fetchJson(
         "/api/countries?continent_id=" + encodeURIComponent(continentId)
       );
+      rows.sort(function (a, b) {
+        if (a.id === "IND") return -1;
+        if (b.id === "IND") return 1;
+        return String(a.name).localeCompare(String(b.name));
+      });
       populateSelect(countrySelect, "— Select country —", rows);
     } catch (e) {
       populateSelect(countrySelect, "— Error loading countries —", []);
@@ -429,7 +434,7 @@
 
     if (cSel.value) {
       loadCountries(cSel.value, coSel).then(function () {
-        var initC = coSel.getAttribute("data-initial-country") || "";
+        var initC = coSel.getAttribute("data-initial-country") || "IND";
         if (initC) coSel.value = initC;
         if (coSel.value === "IND") {
           setIndiaSection(prefix, true);
@@ -452,6 +457,10 @@
   document.addEventListener("DOMContentLoaded", function () {
     if (!document.getElementById("register-form")) return;
     window.QBGeoLang = "en";
+    ["birth", "current"].forEach(function (prefix) {
+      var cSel = document.getElementById(prefix + "_continent_id");
+      if (cSel && !cSel.value) cSel.value = "AS";
+    });
     wirePrefix("birth");
     wirePrefix("current");
   });
