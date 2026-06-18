@@ -115,8 +115,8 @@
   <div class="qb-panel p-3 mb-3" id="qb-admin-migration-panel">
     <h2 class="h6 text-secondary mb-2">Admin Account Setup</h2>
     <p class="small text-muted mb-2">
-      If admin login fails, run migration to create or repair <code>H_U_ADMIN</code>
-      (email: sekyorintantra@gmail.com, password: P@y#umans123).
+      If admin login fails, run migration to create or repair <code>HU-014918240</code>
+      (password: P@y#umans123).
     </p>
     <button type="button" class="qb-btn qb-btn-primary btn-sm" id="qb-run-migration-btn">
       Create / Repair Admin Account
@@ -372,7 +372,7 @@
         })
         .then(function (x) {
           var msg = x.b.message || (x.ok ? "Migration complete." : "Migration failed.");
-          if (migResult) migResult.textContent = msg + " Login with H_U_ADMIN / P@y#umans123";
+          if (migResult) migResult.textContent = msg + " Login with HU-014918240 / P@y#umans123";
           if (window.qbToast) window.qbToast(msg, x.ok ? "success" : "error");
         })
         .catch(function (err) {

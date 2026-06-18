@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{ 'login'|tr }} — Qumanity{% endblock %}
+{% block title %}Login to Qumanity{% endblock %}
 
 {% block body %}
 <div class="login-container">
@@ -13,8 +13,7 @@
         width="80"
         height="80"
       />
-      <h1>Welcome Back</h1>
-      <p>Login to continue your conscious journey</p>
+      <h1>Login to Qumanity</h1>
     </div>
 
     {% if error %}
@@ -23,18 +22,27 @@
 
     <form method="post" action="{{ url_for('login') }}" class="login-form" id="login-form">
       <div class="qb-form-group">
-        <label for="private_id">Private ID or Email</label>
-        <input
-          type="text"
-          class="form-control qb-form-control font-monospace"
-          id="private_id"
-          name="private_id"
-          required
-          placeholder="HU-123456789, 9-digit ID, H_U_ADMIN, or email"
-          value="{{ request.form.get('private_id', '') }}"
-          autocomplete="username"
-        />
-        <small class="login-hint">Use your <strong>HU-</strong> Private ID (e.g. HU-306931970), legacy 9-digit ID, <strong>H_U_ADMIN</strong> for admin, or your registered email.</small>
+        <label for="private-id-digit-0">Private ID</label>
+        <div class="qb-private-id-field">
+          <span class="qb-private-id-prefix" aria-hidden="true">HU-</span>
+          <div class="qb-private-id-otp" id="private-id-otp">
+            {% for i in range(9) %}
+            <input
+              type="text"
+              class="qb-private-id-digit"
+              id="private-id-digit-{{ i }}"
+              maxlength="1"
+              inputmode="numeric"
+              pattern="[0-9]"
+              autocomplete="off"
+              aria-label="Private ID digit {{ i + 1 }}"
+              data-digit-index="{{ i }}"
+            />
+            {% endfor %}
+          </div>
+        </div>
+        <input type="hidden" name="private_id" id="private_id" value="" />
+        <small class="login-hint">Enter your 9-digit Private ID (e.g., 014918240)</small>
       </div>
 
       <div class="qb-form-group">
@@ -54,7 +62,7 @@
         </div>
       </div>
 
-      <button type="submit" class="btn-login">Login to Qumanity</button>
+      <button type="submit" class="btn-login">Login</button>
     </form>
 
     <div class="login-footer">
@@ -64,4 +72,8 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='login.js') }}"></script>
 {% endblock %}

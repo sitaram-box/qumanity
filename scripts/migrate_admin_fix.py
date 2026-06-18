@@ -15,7 +15,7 @@ Or if only python -c works:
   python -c "import runpy; runpy.run_path('scripts/migrate_admin_fix.py')"
 
 After migration, login at /login with:
-  Private ID: H_U_ADMIN  (or email sekyorintantra@gmail.com)
+  Private ID: HU-014918240
   Password:   P@y#umans123
 """
 
@@ -33,12 +33,13 @@ import bcrypt
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-ADMIN_PRIVATE_ID = "H_U_ADMIN"
+ADMIN_PRIVATE_ID = "HU-014918240"
 ADMIN_PUBLIC_ID = "ADMIN-PUBLIC"
 ADMIN_EMAIL = "sekyorintantra@gmail.com"
 ADMIN_PHONE = "8287696616"
 ADMIN_PASSWORD = "P@y#umans123"
-SOURCE_PRIVATE_IDS = ("306931970", "HU-306931970")
+LEGACY_ADMIN_PRIVATE_ID = "H_U_ADMIN"
+SOURCE_PRIVATE_IDS = ("306931970", "HU-306931970", LEGACY_ADMIN_PRIVATE_ID)
 ADMIN_SKIP_PREFIXES = ("HU-", "AN-", "NB-", "H_U_")
 
 
@@ -116,6 +117,41 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
         print(f"  Warning: qoin schema skipped ({exc})")
 
 
+def _migrate_legacy_admin_id(conn: sqlite3.Connection) -> None:
+    """Rename H_U_ADMIN to HU-014918240 when the legacy row still exists."""
+    import identity_core
+
+    legacy = conn.execute(
+        "SELECT id FROM users WHERE private_id = ? COLLATE NOCASE",
+        (LEGACY_ADMIN_PRIVATE_ID,),
+    ).fetchone()
+    if not legacy:
+        return
+
+    target = conn.execute(
+        "SELECT id FROM users WHERE private_id = ? COLLATE NOCASE",
+        (ADMIN_PRIVATE_ID,),
+    ).fetchone()
+    if target and int(target["id"]) != int(legacy["id"]):
+        print(f" Removing duplicate admin row at {ADMIN_PRIVATE_ID}…")
+        _remove_user(conn, ADMIN_PRIVATE_ID)
+
+    legacy = conn.execute(
+        "SELECT id FROM users WHERE private_id = ? COLLATE NOCASE",
+        (LEGACY_ADMIN_PRIVATE_ID,),
+    ).fetchone()
+    if not legacy:
+        return
+
+    identity_core.reassign_user_private_id(
+        conn,
+        LEGACY_ADMIN_PRIVATE_ID,
+        ADMIN_PRIVATE_ID,
+        new_public_id=ADMIN_PUBLIC_ID,
+    )
+    print(f" Migrated {LEGACY_ADMIN_PRIVATE_ID} → {ADMIN_PRIVATE_ID}")
+
+
 def convert_to_admin(
     conn: sqlite3.Connection,
     *,
@@ -124,6 +160,8 @@ def convert_to_admin(
     import identity_core
 
     from app import format_human_private_id
+
+    _migrate_legacy_admin_id(conn)
 
     source = _find_source_user(conn)
     pw_hash = _password_hash(ADMIN_PASSWORD) if reset_password else None
@@ -136,14 +174,14 @@ def convert_to_admin(
         print(f"   Public ID:  {source['public_id']}")
 
         if old_pid.upper() == ADMIN_PRIVATE_ID:
-            print(" User is already H_U_ADMIN — updating contact details.")
+            print(f" User is already {ADMIN_PRIVATE_ID} — updating contact details.")
         else:
             existing_admin = conn.execute(
                 "SELECT id FROM users WHERE private_id = ? COLLATE NOCASE",
                 (ADMIN_PRIVATE_ID,),
             ).fetchone()
             if existing_admin and int(existing_admin["id"]) != int(source["id"]):
-                print(" Removing old bootstrap H_U_ADMIN row…")
+                print(f" Removing old bootstrap admin row at {ADMIN_PRIVATE_ID}…")
                 _remove_user(conn, ADMIN_PRIVATE_ID)
 
             identity_core.reassign_user_private_id(
@@ -154,7 +192,7 @@ def convert_to_admin(
             )
             print(f" Converted {old_pid} → {ADMIN_PRIVATE_ID}")
     else:
-        print(f" User {SOURCE_PRIVATE_IDS[0]} not found — configuring H_U_ADMIN directly.")
+        print(f" Source user not found — configuring {ADMIN_PRIVATE_ID} directly.")
         existing = conn.execute(
             "SELECT id FROM users WHERE private_id = ? COLLATE NOCASE",
             (ADMIN_PRIVATE_ID,),
@@ -279,6 +317,12 @@ def admin_needs_setup(conn: sqlite3.Connection) -> bool:
     if str(admin["phone"] or "").strip() != ADMIN_PHONE:
         return True
     if _find_source_user(conn):
+        return True
+    legacy = conn.execute(
+        "SELECT 1 FROM users WHERE private_id = ? COLLATE NOCASE",
+        (LEGACY_ADMIN_PRIVATE_ID,),
+    ).fetchone()
+    if legacy:
         return True
     row = conn.execute(
         """

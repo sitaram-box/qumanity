@@ -153,12 +153,13 @@ DEMO_ACCOUNT_TYPE_PREFIX = "D_U"
 
 # Legacy registration IDs (U-XXXXXXXX); login accepts any stored private_id shape.
 PRIVATE_ID_RE = re.compile(r"^\s*(U-[A-Za-z0-9]{8})\s*$", re.I)
-# Login: 9-digit numeric Private ID, or the fixed admin account id.
+# Login: 9-digit numeric Private ID with HU- prefix (e.g. HU-014918240).
 PRIVATE_ID_LOGIN_RE = re.compile(r"^\d{9}$")
 HU_PRIVATE_ID_LOGIN_RE = re.compile(r"^HU-\d{9}$", re.IGNORECASE)
-ADMIN_PRIVATE_ID = "H_U_ADMIN"
+ADMIN_PRIVATE_ID = "HU-014918240"
 ADMIN_PUBLIC_ID = "ADMIN-PUBLIC"
 HUMAN_PRIVATE_ID_PREFIX = "HU-"
+LEGACY_ADMIN_PRIVATE_ID = "H_U_ADMIN"
 
 USER_TABLE_SQL = """
 CREATE TABLE IF NOT EXISTS users (
@@ -5255,13 +5256,24 @@ def _election_display_from_cycle(cycle_row: sqlite3.Row | None) -> dict[str, Any
 
 
 def migrate_admin_user_profile(conn: sqlite3.Connection) -> None:
-    """One-time correction for the default admin account (H_U_ADMIN)."""
+    """One-time correction for the default admin account."""
     row = conn.execute(
         "SELECT 1 FROM users WHERE private_id = ? COLLATE NOCASE",
-        ("H_U_ADMIN",),
+        (ADMIN_PRIVATE_ID,),
     ).fetchone()
     if not row:
-        return
+        legacy = conn.execute(
+            "SELECT 1 FROM users WHERE private_id = ? COLLATE NOCASE",
+            (LEGACY_ADMIN_PRIVATE_ID,),
+        ).fetchone()
+        if not legacy:
+            return
+        identity_core.reassign_user_private_id(
+            conn,
+            LEGACY_ADMIN_PRIVATE_ID,
+            ADMIN_PRIVATE_ID,
+            new_public_id=ADMIN_PUBLIC_ID,
+        )
     dob = date(1990, 7, 30)
     age = compute_age(dob)
     age_group = life_stage_from_age(age)
@@ -5291,11 +5303,11 @@ def migrate_admin_user_profile(conn: sqlite3.Connection) -> None:
             sun,
             moon,
             elem,
-            "H_U_ADMIN",
+            ADMIN_PRIVATE_ID,
         ),
     )
-    if qoin_core.wallet_balance(conn, "user", "H_U_ADMIN") == 0:
-        qoin_core.credit_signup_bonus(conn, "H_U_ADMIN")
+    if qoin_core.wallet_balance(conn, "user", ADMIN_PRIVATE_ID) == 0:
+        qoin_core.credit_signup_bonus(conn, ADMIN_PRIVATE_ID)
 
 
 @app.post("/api/set-language")
@@ -14613,22 +14625,26 @@ def api_user_location_mode():
     )
 
 
-def _private_id_login_candidates(raw: str) -> list[str]:
-    """Build Private ID lookup candidates (HU- prefix, legacy numeric, admin)."""
+def _canonical_private_id_for_login(raw: str) -> str | None:
+    """Normalize login input to HU- + 9 digits. Rejects email and invalid IDs."""
     s = (raw or "").strip()
     if not s or "@" in s:
+        return None
+    if s.upper().startswith(HUMAN_PRIVATE_ID_PREFIX):
+        digits = s[len(HUMAN_PRIVATE_ID_PREFIX):].strip()
+    else:
+        digits = s
+    if not PRIVATE_ID_LOGIN_RE.match(digits):
+        return None
+    return format_human_private_id(digits)
+
+
+def _private_id_login_candidates(raw: str) -> list[str]:
+    """Build Private ID lookup candidates (HU- prefixed + legacy bare digits)."""
+    canonical = _canonical_private_id_for_login(raw)
+    if not canonical:
         return []
-    if s.upper() == ADMIN_PRIVATE_ID:
-        return [ADMIN_PRIVATE_ID]
-    candidates: list[str] = []
-    if HU_PRIVATE_ID_LOGIN_RE.match(s):
-        upper = f"{HUMAN_PRIVATE_ID_PREFIX}{s[3:]}"
-        candidates.append(upper)
-        candidates.append(s[3:])  # legacy bare digits
-    elif PRIVATE_ID_LOGIN_RE.match(s):
-        candidates.append(format_human_private_id(s))
-        candidates.append(s)
-    return candidates
+    return [canonical, canonical[len(HUMAN_PRIVATE_ID_PREFIX):]]
 
 
 def _authenticate_user_login(
@@ -14636,32 +14652,23 @@ def _authenticate_user_login(
     login_input: str,
     password: str,
 ) -> sqlite3.Row | None:
-    """Resolve Private ID (multiple formats) or email and verify password."""
+    """Verify password for a Private ID (HU- + 9 digits only)."""
     login_input = (login_input or "").strip()
     password = password or ""
     if not login_input or not password:
         return None
 
     row: sqlite3.Row | None = None
-    if "@" in login_input:
+    for cand in _private_id_login_candidates(login_input):
         row = conn.execute(
             """
             SELECT id, password_hash, private_id, first_name, last_name, account_type
-            FROM users WHERE email = ? COLLATE NOCASE
+            FROM users WHERE private_id = ? COLLATE NOCASE
             """,
-            (login_input,),
+            (cand,),
         ).fetchone()
-    else:
-        for cand in _private_id_login_candidates(login_input):
-            row = conn.execute(
-                """
-                SELECT id, password_hash, private_id, first_name, last_name, account_type
-                FROM users WHERE private_id = ? COLLATE NOCASE
-                """,
-                (cand,),
-            ).fetchone()
-            if row:
-                break
+        if row:
+            break
 
     if not row:
         return None
@@ -14691,7 +14698,13 @@ def login():
     if not raw_pid:
         return render_template(
             "login.html",
-            error="Enter your Private ID, HU- ID, or email.",
+            error="Enter your 9-digit Private ID.",
+        )
+
+    if not _canonical_private_id_for_login(raw_pid):
+        return render_template(
+            "login.html",
+            error="Private ID must be 9 digits (after HU-).",
         )
 
     row = _authenticate_user_login(conn, raw_pid, password)
@@ -14713,11 +14726,14 @@ def login():
 
 @app.post("/api/login")
 def api_login():
-    """JSON login — Private ID (HU- or 9-digit), H_U_ADMIN, or email."""
+    """JSON login — Private ID (HU- + 9 digits) and password only."""
     data = request.get_json(silent=True) or {}
-    raw_pid = str(data.get("private_id") or data.get("email") or "").strip()
+    raw_pid = str(data.get("private_id") or "").strip()
     password = str(data.get("password") or "")
     conn = get_db()
+
+    if not _canonical_private_id_for_login(raw_pid):
+        return jsonify({"error": "Enter a valid 9-digit Private ID"}), 400
 
     row = _authenticate_user_login(conn, raw_pid, password)
     if not row:
@@ -15173,7 +15189,7 @@ def _migration_html_response(status: dict[str, Any]) -> str:
       <div class="qb-panel p-4">
         <h1 class="h4 mb-3">{title}</h1>
         <div class="qb-alert {alert_class} mb-3">{body}</div>
-        <p><strong>Admin Private ID:</strong> <code>{status.get("admin_private_id", "H_U_ADMIN")}</code></p>
+        <p><strong>Admin Private ID:</strong> <code>{status.get("admin_private_id", ADMIN_PRIVATE_ID)}</code></p>
         <p><strong>Admin Public ID:</strong> <code>{status.get("admin_public_id", "ADMIN-PUBLIC")}</code></p>
         <p><strong>Email:</strong> <code>{status.get("admin_email", "")}</code></p>
         <p><strong>Phone:</strong> <code>{status.get("admin_phone", "")}</code></p>
@@ -15424,8 +15440,8 @@ def api_setup_migrate_admin():
         {
             "success": True,
             "message": "Admin migration complete",
-            "admin_private_id": "H_U_ADMIN",
-            "admin_public_id": "ADMIN-PUBLIC",
+            "admin_private_id": ADMIN_PRIVATE_ID,
+            "admin_public_id": ADMIN_PUBLIC_ID,
             "admin_email": "sekyorintantra@gmail.com",
             "admin_phone": "8287696616",
         }
