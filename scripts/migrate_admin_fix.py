@@ -26,6 +26,7 @@ import re
 import sqlite3
 import sys
 from pathlib import Path
+from typing import Any
 
 import bcrypt
 
@@ -262,41 +263,108 @@ def add_hu_prefix(conn: sqlite3.Connection) -> int:
     return updated
 
 
+def admin_needs_setup(conn: sqlite3.Connection) -> bool:
+    """True when admin account is missing or not configured with target credentials."""
+    admin = conn.execute(
+        """
+        SELECT id, email, phone, is_admin FROM users
+        WHERE private_id = ? COLLATE NOCASE
+        """,
+        (ADMIN_PRIVATE_ID,),
+    ).fetchone()
+    if not admin or not int(admin["is_admin"] or 0):
+        return True
+    if str(admin["email"] or "").strip().lower() != ADMIN_EMAIL.lower():
+        return True
+    if str(admin["phone"] or "").strip() != ADMIN_PHONE:
+        return True
+    if _find_source_user(conn):
+        return True
+    row = conn.execute(
+        """
+        SELECT 1 FROM users
+        WHERE COALESCE(is_admin, 0) = 0
+          AND private_id GLOB '[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]'
+        LIMIT 1
+        """
+    ).fetchone()
+    if row:
+        return True
+    return False
+
+
 def run_migration(*, reset_password: bool = True) -> bool:
+    result = run_migration_with_status(reset_password=reset_password)
+    return bool(result.get("ok"))
+
+
+def run_migration_with_status(
+    *,
+    reset_password: bool = True,
+    force: bool = False,
+) -> dict[str, Any]:
+    """Run migration and return a status dict for HTTP responses."""
+    out: dict[str, Any] = {
+        "ok": False,
+        "already_configured": False,
+        "hu_prefix_updated": 0,
+        "admin_private_id": ADMIN_PRIVATE_ID,
+        "admin_public_id": ADMIN_PUBLIC_ID,
+        "admin_email": ADMIN_EMAIL,
+        "admin_phone": ADMIN_PHONE,
+        "admin_password": ADMIN_PASSWORD if reset_password else None,
+        "message": "",
+    }
     print("Starting Qumanity admin migration…")
     try:
         db_path = resolve_db_path()
     except FileNotFoundError as exc:
+        out["message"] = str(exc)
         print(f"ERROR: {exc}")
-        return False
+        return out
 
     print(f"Using database: {db_path}")
     conn = _connect(db_path)
     try:
+        if (
+            not force
+            and not admin_needs_setup(conn)
+            and os.environ.get("RUN_MIGRATION_ON_STARTUP", "").lower() != "true"
+        ):
+            out["ok"] = True
+            out["already_configured"] = True
+            out["message"] = "Admin already configured."
+            print(" Admin already configured — skipping migration.")
+            return out
+
         _ensure_schema(conn)
         convert_to_admin(conn, reset_password=reset_password)
         count = add_hu_prefix(conn)
         conn.commit()
+        out["ok"] = True
+        out["hu_prefix_updated"] = count
+        out["message"] = "Migration complete."
     except Exception as exc:
         conn.rollback()
+        out["message"] = str(exc)
         print(f"ERROR: Migration failed: {exc}")
         import traceback
 
         traceback.print_exc()
-        return False
+        return out
     finally:
         conn.close()
 
     print()
     print("Migration complete!")
-    print(f"  Updated {count} user(s) with HU- prefix")
+    print(f"  Updated {out['hu_prefix_updated']} user(s) with HU- prefix")
     print(f"  Admin Private ID: {ADMIN_PRIVATE_ID}")
     print(f"  Admin Public ID:  {ADMIN_PUBLIC_ID}")
     print(f"  Admin Email:      {ADMIN_EMAIL}")
     print(f"  Admin Phone:      {ADMIN_PHONE}")
     print(f"  Admin Password:   {ADMIN_PASSWORD}")
     print("  Login at: /login")
-    return True
+    return out
 
 
 if __name__ == "__main__":

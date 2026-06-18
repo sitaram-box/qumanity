@@ -15140,6 +15140,120 @@ with app.app_context():
     _start_geography_background()
 
 
+_migrate_startup_lock = threading.Lock()
+_migrate_startup_done = False
+
+
+def _load_migrate_admin_module():
+    """Load scripts/migrate_admin_fix.py without requiring scripts package."""
+    import importlib.util
+
+    script_path = BASE_DIR / "scripts" / "migrate_admin_fix.py"
+    if not script_path.is_file():
+        return None
+    spec = importlib.util.spec_from_file_location("migrate_admin_fix", script_path)
+    if spec is None or spec.loader is None:
+        return None
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _migration_html_response(status: dict[str, Any]) -> str:
+    ok = bool(status.get("ok"))
+    title = "Migration complete" if ok else "Migration failed"
+    alert_class = "qb-alert-success" if ok else "qb-alert-error"
+    already = status.get("already_configured")
+    body = status.get("message") or title
+    if already:
+        body = "Admin is already configured with the correct credentials."
+    hu = status.get("hu_prefix_updated", 0)
+    return f"""
+    <div class="container py-4">
+      <div class="qb-panel p-4">
+        <h1 class="h4 mb-3">{title}</h1>
+        <div class="qb-alert {alert_class} mb-3">{body}</div>
+        <p><strong>Admin Private ID:</strong> <code>{status.get("admin_private_id", "H_U_ADMIN")}</code></p>
+        <p><strong>Admin Public ID:</strong> <code>{status.get("admin_public_id", "ADMIN-PUBLIC")}</code></p>
+        <p><strong>Email:</strong> <code>{status.get("admin_email", "")}</code></p>
+        <p><strong>Phone:</strong> <code>{status.get("admin_phone", "")}</code></p>
+        <p><strong>Password:</strong> <code>{status.get("admin_password", "P@y#umans123")}</code></p>
+        <p class="small text-muted">HU- prefix updates: {hu}</p>
+        <a href="{url_for('login')}" class="qb-btn qb-btn-primary">Login</a>
+        <a href="{url_for('dashboard')}" class="qb-btn qb-btn-neutral ms-2">Dashboard</a>
+      </div>
+    </div>
+    """
+
+
+def _run_startup_admin_migration() -> None:
+    global _migrate_startup_done
+    with _migrate_startup_lock:
+        if _migrate_startup_done:
+            return
+        _migrate_startup_done = True
+    force = os.environ.get("RUN_MIGRATION_ON_STARTUP", "").lower() == "true"
+    try:
+        mod = _load_migrate_admin_module()
+        if mod is None:
+            app.logger.warning("migrate_admin_fix.py not found — skipping startup migration")
+            return
+        with app.app_context():
+            result = mod.run_migration_with_status(reset_password=True, force=force)
+            if result.get("ok"):
+                app.logger.info(
+                    "Startup admin migration: %s (HU updates: %s)",
+                    result.get("message"),
+                    result.get("hu_prefix_updated"),
+                )
+            else:
+                app.logger.warning(
+                    "Startup admin migration failed: %s", result.get("message")
+                )
+    except Exception as exc:
+        app.logger.exception("Startup admin migration error: %s", exc)
+
+
+def _start_admin_migration_background() -> None:
+    thread = threading.Thread(target=_run_startup_admin_migration, daemon=True)
+    thread.start()
+
+
+@app.route("/migrate-admin")
+def migrate_admin_page():
+    """Public one-click admin migration (no API key). Visit once after deploy."""
+    mod = _load_migrate_admin_module()
+    if mod is None:
+        return (
+            "<h1>Migration script missing</h1><p>scripts/migrate_admin_fix.py not found.</p>",
+            500,
+        )
+    try:
+        status = mod.run_migration_with_status(reset_password=True, force=True)
+    except Exception as exc:
+        app.logger.exception("migrate-admin failed")
+        return f"<h1>Migration failed</h1><pre>{exc}</pre>", 500
+    return _migration_html_response(status), (200 if status.get("ok") else 500)
+
+
+@app.get("/api/migrate-admin")
+def api_migrate_admin_json():
+    """JSON variant of /migrate-admin for the admin UI button."""
+    mod = _load_migrate_admin_module()
+    if mod is None:
+        return jsonify({"ok": False, "error": "Migration script not found"}), 500
+    try:
+        status = mod.run_migration_with_status(reset_password=True, force=True)
+    except Exception as exc:
+        app.logger.exception("migrate-admin api failed")
+        return jsonify({"ok": False, "error": str(exc)}), 500
+    return jsonify(status), (200 if status.get("ok") else 500)
+
+
+with app.app_context():
+    _start_admin_migration_background()
+
+
 @app.route("/setup")
 def setup_database():
     """Temporary route to seed database — remove after first use."""
