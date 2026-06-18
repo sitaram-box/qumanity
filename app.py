@@ -565,6 +565,8 @@ def health():
             "repair_urls": {
                 "fix_html": "/fix-admin-login",
                 "fix_api": "/api/fix-admin-login",
+                "reset_html": "/reset-admin",
+                "reset_api": "/api/reset-admin",
                 "debug_admin": "/debug-admin",
             },
         }
@@ -608,6 +610,45 @@ def api_fix_admin_login():
     return jsonify(status), (200 if status.get("ok") else 500)
 
 
+@app.route("/reset-admin", methods=["GET", "POST"])
+def reset_admin_page():
+    """Delete all admins and create fresh HU-014918240."""
+    import admin_login_repair
+
+    status = admin_login_repair.run_reset()
+    log = admin_login_repair.format_reset_log(status)
+    ok = bool(status.get("ok"))
+    title = "Admin reset complete" if ok else "Admin reset failed"
+    return f"""
+    <html>
+    <head><title>{title}</title></head>
+    <body style="font-family: Inter, system-ui, sans-serif; padding: 40px; max-width: 720px; margin: 0 auto; background: #0f172a; color: #f8fafc;">
+      <h1>{title}</h1>
+      <pre style="background: #1e293b; padding: 20px; border-radius: 8px; white-space: pre-wrap; border: 1px solid #475569;">{log}</pre>
+      <h3>Credentials</h3>
+      <ul>
+        <li>Private ID: <code>HU-014918240</code></li>
+        <li>OTP digits: <code>014918240</code></li>
+        <li>Password: <code>P@y#umans123</code></li>
+        <li>Email: <code>sekyorintantra@gmail.com</code></li>
+        <li>Phone: <code>8287696616</code></li>
+      </ul>
+      <a href="{url_for('login')}" style="display:inline-block;background:#f59e0b;color:#000;padding:10px 20px;text-decoration:none;border-radius:6px;font-weight:600;">Go to Login</a>
+    </body>
+    </html>
+    """
+
+
+@app.route("/api/reset-admin", methods=["GET", "POST"])
+def api_reset_admin():
+    """JSON admin reset."""
+    import admin_login_repair
+
+    status = admin_login_repair.run_reset()
+    status["success"] = bool(status.get("ok"))
+    return jsonify(status), (200 if status.get("ok") else 500)
+
+
 @app.route("/debug-admin", methods=["GET"])
 def debug_admin_status():
     """Check admin account — always available for ops."""
@@ -628,6 +669,7 @@ def debug_admin_status():
             "all_admins": diag.get("admins"),
             "legacy_admin": diag.get("legacy"),
             "fix_url": "/fix-admin-login",
+            "reset_url": "/reset-admin",
         }
     )
 
@@ -3506,7 +3548,7 @@ def _before_request() -> None:
         return
     if request.path == "/debug-admin":
         return
-    if request.path in ("/fix-admin-login", "/api/fix-admin-login"):
+    if request.path in ("/fix-admin-login", "/api/fix-admin-login", "/reset-admin", "/api/reset-admin"):
         return
     try:
         conn = get_db()
@@ -15791,6 +15833,17 @@ def create_admin_cli(
     click.echo(f"  Admin UI:   {result['admin_verifications_url']}")
 
 
+@click.command("reset-admin")
+def reset_admin_cli() -> None:
+    """Delete all admins and create HU-014918240 / P@y#umans123."""
+    import subprocess
+
+    script = BASE_DIR / "scripts" / "reset_admin.py"
+    result = subprocess.run([sys.executable, str(script)], cwd=str(BASE_DIR))
+    if result.returncode != 0:
+        raise click.ClickException("reset_admin.py failed")
+
+
 @click.command("fix-admin-login")
 def fix_admin_login_cli() -> None:
     """Diagnose and repair admin login (HU-014918240 / P@y#umans123)."""
@@ -15822,6 +15875,7 @@ def migrate_user_ids_cli(action: str, db: str | None, source_id: str) -> None:
 
 
 app.cli.add_command(create_admin_cli)
+app.cli.add_command(reset_admin_cli)
 app.cli.add_command(fix_admin_login_cli)
 app.cli.add_command(migrate_user_ids_cli)
 

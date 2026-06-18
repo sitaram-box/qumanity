@@ -78,6 +78,203 @@ def verify_admin_password(conn: sqlite3.Connection, password: str = ADMIN_PASSWO
         return False
 
 
+def _connect_db(*, for_reset: bool = False) -> tuple[sqlite3.Connection, Path]:
+    from db_path import resolve_database_path
+
+    db_path = resolve_database_path(ROOT)
+    if not db_path.is_file():
+        raise FileNotFoundError(f"Database not found: {db_path}")
+    conn = sqlite3.connect(str(db_path))
+    conn.row_factory = sqlite3.Row
+    if for_reset:
+        conn.execute("PRAGMA foreign_keys = OFF")
+    else:
+        conn.execute("PRAGMA foreign_keys = ON")
+    return conn, db_path
+
+
+def _remove_user_hard(conn: sqlite3.Connection, private_id: str) -> bool:
+    """Remove a user row, wallets, and private_id FK references."""
+    import identity_core
+
+    pid = str(private_id or "").strip()
+    if not pid:
+        return False
+    row = conn.execute(
+        "SELECT id FROM users WHERE private_id = ? COLLATE NOCASE",
+        (pid,),
+    ).fetchone()
+    if not row:
+        return False
+
+    conn.execute("PRAGMA foreign_keys = OFF")
+    try:
+        for table, column in identity_core._private_id_fk_updates():
+            try:
+                conn.execute(
+                    f"DELETE FROM [{table}] WHERE [{column}] = ?",
+                    (pid,),
+                )
+            except sqlite3.OperationalError:
+                pass
+
+        for table in ("family_profile", "user_education", "user_work", "user_family_setup"):
+            try:
+                conn.execute(
+                    f"DELETE FROM [{table}] WHERE user_private_id = ?",
+                    (pid,),
+                )
+            except sqlite3.OperationalError:
+                pass
+
+        for table in ("registration_donations", "user_accounts"):
+            try:
+                conn.execute(
+                    f"DELETE FROM [{table}] WHERE user_private_id = ?",
+                    (pid,),
+                )
+            except sqlite3.OperationalError:
+                pass
+
+        try:
+            conn.execute(
+                "DELETE FROM wallets WHERE owner_type = 'user' AND owner_id = ?",
+                (pid,),
+            )
+        except sqlite3.OperationalError:
+            pass
+
+        conn.execute("DELETE FROM users WHERE id = ?", (int(row["id"]),))
+    finally:
+        if conn.execute("PRAGMA foreign_keys").fetchone()[0]:
+            conn.execute("PRAGMA foreign_keys = ON")
+    return True
+
+
+def _ensure_schema(conn: sqlite3.Connection) -> None:
+    from app import migrate_users_app_extensions
+
+    migrate_users_app_extensions(conn)
+    import qoin_core
+
+    qoin_core.migrate_qoin_economy_tables(conn)
+
+
+def run_reset() -> dict[str, Any]:
+    """
+    Delete every admin account and create a fresh HU-014918240 admin.
+    """
+    out: dict[str, Any] = {
+        "ok": False,
+        "message": "",
+        "deleted_admins": [],
+        "admin_private_id": ADMIN_PRIVATE_ID,
+        "admin_public_id": ADMIN_PUBLIC_ID,
+        "admin_email": ADMIN_EMAIL,
+        "admin_phone": ADMIN_PHONE,
+        "admin_password": ADMIN_PASSWORD,
+        "login_digits": ADMIN_PRIVATE_ID[len("HU-"):],
+        "login_verified": False,
+    }
+    log_lines: list[str] = []
+
+    try:
+        conn, db_path = _connect_db(for_reset=True)
+        log_lines.append(f"Database: {db_path}")
+        _ensure_schema(conn)
+
+        admins = conn.execute(
+            """
+            SELECT id, private_id, email FROM users
+            WHERE COALESCE(is_admin, 0) = 1
+            ORDER BY id
+            """
+        ).fetchall()
+        log_lines.append(f"Found {len(admins)} admin account(s)")
+        for row in admins:
+            log_lines.append(
+                f"  id={row['id']} private_id={row['private_id']} email={row['email']}"
+            )
+
+        targets_to_remove: list[str] = []
+        for row in admins:
+            targets_to_remove.append(str(row["private_id"]))
+        for pid in (ADMIN_PRIVATE_ID, LEGACY_ADMIN_PRIVATE_ID):
+            if pid not in targets_to_remove:
+                dup = conn.execute(
+                    "SELECT 1 FROM users WHERE private_id = ? COLLATE NOCASE",
+                    (pid,),
+                ).fetchone()
+                if dup:
+                    targets_to_remove.append(pid)
+
+        deleted: list[str] = []
+        for pid in targets_to_remove:
+            if _remove_user_hard(conn, pid):
+                deleted.append(pid)
+                log_lines.append(f"Deleted: {pid}")
+        out["deleted_admins"] = deleted
+        conn.commit()
+
+        import admin_bootstrap
+
+        log_lines.append("Creating fresh admin via admin_bootstrap…")
+        result = admin_bootstrap.create_admin_user(
+            conn,
+            email=ADMIN_EMAIL,
+            phone=ADMIN_PHONE,
+            first_name="Admin",
+            last_name="User",
+            password=ADMIN_PASSWORD,
+            private_id=ADMIN_PRIVATE_ID,
+            public_id=ADMIN_PUBLIC_ID,
+            reset_password=True,
+            migrate=False,
+        )
+        conn.commit()
+        log_lines.append(f"Admin {result.get('action')}: {result.get('private_id')}")
+
+        out["login_verified"] = verify_admin_password(conn)
+        out["diagnosis"] = diagnose_admin(conn)
+        out["log"] = "\n".join(log_lines)
+
+        if out["login_verified"] and out["diagnosis"].get("target"):
+            out["ok"] = True
+            out["message"] = "Admin reset complete and login verified."
+        else:
+            out["message"] = "Admin reset finished but login verification failed."
+        conn.close()
+    except Exception as exc:
+        out["message"] = str(exc)
+        out["log"] = "\n".join(log_lines) + f"\nERROR: {exc}"
+        out["ok"] = False
+
+    return out
+
+
+def format_reset_log(status: dict[str, Any]) -> str:
+    lines = [
+        "=" * 50,
+        "Admin reset",
+        "=" * 50,
+    ]
+    if status.get("log"):
+        lines.append(str(status["log"]))
+    lines.extend(
+        [
+            f"deleted: {status.get('deleted_admins')}",
+            f"ok: {status.get('ok')}",
+            f"message: {status.get('message')}",
+            f"admin_private_id: {status.get('admin_private_id')}",
+            f"login_digits: {status.get('login_digits')}",
+            f"password: {ADMIN_PASSWORD}",
+            f"login_verified: {status.get('login_verified')}",
+            "=" * 50,
+        ]
+    )
+    return "\n".join(lines)
+
+
 def run_repair(*, reset_password: bool = True, force: bool = True) -> dict[str, Any]:
     """Run forced admin migration and verify password."""
     out: dict[str, Any] = {
