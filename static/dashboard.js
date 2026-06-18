@@ -8866,8 +8866,9 @@
         rows.forEach(function (d) {
           var li = document.createElement("li");
           li.className = "mb-1";
+          var rupees = d.amount_rupees != null ? d.amount_rupees : d.amount;
           li.textContent =
-            "₹" + d.amount + " — " + (d.status || "") + " — " + (d.created_at || "");
+            "₹" + rupees + " — " + (d.status || "") + " — " + (d.created_at || "");
           listEl.appendChild(li);
         });
       })
@@ -8922,15 +8923,21 @@
   }
 
   function loadAdminDonations() {
-    var listEl = document.getElementById("qb-admin-donations-list");
+    var tbody = document.getElementById("qb-admin-donations-tbody");
     var totalEl = document.getElementById("qb-admin-donation-total");
+    var countEl = document.getElementById("qb-admin-donation-count");
+    var pendingEl = document.getElementById("qb-admin-donation-pending");
+    var confirmedEl = document.getElementById("qb-admin-donation-confirmed");
     var emptyEl = document.getElementById("qb-admin-donations-empty");
-    if (!listEl) return;
+    if (!tbody) return;
     fetch("/api/donation/admin/list", { credentials: "same-origin", headers: { Accept: "application/json" } })
       .then(function (r) { return r.json(); })
       .then(function (b) {
-        if (totalEl) totalEl.textContent = String(b.total_confirmed || 0);
-        listEl.innerHTML = "";
+        if (totalEl) totalEl.textContent = String(b.total_amount || b.total_confirmed || 0);
+        if (countEl) countEl.textContent = String(b.total_donations || 0);
+        if (pendingEl) pendingEl.textContent = String(b.pending_count || 0);
+        if (confirmedEl) confirmedEl.textContent = String(b.confirmed_count || 0);
+        tbody.innerHTML = "";
         var rows = b.donations || [];
         if (!rows.length) {
           if (emptyEl) emptyEl.hidden = false;
@@ -8938,43 +8945,50 @@
         }
         if (emptyEl) emptyEl.hidden = true;
         rows.forEach(function (d) {
-          var li = document.createElement("li");
-          li.className = "mb-2 p-2 border border-secondary rounded";
-          var name = ((d.first_name || "") + " " + (d.last_name || "")).trim();
-          li.innerHTML =
-            "<strong>" + name + "</strong> (" + (d.user_public_id || "") + ")<br>" +
-            "₹" + d.amount + " — " + (d.payment_method || "") + " — " + (d.status || "") +
-            "<br><small>" + (d.created_at || "") + "</small>";
+          var tr = document.createElement("tr");
+          var name = d.user_name || ((d.first_name || "") + " " + (d.last_name || "")).trim();
+          var rupees = d.amount_rupees != null ? d.amount_rupees : d.amount;
+          var statusBadge = String(d.status || "");
+          var actions = "";
           if (d.status === "pending") {
-            li.innerHTML +=
-              "<br><button type='button' class='qb-btn qb-btn-primary btn-sm mt-1 me-1' data-don-confirm='" +
+            actions =
+              "<button type='button' class='qb-btn qb-btn-primary btn-sm me-1' data-don-confirm='" +
               d.id + "'>Confirm</button>" +
-              "<button type='button' class='qb-btn qb-btn-danger btn-sm mt-1' data-don-reject='" +
+              "<button type='button' class='qb-btn qb-btn-danger btn-sm' data-don-reject='" +
               d.id + "'>Reject</button>";
+          } else {
+            actions = "<span class='text-muted'>—</span>";
           }
-          listEl.appendChild(li);
+          if (d.webhook_verified) {
+            statusBadge += " (webhook)";
+          }
+          tr.innerHTML =
+            "<td>" + name + "</td>" +
+            "<td class='font-monospace'>" + (d.user_public_id || "") + "</td>" +
+            "<td>₹" + rupees + "</td>" +
+            "<td>" + (d.payment_method || "") + "</td>" +
+            "<td>" + statusBadge + "</td>" +
+            "<td>" + (d.created_at || "") + "</td>" +
+            "<td>" + actions + "</td>";
+          tbody.appendChild(tr);
         });
-        listEl.querySelectorAll("[data-don-confirm]").forEach(function (btn) {
+        tbody.querySelectorAll("[data-don-confirm]").forEach(function (btn) {
           btn.addEventListener("click", function () {
-            fetch("/api/donation/confirm", {
+            fetch("/api/admin/donation/confirm/" + btn.getAttribute("data-don-confirm"), {
               method: "POST",
               credentials: "same-origin",
-              headers: { "Content-Type": "application/json", Accept: "application/json" },
-              body: JSON.stringify({ donation_id: btn.getAttribute("data-don-confirm") }),
+              headers: { Accept: "application/json" },
             }).then(function () { loadAdminDonations(); });
           });
         });
-        listEl.querySelectorAll("[data-don-reject]").forEach(function (btn) {
+        tbody.querySelectorAll("[data-don-reject]").forEach(function (btn) {
           btn.addEventListener("click", function () {
             var reason = prompt("Rejection reason (optional):") || "";
-            fetch("/api/donation/reject", {
+            fetch("/api/admin/donation/reject/" + btn.getAttribute("data-don-reject"), {
               method: "POST",
               credentials: "same-origin",
               headers: { "Content-Type": "application/json", Accept: "application/json" },
-              body: JSON.stringify({
-                donation_id: btn.getAttribute("data-don-reject"),
-                reason: reason,
-              }),
+              body: JSON.stringify({ reason: reason }),
             }).then(function () { loadAdminDonations(); });
           });
         });
@@ -8983,7 +8997,7 @@
   }
   var adminDonRefresh = document.getElementById("qb-admin-donations-refresh");
   if (adminDonRefresh) adminDonRefresh.addEventListener("click", loadAdminDonations);
-  if (document.getElementById("qb-admin-donations-list")) loadAdminDonations();
+  if (document.getElementById("qb-admin-donations-tbody")) loadAdminDonations();
 
   function loadAdminEditRequests() {
     var listEl = document.getElementById("qb-admin-edit-list");

@@ -1,0 +1,11 @@
+{
+  "name": "qumanity",
+  "private": true,
+  "description": "Qumanity — Railway deploy helpers",
+  "scripts": {
+    "railway:setup": "bash scripts/setup_railway_env.sh",
+    "railway:setup:vpa": "bash scripts/setup_railway_env.sh --vpa-only",
+    "railway:setup:python": "python3 scripts/setup_railway_env.py",
+    "railway:set-vpa": "railway variables set DONATION_UPI_VPA=success@razorpay && railway variables set RAZORPAY_UPI_VPA=success@razorpay && railway redeploy -y"
+  }
+}
