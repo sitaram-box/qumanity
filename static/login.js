@@ -1,13 +1,13 @@
-(function () {
+document.addEventListener("DOMContentLoaded", function () {
   "use strict";
 
   var form = document.getElementById("login-form");
   var hidden = document.getElementById("private_id");
-  var digits = document.querySelectorAll(".qb-private-id-digit");
-  if (!form || !hidden || !digits.length) return;
+  var boxes = document.querySelectorAll(".otp-box");
+  if (!form || !hidden || !boxes.length) return;
 
   function digitsValue() {
-    return Array.prototype.map.call(digits, function (el) {
+    return Array.prototype.map.call(boxes, function (el) {
       return (el.value || "").replace(/\D/g, "");
     }).join("");
   }
@@ -16,49 +16,57 @@
     hidden.value = digitsValue();
   }
 
-  function focusDigit(index) {
-    if (index >= 0 && index < digits.length) {
-      digits[index].focus();
-      digits[index].select();
+  function focusBox(index) {
+    if (index >= 0 && index < boxes.length) {
+      boxes[index].focus();
+      boxes[index].select();
     }
   }
 
-  digits.forEach(function (input, index) {
-    input.addEventListener("input", function () {
-      var val = (input.value || "").replace(/\D/g, "");
-      if (val.length > 1) {
-        val = val.charAt(0);
+  boxes.forEach(function (box, index) {
+    box.addEventListener("keydown", function (e) {
+      if (e.key.length === 1 && !/\d/.test(e.key)) {
+        e.preventDefault();
+        return;
       }
-      input.value = val;
-      syncHidden();
-      if (val && index < digits.length - 1) {
-        focusDigit(index + 1);
-      }
-    });
-
-    input.addEventListener("keydown", function (e) {
-      if (e.key === "Backspace" && !input.value && index > 0) {
-        focusDigit(index - 1);
+      if (e.key === "Backspace" && !box.value && index > 0) {
+        focusBox(index - 1);
       }
       if (e.key === "ArrowLeft" && index > 0) {
         e.preventDefault();
-        focusDigit(index - 1);
+        focusBox(index - 1);
       }
-      if (e.key === "ArrowRight" && index < digits.length - 1) {
+      if (e.key === "ArrowRight" && index < boxes.length - 1) {
         e.preventDefault();
-        focusDigit(index + 1);
+        focusBox(index + 1);
       }
     });
 
-    input.addEventListener("paste", function (e) {
+    box.addEventListener("input", function () {
+      var val = (box.value || "").replace(/\D/g, "");
+      box.value = val.length > 1 ? val.charAt(0) : val;
+      syncHidden();
+      if (box.value && index < boxes.length - 1) {
+        focusBox(index + 1);
+      }
+    });
+
+    box.addEventListener("paste", function (e) {
       e.preventDefault();
       var text = (e.clipboardData || window.clipboardData).getData("text") || "";
-      var nums = text.replace(/\D/g, "").slice(0, 9);
-      for (var i = 0; i < digits.length; i++) {
-        digits[i].value = nums.charAt(i) || "";
+      var digits = text.replace(/\D/g, "").slice(0, 9);
+      for (var i = 0; i < boxes.length; i++) {
+        boxes[i].value = digits.charAt(i) || "";
       }
       syncHidden();
-      focusDigit(Math.min(nums.length, digits.length - 1));
+      var focusAt = Math.min(digits.length, boxes.length - 1);
+      for (var j = 0; j < boxes.length; j++) {
+        if (!boxes[j].value) {
+          focusAt = j;
+          break;
+        }
+      }
+      focusBox(focusAt);
     });
   });
 
@@ -68,11 +76,11 @@
     if (!/^\d{9}$/.test(value)) {
       e.preventDefault();
       if (window.qbToast) {
-        window.qbToast("Enter all 9 digits of your Private ID.", "error");
+        window.qbToast("Please enter exactly 9 digits for your Private ID.", "error");
       }
-      focusDigit(0);
+      focusBox(0);
     }
   });
 
-  focusDigit(0);
-})();
+  focusBox(0);
+});

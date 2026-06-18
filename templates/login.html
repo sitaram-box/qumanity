@@ -6,13 +6,6 @@
 <div class="login-container">
   <div class="login-card">
     <div class="login-header">
-      <img
-        src="{{ url_for('static', filename='images/logo-qumanity.png') }}"
-        alt="Qumanity"
-        class="login-logo"
-        width="80"
-        height="80"
-      />
       <h1>Login to Qumanity</h1>
     </div>
 
@@ -23,13 +16,13 @@
     <form method="post" action="{{ url_for('login') }}" class="login-form" id="login-form">
       <div class="qb-form-group">
         <label for="private-id-digit-0">Private ID</label>
-        <div class="qb-private-id-field">
-          <span class="qb-private-id-prefix" aria-hidden="true">HU-</span>
-          <div class="qb-private-id-otp" id="private-id-otp">
+        <div class="otp-wrapper">
+          <span class="id-prefix" aria-hidden="true">HU-</span>
+          <div class="otp-container" id="private-id-otp">
             {% for i in range(9) %}
             <input
               type="text"
-              class="qb-private-id-digit"
+              class="otp-box"
               id="private-id-digit-{{ i }}"
               maxlength="1"
               inputmode="numeric"
@@ -37,6 +30,7 @@
               autocomplete="off"
               aria-label="Private ID digit {{ i + 1 }}"
               data-digit-index="{{ i }}"
+              {% if i == 0 %}autofocus{% endif %}
             />
             {% endfor %}
           </div>

@@ -14631,9 +14631,9 @@ def _canonical_private_id_for_login(raw: str) -> str | None:
     if not s or "@" in s:
         return None
     if s.upper().startswith(HUMAN_PRIVATE_ID_PREFIX):
-        digits = s[len(HUMAN_PRIVATE_ID_PREFIX):].strip()
+        digits = re.sub(r"\D", "", s[len(HUMAN_PRIVATE_ID_PREFIX):])
     else:
-        digits = s
+        digits = re.sub(r"\D", "", s)
     if not PRIVATE_ID_LOGIN_RE.match(digits):
         return None
     return format_human_private_id(digits)
@@ -14693,12 +14693,18 @@ def login():
     if request.method == "GET":
         return render_template("login.html", error=None)
 
-    raw_pid = (request.form.get("private_id") or "").strip()
+    raw_pid = re.sub(r"\D", "", (request.form.get("private_id") or "").strip())
     password = request.form.get("password") or ""
     if not raw_pid:
         return render_template(
             "login.html",
             error="Enter your 9-digit Private ID.",
+        )
+
+    if len(raw_pid) != 9:
+        return render_template(
+            "login.html",
+            error="Please enter exactly 9 digits for your Private ID.",
         )
 
     if not _canonical_private_id_for_login(raw_pid):
@@ -14728,11 +14734,11 @@ def login():
 def api_login():
     """JSON login — Private ID (HU- + 9 digits) and password only."""
     data = request.get_json(silent=True) or {}
-    raw_pid = str(data.get("private_id") or "").strip()
+    raw_pid = re.sub(r"\D", "", str(data.get("private_id") or "").strip())
     password = str(data.get("password") or "")
     conn = get_db()
 
-    if not _canonical_private_id_for_login(raw_pid):
+    if len(raw_pid) != 9 or not _canonical_private_id_for_login(raw_pid):
         return jsonify({"error": "Enter a valid 9-digit Private ID"}), 400
 
     row = _authenticate_user_login(conn, raw_pid, password)
