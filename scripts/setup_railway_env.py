@@ -7,10 +7,21 @@ import argparse
 import os
 import subprocess
 import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+import config
 
 TEST_VPA = "success@razorpay"
-REGISTER_URL = "https://web-production-5649cf.up.railway.app/register"
-TEST_URI_URL = "https://web-production-5649cf.up.railway.app/api/test-upi-uri"
+REGISTER_URL = f"{config.APP_URL}/register"
+TEST_URI_URL = f"{config.APP_URL}/api/test-upi-uri"
+ALLOWED_HOSTS = (
+    "qumanity.in,www.qumanity.in,web-production-5649cf.up.railway.app,"
+    "localhost,127.0.0.1"
+)
 
 
 def run(cmd: str, *, check: bool = False) -> subprocess.CompletedProcess[str]:
@@ -76,6 +87,12 @@ def main() -> None:
     if run("railway whoami").returncode != 0:
         print("Logging in to Railway...")
         os.system("railway login")
+
+    print("Setting domain / URL variables...")
+    railway_set("APP_URL", "https://qumanity.in")
+    railway_set("PUBLIC_BASE_URL", "https://qumanity.in")
+    railway_set("DOMAIN", "qumanity.in")
+    railway_set("ALLOWED_HOSTS", ALLOWED_HOSTS)
 
     print(f"Setting test UPI VPA: {TEST_VPA}")
     railway_set("DONATION_UPI_VPA", TEST_VPA)

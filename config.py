@@ -54,6 +54,17 @@ def _get_bool(name: str, default: bool = False) -> bool:
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _first_env(*names: str) -> str:
+    for name in names:
+        raw = os.environ.get(name, "")
+        value = raw.strip()
+        while len(value) >= 2 and value[0] == value[-1] and value[0] in ('"', "'"):
+            value = value[1:-1].strip()
+        if value:
+            return value
+    return ""
+
+
 # ── Environment ──────────────────────────────────────────────────────────────
 FLASK_ENV: str = os.environ.get("FLASK_ENV", "development").strip().lower()
 IS_PRODUCTION: bool = FLASK_ENV == "production"
@@ -75,8 +86,39 @@ QOIN_WALLET_ENCRYPTION_KEY: str = os.environ.get(
 # ── Database ─────────────────────────────────────────────────────────────────
 DATABASE_URL: str | None = os.environ.get("DATABASE_URL")
 
-# ── Public site URL (referral links, QR codes, Open Graph) ───────────────────
-PUBLIC_BASE_URL: str = os.environ.get("PUBLIC_BASE_URL", "").strip().rstrip("/")
+# ── Public site URL (referral links, QR codes, Open Graph, redirects) ────────
+DEFAULT_PUBLIC_URL: str = "https://qumanity.in"
+DOMAIN: str = _first_env("DOMAIN") or "qumanity.in"
+
+
+def _resolve_public_url() -> str:
+    """Canonical HTTPS URL from APP_URL, PUBLIC_BASE_URL, or BASE_URL."""
+    for key in ("APP_URL", "PUBLIC_BASE_URL", "BASE_URL"):
+        raw = os.environ.get(key, "").strip().rstrip("/")
+        if raw:
+            return raw
+    if IS_PRODUCTION:
+        return DEFAULT_PUBLIC_URL
+    port = os.environ.get("FLASK_RUN_PORT", os.environ.get("PORT", "5001"))
+    return f"http://localhost:{port}"
+
+
+APP_URL: str = _resolve_public_url()
+PUBLIC_BASE_URL: str = APP_URL
+
+
+def allowed_hosts() -> list[str]:
+    """Hostnames permitted in production (comma-separated ALLOWED_HOSTS env)."""
+    raw = _first_env("ALLOWED_HOSTS")
+    if raw:
+        return [h.strip().lower() for h in raw.split(",") if h.strip()]
+    return [
+        "qumanity.in",
+        "www.qumanity.in",
+        "web-production-5649cf.up.railway.app",
+        "localhost",
+        "127.0.0.1",
+    ]
 
 # ── Razorpay (online donations) ──────────────────────────────────────────────
 RAZORPAY_KEY_ID: str = os.environ.get("RAZORPAY_KEY_ID", "").strip()
@@ -84,17 +126,6 @@ RAZORPAY_KEY_SECRET: str = os.environ.get("RAZORPAY_KEY_SECRET", "").strip()
 RAZORPAY_WEBHOOK_SECRET: str = os.environ.get("RAZORPAY_WEBHOOK_SECRET", "").strip()
 # Display on registration QR screen (merchant UPI VPA from Razorpay dashboard).
 # Also accepts RAZORPAY_UPI_VPA / UPI_VPA / MERCHANT_UPI_VPA for deploy flexibility.
-def _first_env(*names: str) -> str:
-    for name in names:
-        raw = os.environ.get(name, "")
-        value = raw.strip()
-        while len(value) >= 2 and value[0] == value[-1] and value[0] in ('"', "'"):
-            value = value[1:-1].strip()
-        if value:
-            return value
-    return ""
-
-
 DONATION_UPI_VPA: str = _first_env(
     "DONATION_UPI_VPA",
     "RAZORPAY_UPI_VPA",
@@ -160,6 +191,11 @@ def validate() -> list[str]:
         warnings.append(
             "DATABASE_URL points at SQLite in production. Consider PostgreSQL "
             "for concurrent writes and durability."
+        )
+    if IS_PRODUCTION and not PUBLIC_BASE_URL.startswith("https://"):
+        warnings.append(
+            "APP_URL / PUBLIC_BASE_URL should use HTTPS in production "
+            f"(current: {PUBLIC_BASE_URL})."
         )
     if RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET and not DONATION_UPI_VPA:
         warnings.append(

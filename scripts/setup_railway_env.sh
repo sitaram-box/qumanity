@@ -9,6 +9,8 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 TEST_VPA="success@razorpay"
+APP_URL="${APP_URL:-https://qumanity.in}"
+ALLOWED_HOSTS="${ALLOWED_HOSTS:-qumanity.in,www.qumanity.in,web-production-5649cf.up.railway.app,localhost,127.0.0.1}"
 VPA_ONLY=false
 
 if [[ "${1:-}" == "--vpa-only" ]]; then
@@ -77,6 +79,13 @@ if ! railway whoami 2>/dev/null; then
 fi
 
 echo ""
+echo "Setting domain / URL variables..."
+railway_set "APP_URL" "https://qumanity.in"
+railway_set "PUBLIC_BASE_URL" "https://qumanity.in"
+railway_set "DOMAIN" "qumanity.in"
+railway_set "ALLOWED_HOSTS" "$ALLOWED_HOSTS"
+
+echo ""
 echo "Setting Razorpay test UPI VPA: ${TEST_VPA}"
 railway_set "DONATION_UPI_VPA" "$TEST_VPA"
 railway_set "RAZORPAY_UPI_VPA" "$TEST_VPA"
@@ -85,7 +94,7 @@ if [[ "$VPA_ONLY" == true ]]; then
   railway_restart
   echo ""
   echo "Done. Test registration:"
-  echo "  https://web-production-5649cf.up.railway.app/register"
+  echo "  ${APP_URL}/register"
   exit 0
 fi
 
@@ -126,5 +135,5 @@ railway_restart
 echo ""
 echo "Setup complete."
 echo "  Test UPI VPA: ${TEST_VPA} (Razorpay test mode — auto-confirms)"
-echo "  Registration: https://web-production-5649cf.up.railway.app/register"
-echo "  Verify:       https://web-production-5649cf.up.railway.app/api/test-upi-uri"
+echo "  Registration: ${APP_URL}/register"
+echo "  Verify:       ${APP_URL}/api/test-upi-uri"

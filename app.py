@@ -525,6 +525,13 @@ def build_geo_public_url(kind: str, gid: str) -> str:
 
 app = Flask(__name__)
 
+try:
+    from werkzeug.middleware.proxy_fix import ProxyFix
+
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+except ImportError:
+    pass
+
 _migration_startup_status: dict[str, Any] = {
     "running": False,
     "ok": False,
@@ -814,6 +821,24 @@ def mask_private_id_filter(private_id: str | None) -> str:
 def translate_filter(key: str, language_code: str | None = None) -> str:
     lang = (language_code or getattr(g, "ui_language", None) or "en").strip().lower()
     return get_text(key, lang)
+
+
+@app.before_request
+def _check_allowed_host() -> None:
+    """Reject unknown host headers in production (custom domain + Railway fallback)."""
+    if not config.IS_PRODUCTION:
+        return
+    if request.path in ("/health", "/favicon.ico"):
+        return
+    if request.endpoint and str(request.endpoint).startswith("static"):
+        return
+    host = (request.host or "").split(":")[0].strip().lower()
+    if not host:
+        return
+    allowed = config.allowed_hosts()
+    if host not in allowed:
+        app.logger.warning("Blocked request for unknown host: %s", host)
+        abort(400, description="Invalid host")
 
 
 @app.before_request
@@ -8928,13 +8953,10 @@ def api_qoin_karma_types():
 def _public_base_url() -> str:
     if config.PUBLIC_BASE_URL:
         return config.PUBLIC_BASE_URL
-    env_url = (os.environ.get("BASE_URL") or "").strip()
-    if env_url:
-        return env_url.rstrip("/")
     try:
         return request.url_root.rstrip("/")
     except RuntimeError:
-        return "https://qumanity.in"
+        return config.DEFAULT_PUBLIC_URL
 
 
 def _razorpay_client():
