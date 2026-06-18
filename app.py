@@ -14363,7 +14363,73 @@ def admin_panel():
         quantum_punch_village_id=election_scheduler.TARGET_VILLAGE_ID,
         show_upgrade_panel=show_upgrade_panel,
         is_mentor=is_mentor,
+        is_admin=is_admin,
     )
+
+
+def _redirect_admin_panel_section(section_id: str):
+    """Redirect friendly /admin/* URLs to admin panel anchor sections."""
+    return redirect(url_for("admin_panel") + f"#{section_id}")
+
+
+@app.route("/admin/upgrade-users")
+@admin_page_required
+def admin_upgrade_users():
+    return _redirect_admin_panel_section("qb-admin-upgrade-users")
+
+
+@app.route("/admin/mark-deceased")
+@admin_page_required
+def admin_mark_deceased():
+    return _redirect_admin_panel_section("qb-mentor-mark-deceased")
+
+
+@app.route("/admin/varna-system")
+@admin_page_required
+def admin_varna_system():
+    return _redirect_admin_panel_section("qb-admin-varna-section")
+
+
+@app.route("/admin/family-removal")
+@admin_page_required
+def admin_family_removal():
+    return _redirect_admin_panel_section("qb-private-admin-tools")
+
+
+@app.route("/admin/volunteer-applications")
+@admin_page_required
+def admin_volunteer_applications():
+    return _redirect_admin_panel_section("qb-admin-employment-requests")
+
+
+@app.route("/admin/karma-economy")
+@admin_page_required
+def admin_karma_economy():
+    return _redirect_admin_panel_section("qb-admin-karma-economy")
+
+
+@app.route("/admin/donation-reports")
+@admin_page_required
+def admin_donation_reports():
+    return _redirect_admin_panel_section("qb-admin-donation-reports")
+
+
+@app.route("/admin/donation-management")
+@admin_page_required
+def admin_donation_management():
+    return _redirect_admin_panel_section("qb-admin-donation-mgmt")
+
+
+@app.route("/admin/edit-requests")
+@admin_page_required
+def admin_edit_requests():
+    return _redirect_admin_panel_section("qb-admin-edit-requests")
+
+
+@app.route("/admin/manage-elections")
+@admin_page_required
+def admin_manage_elections():
+    return _redirect_admin_panel_section("qb-private-manage-elections")
 
 
 @app.route("/admin/verifications")
