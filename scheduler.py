@@ -25,6 +25,11 @@ except ImportError:
     identity_core = None  # type: ignore
 
 try:
+    import deceased_core
+except ImportError:
+    deceased_core = None  # type: ignore
+
+try:
     import pytz
 
     IST = pytz.timezone("Asia/Kolkata")

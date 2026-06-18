@@ -2596,6 +2596,23 @@ def load_user(conn: sqlite3.Connection, pk: int) -> sqlite3.Row | None:
     return cur.fetchone()
 
 
+def _row_get(
+    row: sqlite3.Row | dict[str, Any] | None,
+    key: str,
+    default: Any = None,
+) -> Any:
+    """Read a column from sqlite3.Row or dict without AttributeError."""
+    if row is None:
+        return default
+    if isinstance(row, dict):
+        return row.get(key, default)
+    try:
+        val = row[key]
+        return default if val is None else val
+    except (KeyError, IndexError, TypeError):
+        return default
+
+
 def _user_text_country_is_india(user_row: sqlite3.Row) -> bool:
     try:
         return str(user_row["country"] or "").strip().lower() == "india"
@@ -8024,7 +8041,7 @@ def api_family_link_account():
     fn = (
         f"{str(g.current_user['first_name'] or '').strip()} "
         f"{str(g.current_user['last_name'] or '').strip()}"
-    ).strip() or str(g.current_user.get("public_id") or "A user")
+    ).strip() or str(_row_get(g.current_user, "public_id", "A user") or "A user")
     subj = "Family account link request"
     body_txt = (
         f"{fn} wants to link your account ({str(tgt['public_id'] or '')}) "
@@ -8199,7 +8216,7 @@ def api_family_link_reject():
     acc_nm = (
         f"{str(g.current_user['first_name'] or '').strip()} "
         f"{str(g.current_user['last_name'] or '').strip()}"
-    ).strip() or str(g.current_user.get("public_id") or "User")
+    ).strip() or str(_row_get(g.current_user, "public_id", "User") or "User")
     body = f"{acc_nm} declined your family account link request."
     if msg:
         body += f"\n\nThey wrote:\n{msg}"
@@ -13255,7 +13272,7 @@ def generate_unique_private_id(conn: sqlite3.Connection) -> str:
 
 
 def _user_account_status(user: dict[str, Any] | sqlite3.Row) -> str:
-    return str(user.get("account_status") or "active").strip().lower()
+    return str(_row_get(user, "account_status", "active") or "active").strip().lower()
 
 
 def _account_has_limited_access(user: dict[str, Any] | sqlite3.Row) -> bool:
@@ -13653,7 +13670,7 @@ def api_user_dashboard_status():
     user = g.current_user
     status = _user_account_status(user)
     txn_reference = ""
-    failure_reason = str(user.get("verification_failed_reason") or "").strip()
+    failure_reason = str(_row_get(user, "verification_failed_reason", "") or "").strip()
     if status in ("pending_verification", "verification_failed"):
         row = conn.execute(
             """
