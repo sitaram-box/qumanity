@@ -4,7 +4,7 @@ document.addEventListener("DOMContentLoaded", function () {
   var form = document.getElementById("login-form");
   var hidden = document.getElementById("private_id");
   var boxes = document.querySelectorAll(".otp-box");
-  if (!form || !hidden || !boxes.length) return;
+  if (!form || !boxes.length) return;
 
   function digitsValue() {
     return Array.prototype.map.call(boxes, function (el) {
@@ -13,7 +13,9 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function syncHidden() {
-    hidden.value = digitsValue();
+    if (hidden) {
+      hidden.value = digitsValue();
+    }
   }
 
   function focusBox(index) {
@@ -22,6 +24,11 @@ document.addEventListener("DOMContentLoaded", function () {
       boxes[index].select();
     }
   }
+
+  boxes.forEach(function (box) {
+    box.value = "";
+  });
+  syncHidden();
 
   boxes.forEach(function (box, index) {
     box.addEventListener("keydown", function (e) {
@@ -72,7 +79,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
   form.addEventListener("submit", function (e) {
     syncHidden();
-    var value = hidden.value;
+    var value = digitsValue();
     if (!/^\d{9}$/.test(value)) {
       e.preventDefault();
       if (window.qbToast) {

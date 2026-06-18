@@ -193,24 +193,41 @@ p, li, label, td, th, span, div {
   font-size: 1.75rem;
   font-weight: 900;
   letter-spacing: 0.12em;
-  color: var(--qb-sita-brand);
+  color: var(--qb-topbar-accent);
 }
 
 .qb-foundation-logo {
   font-size: 0.5rem;
+  font-weight: 300;
   letter-spacing: 0.2em;
-  color: var(--qb-topbar-muted);
+  color: var(--qb-topbar-text);
   text-transform: uppercase;
   margin-top: 2px;
 }
 
+.qb-logo-divider {
+  width: 2px;
+  height: 2rem;
+  background: var(--qb-border);
+  flex-shrink: 0;
+}
+
 .qb-qumanity-logo {
   font-size: 1.25rem;
-  font-weight: 600;
-  color: var(--qb-topbar-text);
-  padding-left: 15px;
-  border-left: 2px solid var(--qb-border);
   line-height: 1.2;
+  display: flex;
+  align-items: baseline;
+  gap: 0;
+}
+
+.qb-qu {
+  color: var(--qb-topbar-accent);
+  font-weight: 700;
+}
+
+.qb-manity {
+  color: var(--qb-topbar-text);
+  font-weight: 300;
 }
 
 .qb-brand-mark {
@@ -2045,13 +2062,14 @@ body {
 }
 
 .login-card {
-  max-width: 450px;
+  max-width: 480px;
   width: 100%;
   background: var(--qb-surface);
   border-radius: 24px;
   padding: 40px;
   border: 1px solid var(--qb-border);
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
 }
 
 .login-header {
@@ -2093,40 +2111,45 @@ body {
 .otp-wrapper {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
+  gap: 6px;
   margin: 10px 0;
   flex-wrap: nowrap;
+  padding: 5px 0;
+  width: 100%;
+  max-width: 100%;
 }
 
 .otp-container {
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   flex-wrap: nowrap;
+  flex: 1;
+  min-width: 0;
+  justify-content: flex-start;
 }
 
 .id-prefix {
-  font-size: 1.25rem;
+  font-size: 1.125rem;
   font-weight: 700;
   color: var(--qb-text);
-  margin-right: 4px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  min-width: 2rem;
   flex-shrink: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
 .otp-box {
-  width: 40px;
-  height: 50px;
-  min-width: 40px;
-  flex: 0 0 40px;
+  width: 32px;
+  height: 42px;
+  min-width: 32px;
+  flex: 0 0 32px;
   text-align: center;
-  font-size: 1.25rem;
+  font-size: 1rem;
   font-weight: 700;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   border: 2px solid var(--qb-border);
-  border-radius: 8px;
+  border-radius: 6px;
   background: var(--qb-surface-elevated);
   color: var(--qb-text);
   padding: 0;
@@ -2148,19 +2171,20 @@ body {
 
 @media (max-width: 420px) {
   .otp-box {
-    width: 32px;
-    height: 44px;
-    min-width: 32px;
-    flex-basis: 32px;
-    font-size: 1rem;
+    width: 28px;
+    height: 38px;
+    min-width: 28px;
+    flex-basis: 28px;
+    font-size: 0.9rem;
   }
 
   .otp-container {
-    gap: 4px;
+    gap: 3px;
   }
 
   .id-prefix {
-    font-size: 1rem;
+    font-size: 0.95rem;
+    min-width: 1.75rem;
   }
 }
 

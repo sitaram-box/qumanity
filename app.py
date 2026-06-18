@@ -613,6 +613,25 @@ def translate_filter(key: str, language_code: str | None = None) -> str:
 
 
 @app.before_request
+def _prune_invalid_session() -> None:
+    """Drop stale session cookies when the user row no longer exists."""
+    if request.endpoint and str(request.endpoint).startswith("static"):
+        return
+    if request.path in ("/health", "/setup", "/logout"):
+        return
+    pk = session.get("user_pk")
+    if not pk:
+        return
+    try:
+        conn = get_db()
+        row = conn.execute("SELECT 1 FROM users WHERE id = ?", (int(pk),)).fetchone()
+        if not row:
+            session.clear()
+    except Exception:
+        session.clear()
+
+
+@app.before_request
 def _bind_ui_language() -> None:
     if request.path == "/health":
         g.ui_language = "en"
@@ -660,6 +679,7 @@ def inject_language_context() -> dict[str, Any]:
         "preferred_language": lang,
         "current_language": lang,
         "language_options": options,
+        "is_logged_in": bool(session.get("user_pk")),
     }
 
 
@@ -3371,6 +3391,8 @@ def _before_request() -> None:
     if request.path == "/setup":
         return
     if request.path == "/webhook/donation":
+        return
+    if request.path == "/logout":
         return
     # Public diagnostic — no DB so /debug/check works even if migrations fail.
     if request.path == "/debug/check":
@@ -14691,14 +14713,29 @@ def login():
     conn = get_db()
 
     if request.method == "GET":
+        if session.get("user_pk"):
+            session.clear()
         return render_template("login.html", error=None)
 
-    raw_pid = re.sub(r"\D", "", (request.form.get("private_id") or "").strip())
-    password = request.form.get("password") or ""
+    password = (request.form.get("password") or "").strip()
+    raw_pid = ""
+    for i in range(1, 10):
+        raw_pid += (request.form.get(f"otp_{i}") or "").strip()
+    if not raw_pid:
+        raw_pid = re.sub(r"\D", "", (request.form.get("private_id") or "").strip())
+
+    raw_pid = re.sub(r"\D", "", raw_pid)
+
     if not raw_pid:
         return render_template(
             "login.html",
-            error="Enter your 9-digit Private ID.",
+            error="Please enter your Private ID.",
+        )
+
+    if not password:
+        return render_template(
+            "login.html",
+            error="Please enter your password.",
         )
 
     if len(raw_pid) != 9:
@@ -14710,23 +14747,26 @@ def login():
     if not _canonical_private_id_for_login(raw_pid):
         return render_template(
             "login.html",
-            error="Private ID must be 9 digits (after HU-).",
+            error="Private ID must contain only digits.",
         )
 
     row = _authenticate_user_login(conn, raw_pid, password)
     if not row:
         return render_template(
             "login.html",
-            error="Invalid login or password.",
+            error="Invalid Private ID or Password.",
         )
 
     session.clear()
     session["user_pk"] = int(row["id"])
+    session.permanent = True
     full_user = load_user(conn, int(row["id"]))
     _session_sync_admin_flag(full_user)
     dest = request.args.get("next") or ""
     if dest.startswith("/") and full_user:
         return redirect(dest)
+    if full_user and int(full_user["is_admin"] or 0):
+        return redirect(url_for("admin_verifications_page"))
     return redirect(url_for("dashboard"))
 
 
@@ -14762,8 +14802,10 @@ def api_login():
     )
 
 
+@app.get("/logout")
 @app.post("/logout")
 def logout():
+    """Clear session immediately without running schema bootstrap."""
     session.clear()
     return redirect(url_for("index"))
 

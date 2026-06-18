@@ -13,29 +13,35 @@
     <div class="qb-alert qb-alert-error" role="alert">{{ error }}</div>
     {% endif %}
 
-    <form method="post" action="{{ url_for('login') }}" class="login-form" id="login-form">
+    <form
+      method="post"
+      action="{{ url_for('login') }}"
+      class="login-form"
+      id="login-form"
+      autocomplete="off"
+    >
       <div class="qb-form-group">
-        <label for="private-id-digit-0">Private ID</label>
+        <label for="otp-1">Private ID</label>
         <div class="otp-wrapper">
           <span class="id-prefix" aria-hidden="true">HU-</span>
           <div class="otp-container" id="private-id-otp">
-            {% for i in range(9) %}
+            {% for i in range(1, 10) %}
             <input
               type="text"
               class="otp-box"
-              id="private-id-digit-{{ i }}"
+              id="otp-{{ i }}"
+              name="otp_{{ i }}"
               maxlength="1"
               inputmode="numeric"
               pattern="[0-9]"
               autocomplete="off"
-              aria-label="Private ID digit {{ i + 1 }}"
-              data-digit-index="{{ i }}"
-              {% if i == 0 %}autofocus{% endif %}
+              aria-label="Private ID digit {{ i }}"
+              data-digit-index="{{ i - 1 }}"
             />
             {% endfor %}
           </div>
         </div>
-        <input type="hidden" name="private_id" id="private_id" value="" />
+        <input type="hidden" name="private_id" id="private_id" value="" autocomplete="off" />
         <small class="login-hint">Enter your 9-digit Private ID (e.g., 014918240)</small>
       </div>
 
