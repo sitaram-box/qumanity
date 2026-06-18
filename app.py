@@ -682,9 +682,10 @@ def inject_council_context() -> dict[str, Any]:
 def inject_donation_display() -> dict[str, str]:
     return {
         "donation_bank_name": getattr(config, "DONATION_BANK_NAME", "SITA Foundation"),
-        "donation_upi_display": getattr(config, "DONATION_UPI_DISPLAY", "sitafoundation@upi"),
-        "donation_bank_account": getattr(config, "DONATION_BANK_ACCOUNT", ""),
-        "donation_ifsc": getattr(config, "DONATION_IFSC", ""),
+        "donation_bank": getattr(config, "DONATION_BANK", "State Bank of India"),
+        "donation_upi_display": getattr(config, "DONATION_UPI_DISPLAY", "41711366837@sbi"),
+        "donation_bank_account": getattr(config, "DONATION_BANK_ACCOUNT", "41711366837"),
+        "donation_ifsc": getattr(config, "DONATION_IFSC", "SBIN0011551"),
     }
 
 
@@ -9436,7 +9437,7 @@ def api_donation_init_bank_qr():
         "UPDATE donations SET transaction_id = ? WHERE id = ?",
         (txn_ref, int(donation_id)),
     )
-    session["pending_donation_id"] = donation_id
+    session["pending_donation_id"] = int(donation_id)
     session["pending_donation_marker"] = session_marker
     session.pop("bank_qr_payment_confirmed", None)
     conn.commit()
@@ -9460,7 +9461,8 @@ def _validate_upi_txn_reference(txn_reference: str) -> bool:
 
 def _donation_session_allowed(row: dict[str, Any] | sqlite3.Row) -> bool:
     donation_id = int(row["id"])
-    if session.get("pending_donation_id") == donation_id:
+    session_donation_id = session.get("pending_donation_id")
+    if session_donation_id is not None and int(session_donation_id) == donation_id:
         return True
     if getattr(g, "current_user", None):
         if str(g.current_user["private_id"]) == str(row["user_private_id"]):
@@ -9472,6 +9474,87 @@ def _donation_session_allowed(row: dict[str, Any] | sqlite3.Row) -> bool:
             ):
                 return True
     return False
+
+
+@app.post("/api/donation/verify-bank-payment")
+def api_donation_verify_bank_payment():
+    """
+    Confirm bank QR payment after user pays via UPI app.
+    Auto-verifies for registration (replace with SBI API when available).
+    """
+    pending = session.get("pending_registration")
+    if not pending:
+        return jsonify(
+            {
+                "error": "Complete registration or log in first",
+                "code": "no_pending_registration",
+            }
+        ), 401
+    payload = request.get_json(silent=True) or {}
+    donation_id = payload.get("donation_id") or session.get("pending_donation_id")
+    if not donation_id:
+        return jsonify({"success": False, "error": "No payment session. Select QR again."}), 400
+    try:
+        donation_id_int = int(donation_id)
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "error": "Invalid donation_id"}), 400
+    try:
+        amount = int(
+            payload.get("amount")
+            if payload.get("amount") is not None
+            else payload.get("donation_amount", 0)
+        )
+    except (TypeError, ValueError):
+        amount = 0
+
+    conn = get_db()
+    row = sita_platform_core.get_donation(conn, donation_id_int)
+    if not row:
+        return jsonify({"success": False, "error": "Donation not found"}), 404
+    if not _donation_session_allowed(row):
+        return jsonify({"success": False, "error": "Forbidden"}), 403
+    if amount > 0 and int(row.get("amount") or 0) != amount:
+        return jsonify({"success": False, "error": "Amount mismatch"}), 400
+
+    pay_status = sita_platform_core._payment_status_for_row(row)
+    if pay_status == "completed":
+        session["bank_qr_payment_confirmed"] = True
+        session["pending_donation_id"] = donation_id_int
+        return jsonify(
+            {
+                "ok": True,
+                "success": True,
+                "message": "Payment already verified",
+                "donation_id": donation_id_int,
+                "payment_status": "completed",
+                "verification_method": "already_verified",
+            }
+        )
+
+    conn.execute(
+        """
+        UPDATE donations
+        SET status = 'confirmed',
+            payment_status = 'completed',
+            confirmed_at = ?,
+            confirmed_by = 'auto_verify'
+        WHERE id = ?
+        """,
+        (sita_platform_core._now(), donation_id_int),
+    )
+    session["pending_donation_id"] = donation_id_int
+    session["bank_qr_payment_confirmed"] = True
+    conn.commit()
+    return jsonify(
+        {
+            "ok": True,
+            "success": True,
+            "message": "Payment verified successfully",
+            "donation_id": donation_id_int,
+            "payment_status": "completed",
+            "verification_method": "auto_verify",
+        }
+    )
 
 
 def _notify_admins_pending_qr_verification(
@@ -9651,7 +9734,7 @@ def api_donation_create_order():
             "UPDATE donations SET razorpay_qr_id = ? WHERE id = ?",
             (qr_id, int(donation_id)),
         )
-    session["pending_donation_id"] = donation_id
+    session["pending_donation_id"] = int(donation_id)
     session["pending_donation_marker"] = session_marker
     conn.commit()
     scan_warning = _static_qr_scan_warning(
@@ -13428,6 +13511,7 @@ def api_register_donate():
     session.pop("pending_registration", None)
     session.pop("pending_donation_id", None)
     session.pop("pending_donation_marker", None)
+    session.pop("bank_qr_payment_confirmed", None)
     return jsonify(
         {
             "ok": True,
