@@ -15265,6 +15265,59 @@ def api_admin_bootstrap():
     return jsonify({"success": True, **result})
 
 
+@app.post("/api/setup/migrate-admin")
+def api_setup_migrate_admin():
+    """
+    Run admin conversion + HU- prefix migration (Railway-friendly).
+
+    Secured with ``X-Admin-Key`` or ``X-Master-Key`` matching ``ADMIN_API_KEY``.
+  Use when Railway shell cannot find scripts or railway CLI is unavailable:
+
+      curl -X POST https://YOUR-APP/api/setup/migrate-admin \\
+        -H "X-Admin-Key: YOUR_ADMIN_API_KEY"
+    """
+    admin_key = (
+        (request.headers.get("X-Admin-Key") or "").strip()
+        or (request.headers.get("X-Master-Key") or "").strip()
+    )
+    expected = getattr(config, "ADMIN_API_KEY", "") or ""
+    if not expected or not admin_key or admin_key != expected:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    payload = request.get_json(silent=True) or {}
+    reset_password = bool(payload.get("reset_password", True))
+
+    try:
+        import importlib.util
+
+        script_path = BASE_DIR / "scripts" / "migrate_admin_fix.py"
+        if not script_path.is_file():
+            return jsonify({"error": f"Migration script not found at {script_path}"}), 500
+        spec = importlib.util.spec_from_file_location("migrate_admin_fix", script_path)
+        if spec is None or spec.loader is None:
+            return jsonify({"error": "Could not load migration script"}), 500
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        ok = mod.run_migration(reset_password=reset_password)
+    except Exception as exc:
+        app.logger.exception("migrate-admin failed")
+        return jsonify({"error": str(exc)}), 500
+
+    if not ok:
+        return jsonify({"error": "Migration failed — check server logs"}), 500
+
+    return jsonify(
+        {
+            "success": True,
+            "message": "Admin migration complete",
+            "admin_private_id": "H_U_ADMIN",
+            "admin_public_id": "ADMIN-PUBLIC",
+            "admin_email": "sekyorintantra@gmail.com",
+            "admin_phone": "8287696616",
+        }
+    )
+
+
 def _cli_db_connection() -> sqlite3.Connection:
     conn = sqlite3.connect(str(DB_PATH))
     conn.row_factory = sqlite3.Row
