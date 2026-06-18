@@ -1,0 +1,344 @@
+{% extends "base.html" %}
+
+{% block title %}Donation Verifications — Qumanity Admin{% endblock %}
+
+{% block body_class %}qb-page-admin-verifications{% endblock %}
+
+{% block head_extra %}
+<style>
+  .qb-admin-verifications {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 1.25rem 0 2rem;
+  }
+
+  .qb-admin-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .qb-admin-stat-card {
+    text-align: center;
+  }
+
+  .qb-admin-stat-card .count {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--qb-text, #f8fafc);
+  }
+
+  .qb-admin-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .qb-admin-table th {
+    text-align: left;
+    padding: 0.625rem;
+    border-bottom: 2px solid var(--qb-border);
+    color: var(--qb-muted);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+  }
+
+  .qb-admin-table td {
+    padding: 0.625rem;
+    border-bottom: 1px solid var(--qb-border);
+    vertical-align: top;
+  }
+
+  .qb-admin-table code.txn-id {
+    background: var(--qb-bg);
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-family: ui-monospace, monospace;
+    font-size: 0.85rem;
+  }
+
+  .qb-admin-no-pending {
+    text-align: center;
+    padding: 2.5rem 1rem;
+    color: var(--qb-muted);
+  }
+
+  .qb-admin-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.75);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+    padding: 1rem;
+  }
+
+  .qb-admin-modal-backdrop[hidden] {
+    display: none;
+  }
+
+  .qb-admin-modal {
+    background: var(--qb-surface);
+    border: 1px solid var(--qb-border);
+    border-radius: 10px;
+    padding: 1.5rem;
+    max-width: 500px;
+    width: 100%;
+    color: var(--qb-text, #f8fafc);
+  }
+
+  .qb-admin-modal textarea {
+    width: 100%;
+    min-height: 80px;
+    margin: 0.5rem 0 1rem;
+    padding: 0.625rem;
+    border: 1px solid var(--qb-border);
+    border-radius: 6px;
+    background: var(--qb-bg);
+    color: var(--qb-text, #f8fafc);
+    font-family: inherit;
+  }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="qb-admin-verifications container py-3">
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <h1 class="h4 mb-0">Donation Verifications</h1>
+    <a href="{{ url_for('dashboard') }}" class="qb-btn qb-btn-neutral btn-sm">Back to Dashboard</a>
+  </div>
+
+  <div class="qb-admin-stats">
+    <div class="qb-panel qb-admin-stat-card p-3">
+      <h2 class="h6 text-secondary mb-1">Pending</h2>
+      <span class="count" id="admin-pending-count">{{ pending_count }}</span>
+    </div>
+    <div class="qb-panel qb-admin-stat-card p-3">
+      <h2 class="h6 text-secondary mb-1">Verified</h2>
+      <span class="count" id="admin-verified-count">{{ verified_count }}</span>
+    </div>
+    <div class="qb-panel qb-admin-stat-card p-3">
+      <h2 class="h6 text-secondary mb-1">Failed</h2>
+      <span class="count" id="admin-failed-count">{{ failed_count }}</span>
+    </div>
+  </div>
+
+  <div class="qb-panel p-3 pending-list">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+      <h2 class="h5 mb-0">Pending Verifications</h2>
+      <button type="button" class="qb-btn qb-btn-outline btn-sm" id="admin-verifications-refresh">Refresh</button>
+    </div>
+
+    {% if pending_donations %}
+    <div class="table-responsive">
+      <table class="qb-admin-table table table-sm mb-0">
+        <thead>
+          <tr>
+            <th>User</th>
+            <th>Contact</th>
+            <th>Transaction ID</th>
+            <th>Amount</th>
+            <th>Submitted</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="admin-verifications-tbody">
+          {% for donation in pending_donations %}
+          <tr data-donation-id="{{ donation.id }}">
+            <td><strong>{{ donation.user_name }}</strong></td>
+            <td>
+              {% if donation.email %}<div>{{ donation.email }}</div>{% endif %}
+              {% if donation.phone %}<div class="text-muted">{{ donation.phone }}</div>{% endif %}
+            </td>
+            <td>
+              <code class="txn-id">{{ donation.txn_reference or "—" }}</code>
+            </td>
+            <td>₹{{ donation.amount }}</td>
+            <td>{{ donation.created_at }}</td>
+            <td>
+              <button
+                type="button"
+                class="qb-btn qb-btn-primary btn-sm me-1 admin-verify-btn"
+                data-donation-id="{{ donation.id }}"
+                data-txn-ref="{{ donation.txn_reference }}"
+              >
+                Verify
+              </button>
+              <button
+                type="button"
+                class="qb-btn qb-btn-danger btn-sm admin-reject-btn"
+                data-donation-id="{{ donation.id }}"
+              >
+                Reject
+              </button>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="qb-admin-no-pending mb-0">No pending verifications!</p>
+    {% endif %}
+  </div>
+</div>
+
+<div id="verifyModal" class="qb-admin-modal-backdrop" hidden role="dialog" aria-modal="true" aria-labelledby="verify-modal-title">
+  <div class="qb-admin-modal">
+    <h3 class="h5 mb-2" id="verify-modal-title">Verify Donation</h3>
+    <p class="small mb-2">Confirm this donation against your SBI YONO bank statement.</p>
+    <p class="small mb-3">
+      <strong>Transaction ID:</strong>
+      <code class="txn-id" id="verifyTxnId">—</code>
+    </p>
+    <div class="d-flex flex-wrap gap-2">
+      <button type="button" class="qb-btn qb-btn-primary" id="confirmVerifyBtn">Yes, Verify</button>
+      <button type="button" class="qb-btn qb-btn-neutral" data-close-modal="verifyModal">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div id="rejectModal" class="qb-admin-modal-backdrop" hidden role="dialog" aria-modal="true" aria-labelledby="reject-modal-title">
+  <div class="qb-admin-modal">
+    <h3 class="h5 mb-2" id="reject-modal-title">Reject Donation</h3>
+    <p class="small mb-2">Please enter the reason for rejection:</p>
+    <textarea id="rejectReason" placeholder="e.g., Transaction not found in bank statement" aria-label="Rejection reason"></textarea>
+    <div class="d-flex flex-wrap gap-2">
+      <button type="button" class="qb-btn qb-btn-danger" id="confirmRejectBtn">Confirm Reject</button>
+      <button type="button" class="qb-btn qb-btn-neutral" data-close-modal="rejectModal">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var currentDonationId = null;
+
+  function toast(msg, type) {
+    if (window.qbToast) {
+      window.qbToast(msg, type || "info");
+    }
+  }
+
+  function openModal(id) {
+    var el = document.getElementById(id);
+    if (el) el.hidden = false;
+  }
+
+  function closeModal(id) {
+    var el = document.getElementById(id);
+    if (el) {
+      el.hidden = true;
+    }
+    if (id === "rejectModal") {
+      var reason = document.getElementById("rejectReason");
+      if (reason) reason.value = "";
+    }
+  }
+
+  document.querySelectorAll("[data-close-modal]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      closeModal(btn.getAttribute("data-close-modal"));
+    });
+  });
+
+  document.querySelectorAll(".qb-admin-modal-backdrop").forEach(function (backdrop) {
+    backdrop.addEventListener("click", function (e) {
+      if (e.target === backdrop) backdrop.hidden = true;
+    });
+  });
+
+  document.querySelectorAll(".admin-verify-btn").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      currentDonationId = btn.getAttribute("data-donation-id");
+      var txnEl = document.getElementById("verifyTxnId");
+      if (txnEl) {
+        txnEl.textContent = btn.getAttribute("data-txn-ref") || "—";
+      }
+      openModal("verifyModal");
+    });
+  });
+
+  document.querySelectorAll(".admin-reject-btn").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      currentDonationId = btn.getAttribute("data-donation-id");
+      openModal("rejectModal");
+    });
+  });
+
+  document.getElementById("confirmVerifyBtn").addEventListener("click", function () {
+    if (!currentDonationId) return;
+    fetch("/api/admin/donation/verify/" + currentDonationId, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { Accept: "application/json" },
+    })
+      .then(function (r) {
+        return r.json().then(function (b) {
+          return { ok: r.ok, b: b };
+        });
+      })
+      .then(function (x) {
+        if (!x.ok || !x.b.success) {
+          throw new Error((x.b && x.b.error) || "Verification failed");
+        }
+        toast(x.b.message || "Donation verified successfully!", "success");
+        closeModal("verifyModal");
+        window.setTimeout(function () {
+          window.location.reload();
+        }, 600);
+      })
+      .catch(function (err) {
+        toast(err.message || "Verification failed", "error");
+      });
+  });
+
+  document.getElementById("confirmRejectBtn").addEventListener("click", function () {
+    if (!currentDonationId) return;
+    var reasonEl = document.getElementById("rejectReason");
+    var reason = reasonEl ? reasonEl.value.trim() : "";
+    if (!reason) {
+      toast("Please enter a reason for rejection.", "warning");
+      return;
+    }
+    fetch("/api/admin/donation/reject/" + currentDonationId, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({ reason: reason }),
+    })
+      .then(function (r) {
+        return r.json().then(function (b) {
+          return { ok: r.ok, b: b };
+        });
+      })
+      .then(function (x) {
+        if (!x.ok || !x.b.success) {
+          throw new Error((x.b && x.b.error) || "Rejection failed");
+        }
+        toast(x.b.message || "Donation rejected.", "warning");
+        closeModal("rejectModal");
+        window.setTimeout(function () {
+          window.location.reload();
+        }, 600);
+      })
+      .catch(function (err) {
+        toast(err.message || "Rejection failed", "error");
+      });
+  });
+
+  var refreshBtn = document.getElementById("admin-verifications-refresh");
+  if (refreshBtn) {
+    refreshBtn.addEventListener("click", function () {
+      window.location.reload();
+    });
+  }
+})();
+</script>
+{% endblock %}

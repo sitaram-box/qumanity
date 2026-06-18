@@ -701,10 +701,23 @@
             </p>
           </div>
           <p class="small text-muted mt-2 mb-2" id="reg-payment-waiting">
-            Scan the QR and pay with any UPI app. Then confirm below.
+            Scan the QR and pay with any UPI app, internet banking, or direct bank deposit. Then enter your UPI transaction reference below.
           </p>
-          <button type="button" class="qb-btn qb-btn-secondary" id="reg-qr-confirm-btn" hidden>
-            I've Completed Payment
+          <div class="mb-2" id="reg-txn-ref-group">
+            <label class="form-label small" for="reg-txn-reference">UPI Transaction Reference (Txn ID / RRN)</label>
+            <input
+              type="text"
+              class="form-control form-control-sm font-monospace"
+              id="reg-txn-reference"
+              maxlength="30"
+              placeholder="e.g. T2606180709230132050901"
+              autocomplete="off"
+              aria-describedby="reg-txn-ref-error"
+            />
+            <p class="small text-danger mb-0 mt-1" id="reg-txn-ref-error" hidden></p>
+          </div>
+          <button type="button" class="qb-btn qb-btn-secondary" id="reg-txn-submit-btn" disabled>
+            Submit Transaction Reference
           </button>
           <p class="small text-success mt-2 mb-0 qb-payment-success" id="reg-qr-webhook-status" hidden></p>
         </div>

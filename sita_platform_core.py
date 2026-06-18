@@ -84,6 +84,11 @@ def migrate_sita_platform_schema(conn: sqlite3.Connection) -> None:
         ("payment_status", "TEXT DEFAULT 'pending'"),
         ("webhook_verified", "INTEGER NOT NULL DEFAULT 0"),
         ("webhook_payload", "TEXT"),
+        ("upi_txn_reference", "TEXT"),
+        ("verification_status", "TEXT DEFAULT 'pending'"),
+        ("txn_validated", "INTEGER NOT NULL DEFAULT 0"),
+        ("validated_by", "TEXT"),
+        ("validated_at", "TEXT"),
     ]
     cols = _donation_columns(conn)
     for col_name, decl in additions:
@@ -134,6 +139,44 @@ def migrate_sita_platform_schema(conn: sqlite3.Connection) -> None:
         ON edit_requests(status)
         """
     )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS verification_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            donation_id INTEGER NOT NULL,
+            admin_id TEXT,
+            action TEXT NOT NULL,
+            reason TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_verification_logs_donation
+        ON verification_logs(donation_id)
+        """
+    )
+    conn.execute(
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_donations_upi_txn_reference
+        ON donations(upi_txn_reference)
+        WHERE upi_txn_reference IS NOT NULL AND upi_txn_reference != ''
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS notifications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            type TEXT,
+            subject TEXT,
+            message TEXT,
+            sent_at TEXT,
+            status TEXT DEFAULT 'pending'
+        )
+        """
+    )
 
 
 def mask_private_id(private_id: str) -> str:
@@ -150,7 +193,7 @@ def _payment_status_for_row(row: dict[str, Any] | sqlite3.Row) -> str:
     status = str(row.get("status") or "pending").strip().lower()
     if status == "confirmed":
         return "completed"
-    if status in ("failed", "authorized", "pending"):
+    if status in ("failed", "authorized", "pending", "pending_verification"):
         return status
     return "pending"
 
@@ -253,6 +296,150 @@ def get_donation_status_payload(conn: sqlite3.Connection, donation_id: int) -> d
         "razorpay_order_id": row.get("razorpay_order_id"),
         "razorpay_payment_id": row.get("razorpay_payment_id"),
     }
+
+
+def get_verification_check_payload(
+    conn: sqlite3.Connection,
+    donation_id: int,
+) -> dict[str, Any]:
+    payload = get_donation_status_payload(conn, donation_id)
+    if not payload:
+        return {}
+    payment_status = str(payload.get("payment_status") or "pending")
+    payload["verified"] = payment_status == "completed"
+    payload["status"] = payment_status
+    row = get_donation(conn, donation_id)
+    if row:
+        payload["verification_status"] = str(row.get("verification_status") or "pending")
+        payload["txn_reference"] = row.get("upi_txn_reference")
+        pid = str(row.get("user_private_id") or "").strip()
+        if pid and not pid.startswith(PENDING_USER_PREFIX):
+            user = conn.execute(
+                "SELECT account_status FROM users WHERE private_id = ?",
+                (pid,),
+            ).fetchone()
+            if user:
+                payload["account_status"] = str(user["account_status"] or "active")
+    payload["can_access_dashboard"] = True
+    return payload
+
+
+def _log_verification(
+    conn: sqlite3.Connection,
+    donation_id: int,
+    admin_id: str,
+    action: str,
+    reason: str = "",
+) -> None:
+    conn.execute(
+        """
+        INSERT INTO verification_logs (donation_id, admin_id, action, reason, created_at)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (int(donation_id), admin_id, action, (reason or "").strip() or None, _now()),
+    )
+
+
+def _activate_user_after_donation_verify(
+    conn: sqlite3.Connection,
+    user_private_id: str,
+) -> None:
+    conn.execute(
+        """
+        UPDATE users
+        SET account_status = 'active',
+            temp_access = 0,
+            verified_at = ?,
+            verification_failed_reason = NULL,
+            is_active = 1
+        WHERE private_id = ?
+        """,
+        (_now(), str(user_private_id).strip()),
+    )
+
+
+def _fail_user_verification(
+    conn: sqlite3.Connection,
+    user_private_id: str,
+    reason: str,
+) -> None:
+    conn.execute(
+        """
+        UPDATE users
+        SET account_status = 'verification_failed',
+            verification_failed_reason = ?,
+            temp_access = 1,
+            is_active = 1
+        WHERE private_id = ?
+        """,
+        ((reason or "").strip() or None, str(user_private_id).strip()),
+    )
+
+
+def _record_notification(
+    conn: sqlite3.Connection,
+    user_private_id: str,
+    ntype: str,
+    subject: str,
+    message: str,
+) -> None:
+    migrate_sita_platform_schema(conn)
+    uid = None
+    row = conn.execute(
+        "SELECT id FROM users WHERE private_id = ?",
+        (str(user_private_id).strip(),),
+    ).fetchone()
+    if row:
+        uid = int(row["id"])
+    conn.execute(
+        """
+        INSERT INTO notifications (user_id, type, subject, message, sent_at, status)
+        VALUES (?, ?, ?, ?, ?, 'sent')
+        """,
+        (uid, ntype, subject, message, _now()),
+    )
+
+
+def submit_bank_qr_txn_reference(
+    conn: sqlite3.Connection,
+    donation_id: int,
+    txn_reference: str,
+) -> tuple[bool, str]:
+    """Store UPI txn reference; returns (ok, error_message)."""
+    migrate_sita_platform_schema(conn)
+    txn_reference = (txn_reference or "").strip()
+    if not txn_reference:
+        return False, "Transaction reference is required"
+    row = conn.execute(
+        "SELECT id, payment_status FROM donations WHERE id = ?",
+        (int(donation_id),),
+    ).fetchone()
+    if not row:
+        return False, "Donation not found"
+    if str(row["payment_status"] or "").strip().lower() == "completed":
+        return False, "Payment already verified"
+    dup = conn.execute(
+        """
+        SELECT id FROM donations
+        WHERE upi_txn_reference = ? AND id != ?
+        """,
+        (txn_reference, int(donation_id)),
+    ).fetchone()
+    if dup:
+        return False, "This transaction reference was already used"
+    conn.execute(
+        """
+        UPDATE donations
+        SET upi_txn_reference = ?,
+            payment_status = 'pending_verification',
+            verification_status = 'pending',
+            status = 'pending',
+            txn_validated = 0
+        WHERE id = ?
+        """,
+        (txn_reference, int(donation_id)),
+    )
+    return True, ""
 
 
 def _find_donation_for_razorpay(
@@ -689,10 +876,11 @@ def admin_donation_list(conn: sqlite3.Connection) -> dict[str, Any]:
     rows = conn.execute(
         """
         SELECT d.id, d.user_private_id, d.user_public_id, d.amount, d.amount_paise,
-               d.payment_method, d.referral_id, d.status, d.transaction_id,
+               d.payment_method, d.referral_id, d.status, d.payment_status,
+               d.transaction_id, d.upi_txn_reference, d.verification_status,
                d.razorpay_payment_id, d.razorpay_order_id, d.webhook_verified,
                d.created_at, d.confirmed_at, d.confirmed_by, d.admin_notes,
-               u.first_name, u.last_name
+               u.first_name, u.last_name, u.email, u.phone
         FROM donations d
         LEFT JOIN users u ON u.private_id = d.user_private_id
         ORDER BY datetime(d.created_at) DESC
@@ -714,7 +902,8 @@ def admin_donation_list(conn: sqlite3.Connection) -> dict[str, Any]:
             d["user_name"] = "Pending registration"
         donations.append(d)
         st = str(d.get("status") or "")
-        if st == "pending":
+        pay_st = str(d.get("payment_status") or "").lower()
+        if st == "pending" or pay_st in ("pending", "pending_verification"):
             pending_count += 1
         elif st == "confirmed":
             confirmed_count += 1
@@ -739,19 +928,31 @@ def confirm_donation(
 ) -> bool:
     migrate_sita_platform_schema(conn)
     row = conn.execute(
-        "SELECT id, status FROM donations WHERE id = ?",
+        "SELECT id, status, user_private_id FROM donations WHERE id = ?",
         (int(donation_id),),
     ).fetchone()
     if not row or str(row["status"]) == "confirmed":
         return False
+    now = _now()
     conn.execute(
         """
         UPDATE donations
-        SET status = 'confirmed', confirmed_at = ?, confirmed_by = ?
+        SET status = 'confirmed',
+            payment_status = 'completed',
+            verification_status = 'verified',
+            txn_validated = 1,
+            validated_at = ?,
+            validated_by = ?,
+            confirmed_at = ?,
+            confirmed_by = ?
         WHERE id = ?
         """,
-        (_now(), str(admin_private_id).strip(), int(donation_id)),
+        (now, str(admin_private_id).strip(), now, str(admin_private_id).strip(), int(donation_id)),
     )
+    pid = str(row["user_private_id"] or "").strip()
+    if pid and not pid.startswith(PENDING_USER_PREFIX):
+        _activate_user_after_donation_verify(conn, pid)
+    _log_verification(conn, donation_id, admin_private_id, "verified")
     return True
 
 
@@ -762,17 +963,32 @@ def reject_donation(
     reason: str,
 ) -> bool:
     migrate_sita_platform_schema(conn)
-    row = conn.execute("SELECT id FROM donations WHERE id = ?", (int(donation_id),)).fetchone()
+    row = conn.execute(
+        "SELECT id, user_private_id FROM donations WHERE id = ?",
+        (int(donation_id),),
+    ).fetchone()
     if not row:
         return False
+    now = _now()
+    reason_text = (reason or "").strip()
     conn.execute(
         """
         UPDATE donations
-        SET status = 'failed', confirmed_at = ?, confirmed_by = ?, admin_notes = ?
+        SET status = 'failed',
+            payment_status = 'failed',
+            verification_status = 'failed',
+            txn_validated = 0,
+            confirmed_at = ?,
+            confirmed_by = ?,
+            admin_notes = ?
         WHERE id = ?
         """,
-        (_now(), str(admin_private_id).strip(), (reason or "").strip(), int(donation_id)),
+        (now, str(admin_private_id).strip(), reason_text or None, int(donation_id)),
     )
+    pid = str(row["user_private_id"] or "").strip()
+    if pid and not pid.startswith(PENDING_USER_PREFIX):
+        _fail_user_verification(conn, pid, reason_text)
+    _log_verification(conn, donation_id, admin_private_id, "rejected", reason_text)
     return True
 
 

@@ -662,6 +662,12 @@ p, li, label, td, th, span, div {
   color: #fca5a5;
 }
 
+.qb-alert-warning {
+  background: var(--qb-warning-dim);
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  color: var(--qb-warning);
+}
+
 .qb-muted-box {
   color: var(--qb-muted);
   padding: 1rem;

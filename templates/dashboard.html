@@ -147,6 +147,7 @@
         aria-labelledby="dash-private-heading"
         {% if show_public_account %}hidden{% endif %}
       >
+        <div id="qb-account-status-banner" class="qb-account-status-banner mb-3" hidden role="status" aria-live="polite"></div>
         <div class="qb-private-panel-head d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
           <h2 id="dash-private-heading" class="h5 mb-0">{{ 'private_account'|tr }}</h2>
           <div class="d-flex flex-wrap gap-2 align-items-start">
@@ -637,7 +638,7 @@
               <thead>
                 <tr>
                   <th>User</th>
-                  <th>Public ID</th>
+                  <th>Txn Reference</th>
                   <th>Amount (₹)</th>
                   <th>Method</th>
                   <th>Status</th>

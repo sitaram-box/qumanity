@@ -859,6 +859,10 @@ def migrate_users_app_extensions(conn: sqlite3.Connection) -> None:
         ("registered_by_admin", "INTEGER NOT NULL DEFAULT 0"),
         ("birth_latitude", "REAL"),
         ("birth_longitude", "REAL"),
+        ("account_status", "TEXT NOT NULL DEFAULT 'active'"),
+        ("temp_access", "INTEGER NOT NULL DEFAULT 0"),
+        ("verified_at", "TEXT"),
+        ("verification_failed_reason", "TEXT"),
     ]
     for col_name, decl in additions:
         if col_name in cols:
@@ -5995,6 +5999,14 @@ def api_election_vote():
     conn = get_db()
     user = g.current_user
     uid = str(user["private_id"])
+    if _account_has_limited_access(user):
+        st = _user_account_status(user)
+        msg = (
+            "Account pending verification. Voting is limited until verified."
+            if st == "pending_verification"
+            else "Verification failed. Retry your donation to unlock voting."
+        )
+        return jsonify({"error": msg}), 403
     cycle_row, active = _election_cycle_row_for_today(conn)
     if not cycle_row or not active:
         return jsonify({"error": "No active election cycle"}), 400
@@ -9440,6 +9452,7 @@ def api_donation_init_bank_qr():
     session["pending_donation_id"] = int(donation_id)
     session["pending_donation_marker"] = session_marker
     session.pop("bank_qr_payment_confirmed", None)
+    session.pop("qr_txn_submitted", None)
     conn.commit()
     return jsonify(
         {
@@ -9607,27 +9620,41 @@ def api_donation_verify_qr_payment():
         return jsonify({"success": False, "error": "Donation not found"}), 404
     if not _donation_session_allowed(row):
         return jsonify({"success": False, "error": "Forbidden"}), 403
-    ok = sita_platform_core.submit_bank_qr_txn_reference(
+    ok, err_msg = sita_platform_core.submit_bank_qr_txn_reference(
         conn, int(donation_id), txn_reference
     )
     if not ok:
         return jsonify(
-            {"success": False, "error": "Could not submit transaction reference"}
+            {
+                "success": False,
+                "error": err_msg or (
+                    "Please enter a valid transaction reference number"
+                ),
+            }
         ), 400
     amount_rupees = sita_platform_core.donation_amount_rupees(row)
     _notify_admins_pending_qr_verification(
         conn, int(donation_id), txn_reference, amount_rupees
     )
+    session["qr_txn_submitted"] = True
+    session["pending_donation_id"] = int(donation_id)
     conn.commit()
     return jsonify(
         {
             "ok": True,
             "success": True,
-            "message": "Transaction reference submitted for verification",
+            "message": "Transaction reference submitted",
             "donation_id": int(donation_id),
             "payment_status": "pending_verification",
+            "account_status": "pending_verification",
         }
     )
+
+
+@app.post("/api/donation/submit-txn-reference")
+def api_donation_submit_txn_reference():
+    """Alias for verify-qr-payment with spec-compliant path."""
+    return api_donation_verify_qr_payment()
 
 
 @app.get("/api/donation/check-verification/<int:donation_id>")
@@ -9653,12 +9680,17 @@ def api_donation_admin_verify(donation_id: int):
     ok = sita_platform_core.confirm_donation(conn, donation_id, "admin_api_key")
     if not ok:
         return jsonify({"error": "Donation not found or already confirmed"}), 404
+    row = sita_platform_core.get_donation(conn, donation_id)
+    if row:
+        pid = str(row.get("user_private_id") or "").strip()
+        if pid and not pid.startswith(sita_platform_core.PENDING_USER_PREFIX):
+            _notify_user_verification_event(conn, pid, "verified")
     conn.commit()
     return jsonify(
         {
             "ok": True,
             "success": True,
-            "message": "Payment verified successfully",
+            "message": "Donation verified and account activated",
             "donation_id": donation_id,
             "verified": True,
         }
@@ -13206,11 +13238,130 @@ def generate_unique_private_id(conn: sqlite3.Connection) -> str:
     return generate_9_digit_private_id(conn)
 
 
+def _user_account_status(user: dict[str, Any] | sqlite3.Row) -> str:
+    return str(user.get("account_status") or "active").strip().lower()
+
+
+def _account_has_limited_access(user: dict[str, Any] | sqlite3.Row) -> bool:
+    return _user_account_status(user) in (
+        "pending_verification",
+        "verification_failed",
+    )
+
+
+def _account_features_for_status(status: str) -> dict[str, bool]:
+    limited = status in ("pending_verification", "verification_failed")
+    return {
+        "view_profile": True,
+        "view_donations": True,
+        "submit_vote": not limited,
+        "withdraw_funds": not limited,
+    }
+
+
+def _dashboard_banner_for_status(
+    status: str,
+    *,
+    txn_reference: str = "",
+    failure_reason: str = "",
+) -> str:
+    if status == "pending_verification":
+        return "Account pending verification. Some features limited."
+    if status == "verification_failed":
+        return "Verification failed. Please retry payment."
+    return ""
+
+
+def _send_account_notification(
+    email: str | None,
+    phone: str | None,
+    notification_type: str,
+    *,
+    reason: str = "",
+) -> None:
+    """Send SMS and email for registration / verification lifecycle events."""
+    templates = {
+        "registration_pending": {
+            "sms": (
+                "Your Qumanity account is created. Verification pending. "
+                "Thank you for your donation."
+            ),
+            "email_subject": "Welcome to Qumanity — verification pending",
+            "email_body": (
+                "Welcome to Qumanity! Your account is pending admin verification. "
+                "You can log in with your Private ID while we confirm your donation."
+            ),
+        },
+        "verified": {
+            "sms": (
+                "Your Qumanity account is verified and activated! "
+                "Welcome to the community."
+            ),
+            "email_subject": "Account Activated!",
+            "email_body": (
+                "Account Activated! Your Qumanity membership is now permanent."
+            ),
+        },
+        "failed": {
+            "sms": (
+                "Your donation verification failed. Please visit Qumanity to retry."
+            ),
+            "email_subject": "Verification Failed",
+            "email_body": (
+                "Verification Failed. Please retry your donation."
+                + (f"\n\nReason: {reason}" if reason else "")
+            ),
+        },
+    }
+    tpl = templates.get(notification_type)
+    if not tpl:
+        return
+    if phone:
+        identity_core.send_sms_notification(phone, tpl["sms"])
+    if email:
+        identity_core.send_email_notification(
+            email,
+            tpl["email_subject"],
+            tpl["email_body"],
+        )
+
+
+def _notify_user_verification_event(
+    conn: sqlite3.Connection,
+    user_private_id: str,
+    event: str,
+    *,
+    reason: str = "",
+) -> None:
+    row = conn.execute(
+        "SELECT id, email, phone FROM users WHERE private_id = ?",
+        (str(user_private_id).strip(),),
+    ).fetchone()
+    if not row:
+        return
+    _send_account_notification(
+        str(row["email"] or "") or None,
+        str(row["phone"] or "") or None,
+        event,
+        reason=reason,
+    )
+    sita_platform_core._record_notification(
+        conn,
+        user_private_id,
+        "both",
+        event,
+        reason or event,
+    )
+
+
 def _finalize_registration(
     conn: sqlite3.Connection,
     pending: dict[str, Any],
+    *,
+    account_status: str = "active",
+    temp_access: bool = False,
 ) -> tuple[str, str]:
-    """Create active user account and wallet (no registration donation). Returns (private, public)."""
+    """Create user account and wallet. Returns (private, public)."""
     birth_path = identity_core.location_path_for_id(
         pending.get("birth_loc"),
         country_id=pending.get("birth_ctry"),
@@ -13232,6 +13383,9 @@ def _finalize_registration(
     # Login identity is a unique 9-digit number; the structured format is kept
     # only for the public (account) ID.
     private_id = generate_9_digit_private_id(conn)
+    status_norm = (account_status or "active").strip().lower()
+    if status_norm not in ("active", "pending_verification", "verification_failed", "suspended"):
+        status_norm = "active"
     conn.execute(
         """
         INSERT INTO users (
@@ -13244,8 +13398,8 @@ def _finalize_registration(
             birth_global_state_id, current_global_state_id,
             country, email, phone, password_hash,
             mother_tongue_code, mother_tongue_name,
-            account_type, is_active
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'H_U', 1)
+            account_type, is_active, account_status, temp_access
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'H_U', 1, ?, ?)
         """,
         (
             private_id,
@@ -13274,6 +13428,8 @@ def _finalize_registration(
             pending["password_hash"],
             pending.get("mother_tongue_code"),
             pending.get("mother_tongue_name"),
+            status_norm,
+            1 if temp_access or status_norm == "pending_verification" else 0,
         ),
     )
     identity_core.register_user_accounts(
@@ -13310,13 +13466,33 @@ def _finalize_registration(
     except Exception:
         app.logger.exception("birth planet calculation failed for %s", private_id)
     conn.commit()
-    identity_core.notify_user_ids(
-        email=pending.get("email_raw"),
-        phone=pending.get("phone_raw"),
-        private_id=private_id,
-        public_id=public_id,
-        first_name=pending["first_name"],
-    )
+    if status_norm == "pending_verification":
+        _send_account_notification(
+            pending.get("email_raw"),
+            pending.get("phone_raw"),
+            "registration_pending",
+        )
+        id_msg = (
+            f"Welcome to Qumanity, {pending['first_name']}!\n\n"
+            f"Private ID (9-digit login): {private_id}\n"
+            f"Public ID (Account ID): {public_id}\n\n"
+            "Your account is pending admin verification. "
+            "Save your Private ID — you need it to log in."
+        )
+        if pending.get("email_raw"):
+            identity_core.send_email_notification(
+                pending.get("email_raw"),
+                "Your Qumanity IDs — verification pending",
+                id_msg,
+            )
+    else:
+        identity_core.notify_user_ids(
+            email=pending.get("email_raw"),
+            phone=pending.get("phone_raw"),
+            private_id=private_id,
+            public_id=public_id,
+            first_name=pending["first_name"],
+        )
     return private_id, public_id
 
 
@@ -13330,7 +13506,18 @@ def _finalize_registration_with_donation(
 ) -> tuple[str, str]:
     """Create account and store pending 10-tier distribution (credited after first vote)."""
     referrer_private_id = str(pending.get("referred_by_private_id") or "").strip()
-    private_id, public_id = _finalize_registration(conn, pending)
+    pending_verify = (
+        method == "qr"
+        and int(donation_rupees) > 0
+        and session.get("qr_txn_submitted")
+    )
+    account_status = "pending_verification" if pending_verify else "active"
+    private_id, public_id = _finalize_registration(
+        conn,
+        pending,
+        account_status=account_status,
+        temp_access=pending_verify,
+    )
     village_id = str(pending.get("curr_loc") or pending.get("birth_loc") or "").strip()
     loc_ctx = donation_location_context(
         conn,
@@ -13442,6 +13629,105 @@ def register_donation():
     )
 
 
+@app.get("/api/user/dashboard-status")
+@login_required
+def api_user_dashboard_status():
+    """Account verification status and feature flags for dashboard UI."""
+    conn = get_db()
+    user = g.current_user
+    status = _user_account_status(user)
+    txn_reference = ""
+    failure_reason = str(user.get("verification_failed_reason") or "").strip()
+    if status in ("pending_verification", "verification_failed"):
+        row = conn.execute(
+            """
+            SELECT upi_txn_reference, verification_status
+            FROM donations
+            WHERE user_private_id = ?
+            ORDER BY datetime(created_at) DESC
+            LIMIT 1
+            """,
+            (str(user["private_id"]),),
+        ).fetchone()
+        if row:
+            txn_reference = str(row["upi_txn_reference"] or "").strip()
+    return jsonify(
+        {
+            "account_status": status,
+            "banner": _dashboard_banner_for_status(
+                status,
+                txn_reference=txn_reference,
+                failure_reason=failure_reason,
+            ),
+            "can_access": True,
+            "txn_reference": txn_reference,
+            "failure_reason": failure_reason,
+            "features": _account_features_for_status(status),
+        }
+    )
+
+
+@app.post("/api/donation/retry")
+@login_required
+def api_donation_retry():
+    """Start a new QR donation flow after verification failure."""
+    user = g.current_user
+    if _user_account_status(user) != "verification_failed":
+        return jsonify({"error": "Retry is only available after verification failure"}), 400
+    payload = request.get_json(silent=True) or {}
+    try:
+        amount = int(payload.get("amount", 50))
+    except (TypeError, ValueError):
+        return jsonify({"error": "amount must be an integer"}), 400
+    if amount < 1 or amount > 200:
+        return jsonify({"error": "Donation must be between ₹1 and ₹200"}), 400
+    conn = get_db()
+    pid = str(user["private_id"])
+    pub = str(user["public_id"])
+    donation_id = sita_platform_core.record_donation(
+        conn,
+        user_private_id=pid,
+        user_public_id=pub,
+        amount=amount,
+        payment_method="bank_qr",
+        status="pending",
+        payment_status="pending",
+        amount_paise=amount * 100,
+    )
+    txn_ref = f"QUM{donation_id}"
+    conn.execute(
+        "UPDATE donations SET transaction_id = ? WHERE id = ?",
+        (txn_ref, int(donation_id)),
+    )
+    conn.execute(
+        """
+        UPDATE users
+        SET account_status = 'pending_verification',
+            temp_access = 1,
+            verification_failed_reason = NULL
+        WHERE private_id = ?
+        """,
+        (pid,),
+    )
+    conn.commit()
+    qr_image = url_for("static", filename="images/SitaFoundation Donate.jpg")
+    return jsonify(
+        {
+            "success": True,
+            "donation_id": donation_id,
+            "amount": amount,
+            "qr_image": qr_image,
+            "bank_details": {
+                "bank": getattr(config, "DONATION_BANK", "State Bank of India"),
+                "upi": getattr(config, "DONATION_UPI_DISPLAY", "41711366837@sbi"),
+                "account": getattr(config, "DONATION_BANK_ACCOUNT", "41711366837"),
+                "ifsc": getattr(config, "DONATION_IFSC", "SBIN0011551"),
+                "organisation": getattr(config, "DONATION_BANK_NAME", "SITA Foundation"),
+            },
+        }
+    )
+
+
 @app.post("/api/register/donate")
 def api_register_donate():
     pending = session.get("pending_registration")
@@ -13480,20 +13766,31 @@ def api_register_donate():
             return jsonify(
                 {"error": "Submit your UPI transaction reference after paying."}
             ), 400
+        if not session.get("qr_txn_submitted"):
+            return jsonify(
+                {
+                    "error": (
+                        "Enter your UPI transaction reference after paying "
+                        "before submitting registration."
+                    ),
+                }
+            ), 400
         donation_row = sita_platform_core.get_donation(conn, int(pending_donation_id))
         if not donation_row:
             return jsonify({"error": "Payment record not found."}), 400
         pay_status = sita_platform_core._payment_status_for_row(donation_row)
-        if pay_status != "completed":
+        if pay_status not in ("pending_verification", "completed"):
             return jsonify(
                 {
-                    "error": (
-                        "Payment not verified yet. Wait for admin confirmation "
-                        "after submitting your UPI reference."
-                    ),
+                    "error": "Payment reference not accepted. Check your transaction ID.",
                     "payment_status": pay_status,
                 }
             ), 400
+    pending_verify = (
+        method == "qr"
+        and amount > 0
+        and session.get("qr_txn_submitted")
+    )
     try:
         private_id, public_id = _finalize_registration_with_donation(
             conn,
@@ -13512,15 +13809,24 @@ def api_register_donate():
     session.pop("pending_donation_id", None)
     session.pop("pending_donation_marker", None)
     session.pop("bank_qr_payment_confirmed", None)
+    session.pop("qr_txn_submitted", None)
+    account_status = "pending_verification" if pending_verify else "active"
+    message = (
+        "Account created! Your donation is pending admin verification. "
+        "You can log in with limited access until verified."
+        if pending_verify
+        else (
+            "Account created! Your rewards will be credited after your first "
+            "village election vote."
+        )
+    )
     return jsonify(
         {
             "ok": True,
             "private_id": private_id,
             "public_id": public_id,
-            "message": (
-                "Account created! Your rewards will be credited after your first "
-                "village election vote."
-            ),
+            "account_status": account_status,
+            "message": message,
             "redirect": url_for("login"),
         }
     )
@@ -13677,6 +13983,40 @@ def api_donation_admin_list():
         return jsonify({"error": "Admin only"}), 403
     conn = get_db()
     return jsonify(sita_platform_core.admin_donation_list(conn))
+
+
+@app.route("/admin/verifications")
+@login_required
+def admin_verifications_page():
+    """Standalone admin page for pending QR donation verifications."""
+    if not is_admin_user(g.current_user):
+        flash("Admin access required.", "error")
+        return redirect(url_for("dashboard"))
+    conn = get_db()
+    data = sita_platform_core.admin_donation_list(conn)
+    pending_donations: list[dict[str, Any]] = []
+    for d in data.get("donations") or []:
+        pay_st = str(d.get("payment_status") or "").lower()
+        st = str(d.get("status") or "")
+        if st == "pending" or pay_st in ("pending", "pending_verification"):
+            pending_donations.append(
+                {
+                    "id": d["id"],
+                    "user_name": d.get("user_name") or "Pending registration",
+                    "email": d.get("email") or "",
+                    "phone": d.get("phone") or "",
+                    "txn_reference": d.get("upi_txn_reference") or "",
+                    "amount": d.get("amount_rupees") or d.get("amount"),
+                    "created_at": d.get("created_at") or "",
+                }
+            )
+    return render_template(
+        "admin/verifications.html",
+        pending_count=data.get("pending_count", 0),
+        verified_count=data.get("confirmed_count", 0),
+        failed_count=data.get("failed_count", 0),
+        pending_donations=pending_donations,
+    )
 
 
 @app.get("/api/donation/admin/export")
@@ -13839,13 +14179,42 @@ def api_admin_donation_confirm_alias(donation_id: int):
     if not is_admin_user(g.current_user):
         return jsonify({"error": "Admin only"}), 403
     conn = get_db()
+    row = sita_platform_core.get_donation(conn, donation_id)
     ok = sita_platform_core.confirm_donation(
         conn, donation_id, str(g.current_user["private_id"])
     )
     if not ok:
         return jsonify({"error": "Donation not found or already confirmed"}), 404
+    if row:
+        pid = str(row.get("user_private_id") or "").strip()
+        if pid and not pid.startswith(sita_platform_core.PENDING_USER_PREFIX):
+            _notify_user_verification_event(conn, pid, "verified")
     conn.commit()
-    return jsonify({"success": True})
+    return jsonify({"success": True, "message": "Donation verified and account activated"})
+
+
+@app.post("/api/admin/donation/verify/<int:donation_id>")
+def api_admin_donation_verify_alias(donation_id: int):
+    """Verify donation via admin session or X-Admin-Key header."""
+    admin_key = (request.headers.get("X-Admin-Key") or "").strip()
+    expected = getattr(config, "ADMIN_API_KEY", "") or ""
+    if admin_key and expected and admin_key == expected:
+        conn = get_db()
+        row = sita_platform_core.get_donation(conn, donation_id)
+        ok = sita_platform_core.confirm_donation(conn, donation_id, "admin_api_key")
+        if not ok:
+            return jsonify({"error": "Donation not found or already confirmed"}), 404
+        if row:
+            pid = str(row.get("user_private_id") or "").strip()
+            if pid and not pid.startswith(sita_platform_core.PENDING_USER_PREFIX):
+                _notify_user_verification_event(conn, pid, "verified")
+        conn.commit()
+        return jsonify(
+            {"success": True, "message": "Donation verified and account activated"}
+        )
+    if not getattr(g, "current_user", None) or not is_admin_user(g.current_user):
+        return jsonify({"error": "Admin only"}), 403
+    return api_admin_donation_confirm_alias(donation_id)
 
 
 @app.post("/api/admin/donation/reject/<int:donation_id>")
@@ -13856,13 +14225,18 @@ def api_admin_donation_reject_alias(donation_id: int):
     data = request.get_json(silent=True) or {}
     reason = str(data.get("reason") or "").strip()
     conn = get_db()
+    row = sita_platform_core.get_donation(conn, donation_id)
     ok = sita_platform_core.reject_donation(
         conn, donation_id, str(g.current_user["private_id"]), reason
     )
     if not ok:
         return jsonify({"error": "Donation not found"}), 404
+    if row:
+        pid = str(row.get("user_private_id") or "").strip()
+        if pid and not pid.startswith(sita_platform_core.PENDING_USER_PREFIX):
+            _notify_user_verification_event(conn, pid, "failed", reason=reason)
     conn.commit()
-    return jsonify({"success": True})
+    return jsonify({"success": True, "message": "Donation rejected and user notified"})
 
 
 @app.get("/api/admin/donation/export")
@@ -14418,6 +14792,7 @@ def dashboard():
         "electionVoteEligible": election_vote_eligible,
         "userDisplayName": display_name,
         "userPublicId": str(user_row["public_id"] or ""),
+        "accountStatus": _user_account_status(user_row),
         "userZoneId": geo_displays.get("user_zone_id") or "",
         "userZoneName": geo_displays.get("user_zone_name") or "",
         "userZoneCode": geo_displays.get("user_zone_code") or "",

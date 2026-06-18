@@ -141,6 +141,147 @@
     }
   } catch (_e) {}
 
+  function loadAccountStatusBanner() {
+    var bannerEl = document.getElementById("qb-account-status-banner");
+    if (!bannerEl) return;
+    fetch("/api/user/dashboard-status", {
+      credentials: "same-origin",
+      headers: { Accept: "application/json" },
+    })
+      .then(function (r) {
+        return r.json();
+      })
+      .then(function (b) {
+        var status = String(b.account_status || "active");
+        if (status === "active") {
+          bannerEl.hidden = true;
+          bannerEl.innerHTML = "";
+          return;
+        }
+        bannerEl.hidden = false;
+        if (status === "pending_verification") {
+          bannerEl.className = "qb-account-status-banner qb-alert qb-alert-warning mb-3";
+          bannerEl.innerHTML =
+            "<strong>Account Pending Verification</strong>" +
+            "<p class=" + '"small mb-1 mt-1"' + ">Your donation is being verified by our admin team.</p>" +
+            (b.txn_reference
+              ? "<p class=" +
+                '"small mb-1"' +
+                ">Transaction ID: <strong class=" +
+                '"font-monospace"' +
+                ">" +
+                escHtml(b.txn_reference) +
+                "</strong></p>"
+              : "") +
+            "<p class=" + '"small mb-0"' + ">You'll receive a notification once verified. Some features are limited.</p>";
+        } else if (status === "verification_failed") {
+          bannerEl.className = "qb-account-status-banner qb-alert qb-alert-error mb-3";
+          bannerEl.innerHTML =
+            "<strong>Verification Failed</strong>" +
+            "<p class=" + '"small mb-1 mt-1"' + ">We couldn't verify your transaction.</p>" +
+            (b.failure_reason
+              ? "<p class=" +
+                '"small mb-2"' +
+                ">Reason: " +
+                escHtml(b.failure_reason) +
+                "</p>"
+              : "") +
+            "<div class=" +
+            '"d-flex flex-wrap gap-2"' +
+            ">" +
+            "<button type=" +
+            '"button"' +
+            " class=" +
+            '"qb-btn qb-btn-primary btn-sm"' +
+            " id=" +
+            '"qb-retry-donation-btn"' +
+            ">Retry Payment</button>" +
+            "<a href=" +
+            '"mailto:support@qumanity.org"' +
+            " class=" +
+            '"qb-btn qb-btn-neutral btn-sm"' +
+            ">Contact Support</a>" +
+            "</div>";
+          var retryBtn = document.getElementById("qb-retry-donation-btn");
+          if (retryBtn) {
+            retryBtn.addEventListener("click", showRetryDonationModal);
+          }
+        }
+      })
+      .catch(function () {});
+  }
+
+  function showRetryDonationModal() {
+    var backdrop = document.createElement("div");
+    backdrop.className = "qb-id-modal-backdrop";
+    backdrop.innerHTML =
+      "<div class=" +
+      '"qb-id-modal"' +
+      ">" +
+      "<h2 class=" +
+      '"h5 mb-2"' +
+      ">Retry Donation</h2>" +
+      "<p class=" +
+      '"small mb-3"' +
+      ">Choose how you want to activate your account.</p>" +
+      "<button type=" +
+      '"button"' +
+      " class=" +
+      '"qb-btn qb-btn-secondary btn-sm mb-2 w-100"' +
+      " data-retry-zero>Zero Amount Donation (₹0)</button>" +
+      "<button type=" +
+      '"button"' +
+      " class=" +
+      '"qb-btn qb-btn-primary btn-sm w-100"' +
+      " data-retry-pay>Pay Again via QR</button>" +
+      "<button type=" +
+      '"button"' +
+      " class=" +
+      '"qb-btn qb-btn-neutral btn-sm mt-2 w-100"' +
+      " data-retry-close>Cancel</button>" +
+      "</div>";
+    document.body.appendChild(backdrop);
+    backdrop.querySelector("[data-retry-close]").addEventListener("click", function () {
+      backdrop.remove();
+    });
+    backdrop.querySelector("[data-retry-zero]").addEventListener("click", function () {
+      backdrop.remove();
+      if (window.qbToast) {
+        window.qbToast(
+          "Zero-amount activation requires admin approval. Contact support.",
+          "info"
+        );
+      }
+    });
+    backdrop.querySelector("[data-retry-pay]").addEventListener("click", function () {
+      backdrop.remove();
+      fetch("/api/donation/retry", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ amount: 50 }),
+      })
+        .then(function (r) {
+          return r.json();
+        })
+        .then(function (b) {
+          if (!b.success) throw new Error(b.error || "Retry failed");
+          if (window.qbToast) {
+            window.qbToast(
+              "New donation started. Pay via QR and contact support with your txn reference.",
+              "info"
+            );
+          }
+          loadAccountStatusBanner();
+        })
+        .catch(function (err) {
+          if (window.qbToast) window.qbToast(err.message || "Retry failed", "error");
+        });
+    });
+  }
+
+  loadAccountStatusBanner();
+
   /* preferredLanguage + uiStrings come from server on each full page load (no client cache). */
   var uiLang = String((dashCfg && dashCfg.preferredLanguage) || "en").toLowerCase();
   var uiS = (dashCfg && dashCfg.uiStrings) || {};
@@ -8947,13 +9088,24 @@
         rows.forEach(function (d) {
           var tr = document.createElement("tr");
           var name = d.user_name || ((d.first_name || "") + " " + (d.last_name || "")).trim();
+          var contact = "";
+          if (d.email) contact += escHtml(d.email);
+          if (d.phone) {
+            contact += (contact ? "<br>" : "") + escHtml(d.phone);
+          }
           var rupees = d.amount_rupees != null ? d.amount_rupees : d.amount;
+          var payStatus = String(d.payment_status || "").toLowerCase();
           var statusBadge = String(d.status || "");
+          if (payStatus === "pending_verification") {
+            statusBadge = "pending verification";
+          }
           var actions = "";
-          if (d.status === "pending") {
+          var needsAction =
+            d.status === "pending" || payStatus === "pending_verification";
+          if (needsAction) {
             actions =
               "<button type='button' class='qb-btn qb-btn-primary btn-sm me-1' data-don-confirm='" +
-              d.id + "'>Confirm</button>" +
+              d.id + "'>Verify</button>" +
               "<button type='button' class='qb-btn qb-btn-danger btn-sm' data-don-reject='" +
               d.id + "'>Reject</button>";
           } else {
@@ -8962,23 +9114,31 @@
           if (d.webhook_verified) {
             statusBadge += " (webhook)";
           }
+          var txnRef = d.upi_txn_reference || d.txn_reference || "—";
           tr.innerHTML =
-            "<td>" + name + "</td>" +
-            "<td class='font-monospace'>" + (d.user_public_id || "") + "</td>" +
+            "<td>" + escHtml(name) + (contact ? "<br><span class='text-muted'>" + contact + "</span>" : "") + "</td>" +
+            "<td class='font-monospace'>" + escHtml(txnRef) + "</td>" +
             "<td>₹" + rupees + "</td>" +
-            "<td>" + (d.payment_method || "") + "</td>" +
-            "<td>" + statusBadge + "</td>" +
-            "<td>" + (d.created_at || "") + "</td>" +
+            "<td>" + escHtml(d.payment_method || "") + "</td>" +
+            "<td>" + escHtml(statusBadge) + "</td>" +
+            "<td>" + escHtml(d.created_at || "") + "</td>" +
             "<td>" + actions + "</td>";
           tbody.appendChild(tr);
         });
         tbody.querySelectorAll("[data-don-confirm]").forEach(function (btn) {
           btn.addEventListener("click", function () {
-            fetch("/api/admin/donation/confirm/" + btn.getAttribute("data-don-confirm"), {
+            fetch("/api/admin/donation/verify/" + btn.getAttribute("data-don-confirm"), {
               method: "POST",
               credentials: "same-origin",
               headers: { Accept: "application/json" },
-            }).then(function () { loadAdminDonations(); });
+            }).then(function (r) {
+              return r.json().then(function (b) {
+                if (window.qbToast) {
+                  window.qbToast(b.message || "Donation verified", "success");
+                }
+                loadAdminDonations();
+              });
+            });
           });
         });
         tbody.querySelectorAll("[data-don-reject]").forEach(function (btn) {
@@ -8989,7 +9149,14 @@
               credentials: "same-origin",
               headers: { "Content-Type": "application/json", Accept: "application/json" },
               body: JSON.stringify({ reason: reason }),
-            }).then(function () { loadAdminDonations(); });
+            }).then(function (r) {
+              return r.json().then(function (b) {
+                if (window.qbToast) {
+                  window.qbToast(b.message || "Donation rejected", "warning");
+                }
+                loadAdminDonations();
+              });
+            });
           });
         });
       })

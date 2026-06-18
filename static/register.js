@@ -563,7 +563,10 @@
     var cashFields = document.getElementById("reg-donate-cash-fields");
     var cashReferralInput = document.getElementById("reg-donate-referral-id");
     var cashReferralError = document.getElementById("reg-cash-referral-error");
-    var qrConfirmBtn = document.getElementById("reg-qr-confirm-btn");
+    var qrConfirmBtn = null;
+    var txnRefInput = document.getElementById("reg-txn-reference");
+    var txnSubmitBtn = document.getElementById("reg-txn-submit-btn");
+    var txnRefError = document.getElementById("reg-txn-ref-error");
     var previewBox = document.getElementById("reg-distribution-preview");
     var previewList = document.getElementById("reg-distribution-list");
     var previewTotal = document.getElementById("reg-distribution-total");
@@ -574,6 +577,7 @@
     var donateErr = document.getElementById("reg-donation-error");
     var previewRequestId = 0;
     var qrPaymentConfirmed = false;
+    var txnReferenceSubmitted = false;
     var cashReferralValid = false;
     var cashReferralTimer = null;
     var pendingDonationId = null;
@@ -583,7 +587,19 @@
     var qrAmountEl = document.getElementById("reg-qr-amount");
     var qrUpiEl = document.getElementById("reg-qr-upi-id");
     var PAYMENT_SUCCESS_MSG =
-      "Payment confirmed! You can now submit your registration.";
+      "Transaction reference accepted! You can now submit your registration.";
+
+    function isValidTxnReference(ref) {
+      if (!ref) return false;
+      if (ref.length < 10 || ref.length > 30) return false;
+      return /^[A-Za-z0-9]+$/.test(ref);
+    }
+
+    function updateTxnSubmitState() {
+      if (!txnSubmitBtn) return;
+      var ref = txnRefInput ? txnRefInput.value.trim() : "";
+      txnSubmitBtn.disabled = !isValidTxnReference(ref) || txnReferenceSubmitted;
+    }
 
     function setDonationSubmitEnabled(enabled) {
       if (!donateSubmit) return;
@@ -599,6 +615,7 @@
 
     function resetPaymentState() {
       qrPaymentConfirmed = false;
+      txnReferenceSubmitted = false;
       cashReferralValid = false;
       pendingDonationId = null;
       if (cashReferralTimer) {
@@ -606,14 +623,16 @@
         cashReferralTimer = null;
       }
       if (qrAmountEl) qrAmountEl.textContent = "—";
+      if (txnRefInput) txnRefInput.value = "";
+      if (txnRefError) txnRefError.hidden = true;
       if (paymentWaitingEl) {
         paymentWaitingEl.hidden = false;
         paymentWaitingEl.textContent =
-          "Scan the QR and pay with any UPI app. Then confirm below.";
+          "Scan the QR and pay. Then enter your UPI transaction reference.";
       }
-      if (qrConfirmBtn) {
-        qrConfirmBtn.hidden = true;
-        qrConfirmBtn.disabled = false;
+      if (txnSubmitBtn) {
+        txnSubmitBtn.hidden = false;
+        txnSubmitBtn.disabled = true;
       }
       if (webhookStatusEl) {
         webhookStatusEl.hidden = true;
@@ -638,7 +657,7 @@
         paymentWaitingEl.textContent = "Preparing payment…";
         paymentWaitingEl.hidden = false;
       }
-      if (qrConfirmBtn) qrConfirmBtn.hidden = true;
+      if (txnSubmitBtn) txnSubmitBtn.disabled = true;
       if (webhookStatusEl) webhookStatusEl.hidden = true;
       setDonationSubmitEnabled(false);
       fetch("/api/donation/init-bank-qr", {
@@ -659,10 +678,11 @@
           pendingDonationId = x.b.donation_id;
           if (paymentWaitingEl) {
             paymentWaitingEl.textContent =
-              "Scan the QR and pay. Then click I've Completed Payment.";
+              "Scan the QR and pay. Then enter your UPI transaction reference below.";
             paymentWaitingEl.hidden = false;
           }
-          if (qrConfirmBtn) qrConfirmBtn.hidden = false;
+          if (txnSubmitBtn) txnSubmitBtn.disabled = true;
+          updateTxnSubmitState();
         })
         .catch(function (err) {
           if (donateErr) {
@@ -673,21 +693,27 @@
         });
     }
 
-    function confirmBankPayment() {
+    function submitTxnReference() {
       var amount = getSelectedAmount();
+      var ref = txnRefInput ? txnRefInput.value.trim() : "";
       if (!pendingDonationId || !amount || amount <= 0) return;
-      if (qrConfirmBtn) qrConfirmBtn.disabled = true;
-      if (paymentWaitingEl) {
-        paymentWaitingEl.textContent = "Verifying your payment…";
-        paymentWaitingEl.hidden = false;
+      if (!isValidTxnReference(ref)) {
+        if (txnRefError) {
+          txnRefError.textContent =
+            "Please enter a valid transaction reference number";
+          txnRefError.hidden = false;
+        }
+        return;
       }
-      fetch("/api/donation/verify-bank-payment", {
+      if (txnRefError) txnRefError.hidden = true;
+      if (txnSubmitBtn) txnSubmitBtn.disabled = true;
+      fetch("/api/donation/submit-txn-reference", {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({
           donation_id: pendingDonationId,
-          amount: amount,
+          txn_reference: ref,
         }),
       })
         .then(function (r) {
@@ -697,9 +723,14 @@
         })
         .then(function (x) {
           if (!x.ok || !x.b || !x.b.success) {
-            throw new Error((x.b && x.b.error) || "Payment verification failed");
+            throw new Error(
+              (x.b && x.b.error) ||
+                "Please enter a valid transaction reference number"
+            );
           }
+          txnReferenceSubmitted = true;
           qrPaymentConfirmed = true;
+          if (txnRefInput) txnRefInput.readOnly = true;
           if (paymentWaitingEl) paymentWaitingEl.hidden = true;
           if (webhookStatusEl) {
             webhookStatusEl.textContent = PAYMENT_SUCCESS_MSG;
@@ -707,23 +738,29 @@
           }
           setDonationSubmitEnabled(true);
           if (window.qbToast) {
-            window.qbToast("Payment confirmed! Submit your registration.", "success");
+            window.qbToast("Transaction reference submitted.", "success");
           }
         })
         .catch(function (err) {
-          if (qrConfirmBtn) qrConfirmBtn.disabled = false;
-          if (paymentWaitingEl) paymentWaitingEl.hidden = true;
-          if (donateErr) {
-            donateErr.textContent = err.message || "Could not verify payment";
-            donateErr.hidden = false;
-            donateErr.classList.remove("text-warning");
-            donateErr.classList.add("text-danger");
+          txnReferenceSubmitted = false;
+          updateTxnSubmitState();
+          if (txnRefError) {
+            txnRefError.textContent =
+              err.message || "Please enter a valid transaction reference number";
+            txnRefError.hidden = false;
           }
         });
     }
 
-    if (qrConfirmBtn) {
-      qrConfirmBtn.addEventListener("click", confirmBankPayment);
+    if (txnRefInput) {
+      txnRefInput.addEventListener("input", function () {
+        txnRefInput.value = txnRefInput.value.replace(/[^A-Za-z0-9]/g, "");
+        if (txnRefError) txnRefError.hidden = true;
+        updateTxnSubmitState();
+      });
+    }
+    if (txnSubmitBtn) {
+      txnSubmitBtn.addEventListener("click", submitTxnReference);
     }
 
     function validateCashReferral() {
@@ -1102,6 +1139,9 @@
       backdrop.innerHTML =
         '<div class="qb-id-modal">' +
         '<h2 class="h5 mb-2">🎉 Account Created Successfully!</h2>' +
+        (ids.account_status === "pending_verification"
+          ? '<p class="small text-warning mb-2">Your donation is pending admin verification. You can log in with limited access until verified.</p>'
+          : "") +
         '<p class="qb-id-modal-warning small mb-3">⚠️ Please save these IDs. You will need them to log in. You cannot recover your account without them.</p>' +
         rows +
         '<button type="button" class="qb-btn qb-btn-primary" id="reg-modal-close-btn">✅ I have saved my IDs</button>' +
@@ -1152,11 +1192,12 @@
         if (
           amount > 0 &&
           method === "qr" &&
-          !qrPaymentConfirmed
+          !qrPaymentConfirmed &&
+          !txnReferenceSubmitted
         ) {
           if (donateErr) {
             donateErr.textContent =
-              "Complete payment first — scan QR, pay, then click I've Completed Payment.";
+              "Pay via QR, then enter and submit your UPI transaction reference.";
             donateErr.hidden = false;
           }
           return;
@@ -1196,6 +1237,7 @@
             showIdSaveModal({
               private_id: x.b.private_id,
               public_id: x.b.public_id,
+              account_status: x.b.account_status,
             });
           })
           .catch(function (err) {
