@@ -155,7 +155,10 @@ DEMO_ACCOUNT_TYPE_PREFIX = "D_U"
 PRIVATE_ID_RE = re.compile(r"^\s*(U-[A-Za-z0-9]{8})\s*$", re.I)
 # Login: 9-digit numeric Private ID, or the fixed admin account id.
 PRIVATE_ID_LOGIN_RE = re.compile(r"^\d{9}$")
+HU_PRIVATE_ID_LOGIN_RE = re.compile(r"^HU-\d{9}$", re.IGNORECASE)
 ADMIN_PRIVATE_ID = "H_U_ADMIN"
+ADMIN_PUBLIC_ID = "ADMIN-PUBLIC"
+HUMAN_PRIVATE_ID_PREFIX = "HU-"
 
 USER_TABLE_SQL = """
 CREATE TABLE IF NOT EXISTS users (
@@ -13255,15 +13258,25 @@ def register():
 
 
 def generate_9_digit_private_id(conn: sqlite3.Connection) -> str:
-    """Generate a unique 9-digit numeric Private ID (100000000–999999999)."""
+    """Generate a unique human Private ID: HU- + 9 digits."""
     for _ in range(100_000):
-        candidate = str(secrets.randbelow(900_000_000) + 100_000_000)
+        digits = str(secrets.randbelow(900_000_000) + 100_000_000)
+        candidate = f"{HUMAN_PRIVATE_ID_PREFIX}{digits}"
         row = conn.execute(
-            "SELECT 1 FROM users WHERE private_id = ?", (candidate,)
+            "SELECT 1 FROM users WHERE private_id = ? COLLATE NOCASE",
+            (candidate,),
         ).fetchone()
         if not row:
             return candidate
-    raise RuntimeError("Could not allocate a unique 9-digit private ID")
+    raise RuntimeError("Could not allocate a unique HU- private ID")
+
+
+def format_human_private_id(digits: str) -> str:
+    """Normalize 9-digit numeric string to HU- prefixed Private ID."""
+    d = str(digits or "").strip()
+    if d.upper().startswith(HUMAN_PRIVATE_ID_PREFIX):
+        return f"{HUMAN_PRIVATE_ID_PREFIX}{d[3:]}"
+    return f"{HUMAN_PRIVATE_ID_PREFIX}{d}"
 
 
 def generate_unique_private_id(conn: sqlite3.Connection) -> str:
@@ -14600,16 +14613,70 @@ def api_user_location_mode():
     )
 
 
-def _normalize_login_private_id(raw: str) -> str | None:
-    """Accept 9-digit Private ID or the fixed admin login id ``H_U_ADMIN``."""
+def _private_id_login_candidates(raw: str) -> list[str]:
+    """Build Private ID lookup candidates (HU- prefix, legacy numeric, admin)."""
     s = (raw or "").strip()
-    if not s:
-        return None
+    if not s or "@" in s:
+        return []
     if s.upper() == ADMIN_PRIVATE_ID:
-        return ADMIN_PRIVATE_ID
-    if PRIVATE_ID_LOGIN_RE.match(s):
-        return s
-    return None
+        return [ADMIN_PRIVATE_ID]
+    candidates: list[str] = []
+    if HU_PRIVATE_ID_LOGIN_RE.match(s):
+        upper = f"{HUMAN_PRIVATE_ID_PREFIX}{s[3:]}"
+        candidates.append(upper)
+        candidates.append(s[3:])  # legacy bare digits
+    elif PRIVATE_ID_LOGIN_RE.match(s):
+        candidates.append(format_human_private_id(s))
+        candidates.append(s)
+    return candidates
+
+
+def _authenticate_user_login(
+    conn: sqlite3.Connection,
+    login_input: str,
+    password: str,
+) -> sqlite3.Row | None:
+    """Resolve Private ID (multiple formats) or email and verify password."""
+    login_input = (login_input or "").strip()
+    password = password or ""
+    if not login_input or not password:
+        return None
+
+    row: sqlite3.Row | None = None
+    if "@" in login_input:
+        row = conn.execute(
+            """
+            SELECT id, password_hash, private_id, first_name, last_name, account_type
+            FROM users WHERE email = ? COLLATE NOCASE
+            """,
+            (login_input,),
+        ).fetchone()
+    else:
+        for cand in _private_id_login_candidates(login_input):
+            row = conn.execute(
+                """
+                SELECT id, password_hash, private_id, first_name, last_name, account_type
+                FROM users WHERE private_id = ? COLLATE NOCASE
+                """,
+                (cand,),
+            ).fetchone()
+            if row:
+                break
+
+    if not row:
+        return None
+
+    stored = row["password_hash"]
+    stored_b = stored.encode("utf-8") if isinstance(stored, str) else stored
+    if not bcrypt.checkpw(password.encode("utf-8"), stored_b):
+        return None
+    return row
+
+
+def _normalize_login_private_id(raw: str) -> str | None:
+    """Legacy helper — first candidate for a Private ID login string."""
+    candidates = _private_id_login_candidates(raw)
+    return candidates[0] if candidates else None
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -14621,33 +14688,17 @@ def login():
 
     raw_pid = (request.form.get("private_id") or "").strip()
     password = request.form.get("password") or ""
-    canon = _normalize_login_private_id(raw_pid)
-    if not canon:
+    if not raw_pid:
         return render_template(
             "login.html",
-            error="Enter your 9-digit Private ID or H_U_ADMIN.",
+            error="Enter your Private ID, HU- ID, or email.",
         )
 
-    row = conn.execute(
-        """
-        SELECT id, password_hash FROM users
-        WHERE private_id = ? COLLATE NOCASE
-        """,
-        (canon,),
-    ).fetchone()
+    row = _authenticate_user_login(conn, raw_pid, password)
     if not row:
         return render_template(
             "login.html",
-            error="Invalid Private ID or password.",
-        )
-
-    stored = row["password_hash"]
-    stored_b = stored.encode("utf-8") if isinstance(stored, str) else stored
-
-    if not bcrypt.checkpw(password.encode("utf-8"), stored_b):
-        return render_template(
-            "login.html",
-            error="Invalid Private ID or password.",
+            error="Invalid login or password.",
         )
 
     session.clear()
@@ -14662,31 +14713,15 @@ def login():
 
 @app.post("/api/login")
 def api_login():
-    """JSON login — accepts 9-digit Private ID or H_U_ADMIN."""
+    """JSON login — Private ID (HU- or 9-digit), H_U_ADMIN, or email."""
     data = request.get_json(silent=True) or {}
-    raw_pid = str(data.get("private_id") or "").strip()
+    raw_pid = str(data.get("private_id") or data.get("email") or "").strip()
     password = str(data.get("password") or "")
     conn = get_db()
 
-    canon = _normalize_login_private_id(raw_pid)
-    if not canon:
-        return jsonify({"error": "Enter your 9-digit Private ID or H_U_ADMIN."}), 400
-
-    row = conn.execute(
-        """
-        SELECT id, password_hash, private_id, first_name, last_name, account_type
-        FROM users
-        WHERE private_id = ? COLLATE NOCASE
-        """,
-        (canon,),
-    ).fetchone()
+    row = _authenticate_user_login(conn, raw_pid, password)
     if not row:
-        return jsonify({"error": "Invalid Private ID or password"}), 401
-
-    stored = row["password_hash"]
-    stored_b = stored.encode("utf-8") if isinstance(stored, str) else stored
-    if not bcrypt.checkpw(password.encode("utf-8"), stored_b):
-        return jsonify({"error": "Invalid Private ID or password"}), 401
+        return jsonify({"error": "Invalid login or password"}), 401
 
     session.clear()
     session["user_pk"] = int(row["id"])
@@ -15285,7 +15320,27 @@ def create_admin_cli(
     click.echo(f"  Admin UI:   {result['admin_verifications_url']}")
 
 
+@click.command("migrate-user-ids")
+@click.option("--db", default=None, help="Database path (default: DATABASE_PATH)")
+@click.argument("action", type=click.Choice(["convert-admin", "add-hu-prefix", "all"]))
+@click.option("--from", "source_id", default="306931970", help="Source Private ID for convert-admin/all")
+def migrate_user_ids_cli(action: str, db: str | None, source_id: str) -> None:
+    """Migrate Private IDs: convert-admin, add-hu-prefix, or all."""
+    import subprocess
+
+    script = BASE_DIR / "scripts" / "migrate_user_ids.py"
+    cmd = [sys.executable, str(script), action]
+    if action in ("convert-admin", "all"):
+        cmd.extend(["--from", source_id])
+    if db:
+        cmd.extend(["--db", db])
+    result = subprocess.run(cmd, cwd=str(BASE_DIR))
+    if result.returncode != 0:
+        raise click.ClickException("migrate_user_ids.py failed")
+
+
 app.cli.add_command(create_admin_cli)
+app.cli.add_command(migrate_user_ids_cli)
 
 
 if __name__ == "__main__":

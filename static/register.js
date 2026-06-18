@@ -1109,7 +1109,7 @@
     /* Post-registration modal: user must confirm IDs are saved before login. */
     function showIdSaveModal(ids) {
       var rows = [
-        { label: "Private ID (9-digit)", value: ids.private_id, key: "private" },
+        { label: "Private ID (HU-)", value: ids.private_id, key: "private" },
         { label: "Public ID (Account ID)", value: ids.public_id, key: "public" },
       ]
         .filter(function (r) {

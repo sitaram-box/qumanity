@@ -23,18 +23,18 @@
 
     <form method="post" action="{{ url_for('login') }}" class="login-form" id="login-form">
       <div class="qb-form-group">
-        <label for="private_id">Private ID</label>
+        <label for="private_id">Private ID or Email</label>
         <input
           type="text"
           class="form-control qb-form-control font-monospace"
           id="private_id"
           name="private_id"
           required
-          placeholder="Enter your 9-digit Private ID or H_U_ADMIN"
+          placeholder="HU-123456789, 9-digit ID, H_U_ADMIN, or email"
           value="{{ request.form.get('private_id', '') }}"
           autocomplete="username"
         />
-        <small class="login-hint">Enter the 9-digit Private ID you received during registration, or <strong>H_U_ADMIN</strong> for the admin account.</small>
+        <small class="login-hint">Use your <strong>HU-</strong> Private ID (e.g. HU-306931970), legacy 9-digit ID, <strong>H_U_ADMIN</strong> for admin, or your registered email.</small>
       </div>
 
       <div class="qb-form-group">

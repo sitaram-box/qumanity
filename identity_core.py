@@ -164,6 +164,91 @@ def _private_id_fk_updates() -> tuple[tuple[str, str], ...]:
         ("deceased_users", "original_private_id"),
         ("deceased_users", "wallet_transferred_to"),
         ("akashic_records", "user_private_id"),
+        ("donations", "user_private_id"),
+        ("donation_distributions", "new_user_private_id"),
+        ("donation_distributions", "referrer_private_id"),
+        ("donation_distributions", "agent_private_id"),
+        ("donation_transactions", "user_private_id"),
+        ("referrals", "referrer_private_id"),
+        ("referrals", "referred_private_id"),
+        ("volunteers", "volunteer_private_id"),
+        ("share_logs", "user_private_id"),
+        ("edit_requests", "user_private_id"),
+        ("family_removal_requests", "user_private_id"),
+    )
+
+
+def reassign_user_private_id(
+    conn: sqlite3.Connection,
+    old_private_id: str,
+    new_private_id: str,
+    *,
+    new_public_id: str | None = None,
+) -> None:
+    """Move all FK references from ``old_private_id`` to ``new_private_id``."""
+    old_pid = str(old_private_id or "").strip()
+    new_pid = str(new_private_id or "").strip()
+    if not old_pid or not new_pid or old_pid == new_pid:
+        return
+
+    for table, column in _private_id_fk_updates():
+        try:
+            conn.execute(
+                f"UPDATE [{table}] SET [{column}] = ? WHERE [{column}] = ?",
+                (new_pid, old_pid),
+            )
+        except sqlite3.OperationalError:
+            pass
+
+    for table in ("family_profile", "user_education", "user_work", "user_family_setup"):
+        try:
+            conn.execute(
+                f"UPDATE [{table}] SET user_private_id = ? WHERE user_private_id = ?",
+                (new_pid, old_pid),
+            )
+        except sqlite3.OperationalError:
+            pass
+
+    try:
+        conn.execute(
+            """
+            UPDATE wallets SET owner_id = ?
+            WHERE owner_type = 'user' AND owner_id = ?
+            """,
+            (new_pid, old_pid),
+        )
+    except sqlite3.OperationalError:
+        pass
+
+    if new_public_id:
+        try:
+            conn.execute(
+                "UPDATE donations SET user_public_id = ? WHERE user_private_id = ?",
+                (str(new_public_id).strip(), new_pid),
+            )
+        except sqlite3.OperationalError:
+            pass
+
+    cols = {
+        str(r[1])
+        for r in conn.execute("PRAGMA table_info(users)").fetchall()
+    }
+    if "referred_by_private_id" in cols:
+        try:
+            conn.execute(
+                "UPDATE users SET referred_by_private_id = ? WHERE referred_by_private_id = ?",
+                (new_pid, old_pid),
+            )
+        except sqlite3.OperationalError:
+            pass
+
+    conn.execute(
+        """
+        UPDATE users
+        SET private_id = ?, public_id = COALESCE(?, public_id)
+        WHERE private_id = ? COLLATE NOCASE
+        """,
+        (new_pid, new_public_id, old_pid),
     )
 
 
