@@ -24,7 +24,9 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote, unquote
 import bcrypt
+import click
 
+import admin_bootstrap
 import config  # loads .env at import time; single source of truth for settings
 from blockchain_adapter import blockchain
 from blockchain_core import migrate_blockchain_schema
@@ -1269,6 +1271,20 @@ def admin_required(view):
         if not is_admin_user(getattr(g, "current_user", None)):
             return jsonify({"error": "Admin only"}), 403
         return view(*args, **kwargs)
+    return _wrap
+
+
+def admin_page_required(view):
+    """HTML admin routes: redirect to dashboard when not admin."""
+
+    @wraps(view)
+    @login_required
+    def _wrap(*args: Any, **kwargs: Any):
+        if not is_admin_user(getattr(g, "current_user", None)):
+            flash("Admin access required.", "error")
+            return redirect(url_for("dashboard"))
+        return view(*args, **kwargs)
+
     return _wrap
 
 
@@ -13986,12 +14002,9 @@ def api_donation_admin_list():
 
 
 @app.route("/admin/verifications")
-@login_required
+@admin_page_required
 def admin_verifications_page():
     """Standalone admin page for pending QR donation verifications."""
-    if not is_admin_user(g.current_user):
-        flash("Admin access required.", "error")
-        return redirect(url_for("dashboard"))
     conn = get_db()
     data = sita_platform_core.admin_donation_list(conn)
     pending_donations: list[dict[str, Any]] = []
@@ -15159,6 +15172,103 @@ def setup_database():
 
     except Exception as exc:
         return f"<h1>Error</h1><pre>{str(exc)}</pre>"
+
+
+@app.post("/api/admin/bootstrap")
+def api_admin_bootstrap():
+    """
+    Create or reset an admin account (Railway / production bootstrap).
+
+    Secured with ``X-Admin-Key`` or ``X-Master-Key`` matching ``ADMIN_API_KEY``.
+    """
+    admin_key = (
+        (request.headers.get("X-Admin-Key") or "").strip()
+        or (request.headers.get("X-Master-Key") or "").strip()
+    )
+    expected = getattr(config, "ADMIN_API_KEY", "") or ""
+    if not expected or not admin_key or admin_key != expected:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    payload = request.get_json(silent=True) or {}
+    conn = get_db()
+    try:
+        result = admin_bootstrap.create_admin_user(
+            conn,
+            email=str(payload.get("email") or "admin@qumanity.com"),
+            phone=str(payload.get("phone") or "9999999999"),
+            first_name=str(payload.get("first_name") or payload.get("name") or "Admin"),
+            last_name=str(payload.get("last_name") or "User"),
+            password=str(payload.get("password") or admin_bootstrap.DEFAULT_PASSWORD),
+            private_id=str(payload.get("private_id") or admin_bootstrap.DEFAULT_PRIVATE_ID),
+            public_id=str(payload.get("public_id") or admin_bootstrap.DEFAULT_PUBLIC_ID)
+            if payload.get("public_id")
+            else None,
+            reset_password=bool(payload.get("reset_password", True)),
+        )
+    except Exception as exc:
+        conn.rollback()
+        app.logger.exception("admin bootstrap failed")
+        return jsonify({"error": str(exc)}), 500
+
+    return jsonify({"success": True, **result})
+
+
+def _cli_db_connection() -> sqlite3.Connection:
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
+    return conn
+
+
+@click.command("create-admin")
+@click.option("--email", default="admin@qumanity.com", help="Admin email (optional metadata)")
+@click.option("--phone", default="9999999999", help="Admin phone (optional metadata)")
+@click.option("--first-name", default="Admin")
+@click.option("--last-name", default="User")
+@click.option("--password", default=admin_bootstrap.DEFAULT_PASSWORD)
+@click.option("--private-id", default=admin_bootstrap.DEFAULT_PRIVATE_ID)
+@click.option("--no-reset-password", is_flag=True, help="Keep existing password if admin exists")
+def create_admin_cli(
+    email: str,
+    phone: str,
+    first_name: str,
+    last_name: str,
+    password: str,
+    private_id: str,
+    no_reset_password: bool,
+) -> None:
+    """Create or update an admin user in the local/Railway SQLite database."""
+    conn = _cli_db_connection()
+    try:
+        result = admin_bootstrap.create_admin_user(
+            conn,
+            email=email,
+            phone=phone,
+            first_name=first_name,
+            last_name=last_name,
+            password=password,
+            private_id=private_id,
+            reset_password=not no_reset_password,
+        )
+    except Exception as exc:
+        conn.close()
+        raise click.ClickException(str(exc)) from exc
+    conn.close()
+
+    click.echo(f"Admin {result['action']} successfully.")
+    click.echo(f"  Private ID: {result['private_id']}  (use this to log in)")
+    click.echo(f"  Public ID:  {result['public_id']}")
+    if result.get("email"):
+        click.echo(f"  Email:      {result['email']}")
+    if result.get("phone"):
+        click.echo(f"  Phone:      {result['phone']}")
+    if result.get("password"):
+        click.echo(f"  Password:   {result['password']}")
+    click.echo(f"  Login:      {result['login_url']}")
+    click.echo(f"  Admin UI:   {result['admin_verifications_url']}")
+
+
+app.cli.add_command(create_admin_cli)
 
 
 if __name__ == "__main__":

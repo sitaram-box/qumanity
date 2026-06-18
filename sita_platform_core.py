@@ -1206,3 +1206,10 @@ def _apply_field_update(
             )
         except ValueError:
             pass
+
+
+def create_admin_user(conn: sqlite3.Connection, **kwargs: Any) -> dict[str, Any]:
+    """Bootstrap an admin account. See ``admin_bootstrap.create_admin_user``."""
+    from admin_bootstrap import create_admin_user as _bootstrap_admin
+
+    return _bootstrap_admin(conn, **kwargs)
