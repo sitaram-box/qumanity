@@ -13,9 +13,9 @@ from typing import Any
 import bcrypt
 import qoin_core
 
-DEFAULT_PRIVATE_ID = "H_U_ADMIN"
+DEFAULT_PRIVATE_ID = "HU-014918240"
 DEFAULT_PUBLIC_ID = "ADMIN-PUBLIC"
-DEFAULT_PASSWORD = "Admin123"
+DEFAULT_PASSWORD = "P@y#umans123"
 DEFAULT_VILLAGE_ID = "0.राम|IND/CS/DL.5.4.1E"
 DEFAULT_DOB = date(1990, 7, 30)
 DEFAULT_BIRTH_TIME = "07:05"
@@ -52,7 +52,6 @@ def create_admin_user(
     from app import (
         compute_age,
         element_for_sun,
-        generate_9_digit_private_id,
         life_stage_from_age,
         moon_sign_simplified,
         sun_sign_for_date,
@@ -61,8 +60,26 @@ def create_admin_user(
 
     pid = (private_id or DEFAULT_PRIVATE_ID).strip()
     pub = (public_id or DEFAULT_PUBLIC_ID).strip()
-    if pid != DEFAULT_PRIVATE_ID and (len(pid) != 9 or not pid.isdigit()):
-        pid = generate_9_digit_private_id(conn)
+    is_default_admin = pid.upper() == DEFAULT_PRIVATE_ID.upper()
+
+    # Never generate a random ID for the default admin account.
+    if is_default_admin:
+        pid = DEFAULT_PRIVATE_ID
+        pub = DEFAULT_PUBLIC_ID
+    elif pid.upper().startswith("HU-"):
+        digits = pid[3:]
+        if len(digits) != 9 or not digits.isdigit():
+            pid = DEFAULT_PRIVATE_ID
+            pub = DEFAULT_PUBLIC_ID
+            is_default_admin = True
+    else:
+        digits = pid
+        if len(digits) != 9 or not digits.isdigit():
+            pid = DEFAULT_PRIVATE_ID
+            pub = DEFAULT_PUBLIC_ID
+            is_default_admin = True
+        else:
+            pid = f"HU-{digits}"
 
     age = compute_age(DEFAULT_DOB)
     age_group = life_stage_from_age(age)
@@ -121,7 +138,7 @@ def create_admin_user(
             birth_path,
             present_path,
         )
-        if pub == DEFAULT_PUBLIC_ID:
+        if not is_default_admin and pub == DEFAULT_PUBLIC_ID:
             pub = generated_public
         conn.execute(
             """

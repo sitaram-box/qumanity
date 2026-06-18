@@ -144,7 +144,14 @@ def _remove_user_hard(conn: sqlite3.Connection, private_id: str) -> bool:
         except sqlite3.OperationalError:
             pass
 
-        conn.execute("DELETE FROM users WHERE id = ?", (int(row["id"]),))
+        user_id = row["id"]
+        if user_id is not None:
+            conn.execute("DELETE FROM users WHERE id = ?", (int(user_id),))
+        else:
+            conn.execute(
+                "DELETE FROM users WHERE private_id = ? COLLATE NOCASE",
+                (pid,),
+            )
     finally:
         if conn.execute("PRAGMA foreign_keys").fetchone()[0]:
             conn.execute("PRAGMA foreign_keys = ON")
@@ -218,7 +225,7 @@ def run_reset() -> dict[str, Any]:
 
         import admin_bootstrap
 
-        log_lines.append("Creating fresh admin via admin_bootstrap…")
+        log_lines.append(f"Creating fresh admin at fixed ID {ADMIN_PRIVATE_ID}…")
         result = admin_bootstrap.create_admin_user(
             conn,
             email=ADMIN_EMAIL,
@@ -231,8 +238,15 @@ def run_reset() -> dict[str, Any]:
             reset_password=True,
             migrate=False,
         )
-        conn.commit()
-        log_lines.append(f"Admin {result.get('action')}: {result.get('private_id')}")
+        created_pid = str(result.get("private_id") or "").strip()
+        log_lines.append(f"Admin {result.get('action')}: {created_pid}")
+        if created_pid.upper() != ADMIN_PRIVATE_ID.upper():
+            out["message"] = (
+                f"Admin created with wrong ID {created_pid}; expected {ADMIN_PRIVATE_ID}"
+            )
+            out["log"] = "\n".join(log_lines)
+            conn.close()
+            return out
 
         out["login_verified"] = verify_admin_password(conn)
         out["diagnosis"] = diagnose_admin(conn)
