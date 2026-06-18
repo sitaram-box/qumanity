@@ -28,7 +28,7 @@
     />
     <link
       rel="stylesheet"
-      href="{{ url_for('static', filename='style.css') }}?v=9"
+      href="{{ url_for('static', filename='style.css') }}?v=10"
     />
     {% block head_extra %}{% endblock %}
   </head>
@@ -48,7 +48,7 @@
       </a>
       <div class="qb-nav-cluster flex-shrink-0 d-flex flex-wrap align-items-center gap-2 justify-content-end">
         <nav class="qb-nav-actions">
-        {% if session.get('user_pk') %}
+        {% if session.get('user_pk') and not show_public_nav %}
         <a href="{{ url_for('dashboard') }}" class="qb-btn qb-btn-outline"
           >{{ 'dashboard'|tr }}</a
         >

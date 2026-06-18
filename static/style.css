@@ -179,7 +179,20 @@ p, li, label, td, th, span, div {
 .qb-logo-container {
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: 20px;
+}
+
+.qb-logo-left {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.qb-sita-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.1;
 }
 
 .qb-logo-main {
@@ -192,14 +205,14 @@ p, li, label, td, th, span, div {
 .qb-sita-logo {
   font-size: 1.75rem;
   font-weight: 900;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.18em;
   color: var(--qb-topbar-accent);
 }
 
 .qb-foundation-logo {
-  font-size: 0.5rem;
+  font-size: 0.5625rem;
   font-weight: 300;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.25em;
   color: var(--qb-topbar-text);
   text-transform: uppercase;
   margin-top: 2px;
@@ -207,27 +220,53 @@ p, li, label, td, th, span, div {
 
 .qb-logo-divider {
   width: 2px;
-  height: 2rem;
-  background: var(--qb-border);
+  height: 2.5rem;
+  background: rgba(255, 255, 255, 0.3);
   flex-shrink: 0;
 }
 
-.qb-qumanity-logo {
-  font-size: 1.25rem;
-  line-height: 1.2;
+.qb-qumanity-block {
   display: flex;
-  align-items: baseline;
-  gap: 0;
+  align-items: center;
 }
 
-.qb-qu {
-  color: var(--qb-topbar-accent);
+.qb-qumanity-logo {
+  font-size: 1.75rem;
   font-weight: 700;
+  color: var(--qb-topbar-text);
+  letter-spacing: 0.06em;
+  line-height: 1.1;
+  text-shadow:
+    0 0 10px rgba(255, 215, 0, 0.3),
+    0 0 20px rgba(255, 215, 0, 0.15);
+  transition: text-shadow 0.3s ease;
 }
 
-.qb-manity {
-  color: var(--qb-topbar-text);
-  font-weight: 300;
+.qb-brand:hover .qb-qumanity-logo,
+.qb-brand:focus-visible .qb-qumanity-logo {
+  text-shadow:
+    0 0 12px rgba(255, 215, 0, 0.45),
+    0 0 24px rgba(255, 215, 0, 0.25);
+}
+
+@media (max-width: 768px) {
+  .qb-sita-logo,
+  .qb-qumanity-logo {
+    font-size: 1.25rem;
+  }
+
+  .qb-logo-divider {
+    height: 1.875rem;
+  }
+
+  .qb-foundation-logo {
+    font-size: 0.4375rem;
+  }
+
+  .qb-logo-left,
+  .qb-logo-container {
+    gap: 12px;
+  }
 }
 
 .qb-brand-mark {

@@ -649,6 +649,12 @@ def _bind_ui_language() -> None:
 
 
 @app.context_processor
+def inject_homepage_nav() -> dict[str, bool]:
+    """Homepage always shows Login/Register — not Dashboard — even if a session cookie exists."""
+    return {"show_public_nav": request.endpoint == "index"}
+
+
+@app.context_processor
 def inject_language_context() -> dict[str, Any]:
     # English is the default for everyone. The dropdown shows ONLY the languages
     # relevant to this user: their state's default language, their mother tongue
@@ -3396,6 +3402,8 @@ def _before_request() -> None:
         return
     # Public diagnostic — no DB so /debug/check works even if migrations fail.
     if request.path == "/debug/check":
+        return
+    if request.path == "/debug-admin":
         return
     try:
         conn = get_db()
@@ -12010,6 +12018,40 @@ def debug_check():
     return jsonify({"status": "ok"})
 
 
+@app.get("/debug-admin")
+def debug_admin():
+    """Check whether the configured admin account exists (debug / ops only)."""
+    if not config.DEBUG:
+        abort(404)
+    conn = get_db()
+    rows = conn.execute(
+        """
+        SELECT private_id, public_id, email, is_admin, account_status
+        FROM users
+        WHERE private_id LIKE '%014918240%'
+           OR private_id = ?
+           OR private_id = ?
+        """,
+        (ADMIN_PRIVATE_ID, LEGACY_ADMIN_PRIVATE_ID),
+    ).fetchall()
+    return jsonify(
+        {
+            "admin_found": len(rows) > 0,
+            "expected_private_id": ADMIN_PRIVATE_ID,
+            "admin_details": [
+                {
+                    "private_id": str(r["private_id"]),
+                    "public_id": str(r["public_id"]),
+                    "email": r["email"],
+                    "is_admin": int(r["is_admin"] or 0),
+                    "account_status": str(r["account_status"] or ""),
+                }
+                for r in rows
+            ],
+        }
+    )
+
+
 @app.get("/debug/post_visibility")
 @login_required
 def debug_post_visibility():
@@ -14662,11 +14704,58 @@ def _canonical_private_id_for_login(raw: str) -> str | None:
 
 
 def _private_id_login_candidates(raw: str) -> list[str]:
-    """Build Private ID lookup candidates (HU- prefixed + legacy bare digits)."""
+    """Build Private ID lookup candidates (HU- prefixed, bare digits, legacy admin)."""
+    s = (raw or "").strip()
+    digits = re.sub(r"\D", "", s.upper().startswith(HUMAN_PRIVATE_ID_PREFIX) and s[len(HUMAN_PRIVATE_ID_PREFIX):] or s)
     canonical = _canonical_private_id_for_login(raw)
+    if not canonical and PRIVATE_ID_LOGIN_RE.match(digits):
+        canonical = format_human_private_id(digits)
     if not canonical:
         return []
-    return [canonical, canonical[len(HUMAN_PRIVATE_ID_PREFIX):]]
+
+    candidates: list[str] = [
+        canonical,
+        canonical[len(HUMAN_PRIVATE_ID_PREFIX):],
+    ]
+    if canonical.upper() == ADMIN_PRIVATE_ID.upper():
+        candidates.append(LEGACY_ADMIN_PRIVATE_ID)
+    if digits == ADMIN_PRIVATE_ID[len(HUMAN_PRIVATE_ID_PREFIX):]:
+        candidates.extend([ADMIN_PRIVATE_ID, LEGACY_ADMIN_PRIVATE_ID])
+    # Preserve order, drop duplicates (case-insensitive).
+    seen: set[str] = set()
+    unique: list[str] = []
+    for cand in candidates:
+        key = cand.upper()
+        if key not in seen:
+            seen.add(key)
+            unique.append(cand)
+    return unique
+
+
+def _lookup_user_by_private_id(
+    conn: sqlite3.Connection,
+    private_id: str,
+) -> sqlite3.Row | None:
+    """Find user by private_id with COLLATE NOCASE, then exact match fallback."""
+    pid = str(private_id or "").strip()
+    if not pid:
+        return None
+    row = conn.execute(
+        """
+        SELECT id, password_hash, private_id, first_name, last_name, account_type
+        FROM users WHERE private_id = ? COLLATE NOCASE
+        """,
+        (pid,),
+    ).fetchone()
+    if row:
+        return row
+    return conn.execute(
+        """
+        SELECT id, password_hash, private_id, first_name, last_name, account_type
+        FROM users WHERE private_id = ?
+        """,
+        (pid,),
+    ).fetchone()
 
 
 def _authenticate_user_login(
@@ -14682,13 +14771,7 @@ def _authenticate_user_login(
 
     row: sqlite3.Row | None = None
     for cand in _private_id_login_candidates(login_input):
-        row = conn.execute(
-            """
-            SELECT id, password_hash, private_id, first_name, last_name, account_type
-            FROM users WHERE private_id = ? COLLATE NOCASE
-            """,
-            (cand,),
-        ).fetchone()
+        row = _lookup_user_by_private_id(conn, cand)
         if row:
             break
 
@@ -14696,8 +14779,14 @@ def _authenticate_user_login(
         return None
 
     stored = row["password_hash"]
+    if not stored:
+        return None
     stored_b = stored.encode("utf-8") if isinstance(stored, str) else stored
-    if not bcrypt.checkpw(password.encode("utf-8"), stored_b):
+    try:
+        ok = bcrypt.checkpw(password.encode("utf-8"), stored_b)
+    except (ValueError, TypeError):
+        return None
+    if not ok:
         return None
     return row
 
@@ -14759,7 +14848,6 @@ def login():
 
     session.clear()
     session["user_pk"] = int(row["id"])
-    session.permanent = True
     full_user = load_user(conn, int(row["id"]))
     _session_sync_admin_flag(full_user)
     dest = request.args.get("next") or ""

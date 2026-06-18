@@ -30,7 +30,7 @@
 
     <div class="qb-home-header-trailing">
       <div class="qb-home-auth">
-        {% if session.get('user_pk') %}
+        {% if session.get('user_pk') and not show_public_nav %}
         <a href="{{ url_for('dashboard') }}" class="qb-btn qb-btn-outline qb-home-btn-auth"
           >{{ 'dashboard'|tr }}</a
         >
@@ -99,9 +99,10 @@
       quantum technology.
     </p>
     <div class="hero-buttons">
-      {% if session.get('user_pk') %}
+      {% if session.get('user_pk') and not show_public_nav %}
       <a href="{{ url_for('dashboard') }}" class="qb-btn qb-btn-primary btn-large">Open Dashboard</a>
       {% else %}
+      <a href="{{ url_for('login') }}" class="qb-btn qb-btn-outline btn-large">Login</a>
       <a href="{{ url_for('register') }}" class="qb-btn qb-btn-primary btn-large">Join the Movement</a>
       {% endif %}
       <a href="{{ url_for('about') }}" class="qb-btn qb-btn-secondary btn-large">Learn More</a>
@@ -405,11 +406,11 @@
 <section class="cta-section" aria-labelledby="cta-heading">
   <h2 id="cta-heading">Ready to Join the Conscious Revolution?</h2>
   <p>Create your account today. It takes less than 5 minutes.</p>
-  {% if not session.get('user_pk') %}
+  {% if session.get('user_pk') and not show_public_nav %}
+  <a href="{{ url_for('dashboard') }}" class="qb-btn btn-large cta-register-btn">Open Your Dashboard</a>
+  {% else %}
   <a href="{{ url_for('register') }}" class="qb-btn btn-large cta-register-btn">Register Now</a>
   <p class="cta-note">Already have an account? <a href="{{ url_for('login') }}">Sign in</a></p>
-  {% else %}
-  <a href="{{ url_for('dashboard') }}" class="qb-btn btn-large cta-register-btn">Open Your Dashboard</a>
   {% endif %}
 </section>
 
