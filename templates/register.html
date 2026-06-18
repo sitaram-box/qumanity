@@ -654,13 +654,37 @@
       </div>
       <div class="payment-option mb-2">
         <label class="payment-label small">
+          <input type="radio" name="reg-donate-method" value="link" class="reg-donate-method-radio" />
+          <span>🔗 Pay with UPI Link</span>
+        </label>
+        <div id="reg-payment-link-placeholder" class="mt-2" hidden>
+          <p class="small mb-2">
+            Opens Razorpay payment page with UPI — works reliably in test mode
+            (PhonePe, GPay, Paytm). Use <strong>success@razorpay</strong> when prompted in test.
+          </p>
+          <div class="qb-panel p-2">
+            <p class="small mb-2 mb-0">
+              <strong>Amount:</strong> <span id="reg-link-amount">—</span>
+            </p>
+            <button type="button" class="qb-btn qb-btn-primary mt-2" id="reg-open-payment-link" disabled>
+              Pay with UPI
+            </button>
+            <p class="small text-muted mt-2 mb-0" id="reg-link-payment-waiting" hidden>
+              Waiting for payment…
+            </p>
+            <p class="small text-success mt-1 mb-0 qb-payment-success" id="reg-link-webhook-status" hidden></p>
+          </div>
+        </div>
+      </div>
+      <div class="payment-option mb-2">
+        <label class="payment-label small">
           <input type="radio" name="reg-donate-method" value="qr" class="reg-donate-method-radio" />
           <span>📱 QR Code Scan</span>
         </label>
         <div id="reg-qr-placeholder" class="qr-placeholder mt-2" hidden>
           <p class="small mb-2">
             Scan with Google Pay, PhonePe, Paytm, or any UPI app.
-            Payment opens directly in your app — no Razorpay website or card details.
+            If scan fails, use <strong>Pay with UPI Link</strong> above.
           </p>
           <div class="qb-qr-payment-box" id="reg-qr-container">
             <img
@@ -736,6 +760,6 @@
   };
 </script>
 <script src="{{ url_for('static', filename='register_geo.js') }}?v=6" defer></script>
-<script src="{{ url_for('static', filename='register.js') }}?v=19" defer></script>
+<script src="{{ url_for('static', filename='register.js') }}?v=23" defer></script>
 {% endif %}
 {% endblock %}

@@ -8614,6 +8614,105 @@ def _create_razorpay_order(amount_rupees: int, *, receipt: str = "") -> dict[str
     return client.order.create(data=order_data)
 
 
+def _pending_registration_customer_info() -> dict[str, str]:
+    """Extract customer fields from session pending registration."""
+    pending = session.get("pending_registration") or {}
+    first = str(pending.get("first_name") or "").strip()
+    last = str(pending.get("last_name") or "").strip()
+    name = f"{first} {last}".strip() or "Qumanity User"
+    email = str(pending.get("email_raw") or "").strip()
+    phone = re.sub(r"\D", "", str(pending.get("phone_raw") or ""))
+    if len(phone) > 10:
+        phone = phone[-10:]
+    return {"name": name[:50], "email": email, "phone": phone}
+
+
+def _create_razorpay_payment_link(
+    amount_rupees: int,
+    donation_id: int,
+    *,
+    name: str = "Qumanity User",
+    email: str = "",
+    phone: str = "",
+) -> dict[str, Any]:
+    """Create Razorpay Payment Link — reliable UPI path for test and production."""
+    client = _razorpay_client()
+    if client is None:
+        raise ValueError("Payment gateway is not configured")
+    txn_ref = f"QUM{donation_id}"
+    customer: dict[str, str] = {"name": (name or "Qumanity User")[:50]}
+    if email:
+        customer["email"] = email[:100]
+    if phone:
+        customer["contact"] = phone[:15]
+    payment_link_data: dict[str, Any] = {
+        "amount": int(amount_rupees) * 100,
+        "currency": "INR",
+        "accept_partial": False,
+        "expire_by": int(time.time()) + 3600,
+        "reference_id": txn_ref,
+        "description": f"Qumanity Registration Donation {txn_ref}",
+        "customer": customer,
+        "notify": {"email": False, "sms": False},
+        "reminder_enable": False,
+        "notes": {
+            "donation_id": str(donation_id),
+            "donation_type": "registration",
+        },
+    }
+    return client.payment_link.create(payment_link_data)
+
+
+def _sync_donation_from_payment_link(
+    conn: sqlite3.Connection,
+    donation_id: int,
+    payment_link_id: str,
+) -> dict[str, Any] | None:
+    """Poll Razorpay payment link and mark donation completed when paid."""
+    client = _razorpay_client()
+    if client is None:
+        return sita_platform_core.get_donation(conn, donation_id)
+    try:
+        plink = client.payment_link.fetch(payment_link_id)
+    except Exception as exc:
+        app.logger.warning("Payment link fetch failed for %s: %s", payment_link_id, exc)
+        return sita_platform_core.get_donation(conn, donation_id)
+    status = str(plink.get("status") or "").strip().lower()
+    if status != "paid":
+        return sita_platform_core.get_donation(conn, donation_id)
+    payments = plink.get("payments") or []
+    payment_id = ""
+    order_id = ""
+    amount_paise = int(plink.get("amount") or 0)
+    if payments:
+        payment_id = str(payments[0] or "").strip()
+    if payment_id:
+        try:
+            payment = client.payment.fetch(payment_id)
+            order_id = str(payment.get("order_id") or "").strip()
+            amount_paise = int(payment.get("amount") or amount_paise)
+        except Exception:
+            pass
+    if payment_id:
+        sita_platform_core.confirm_donation_from_razorpay(
+            conn,
+            donation_id,
+            razorpay_payment_id=payment_id,
+            razorpay_order_id=order_id or None,
+            amount_paise=amount_paise or None,
+            confirmed_by="razorpay_payment_link_poll",
+        )
+        conn.execute(
+            """
+            UPDATE donations
+            SET razorpay_payment_link_id = COALESCE(razorpay_payment_link_id, ?)
+            WHERE id = ?
+            """,
+            (payment_link_id, int(donation_id)),
+        )
+    return sita_platform_core.get_donation(conn, donation_id)
+
+
 _MERCHANT_UPI_VPA_CACHE: str = ""
 
 
@@ -8680,10 +8779,19 @@ def _resolve_merchant_upi_vpa() -> tuple[str, str]:
     ):
         vpa = _clean_env_value(os.environ.get(env_name, ""))
         if vpa and "@" in vpa:
-            return vpa, env_name
+            if vpa.lower() in _PLACEHOLDER_UPI_VPAS:
+                app.logger.warning(
+                    "%s is a placeholder (%s); trying Razorpay discovery",
+                    env_name,
+                    vpa,
+                )
+            elif _validate_upi_vpa(vpa):
+                return vpa, env_name
+            else:
+                app.logger.warning("Invalid %s format: %s", env_name, vpa)
 
     vpa = _clean_env_value(getattr(config, "DONATION_UPI_VPA", ""))
-    if vpa and "@" in vpa:
+    if vpa and "@" in vpa and vpa.lower() not in _PLACEHOLDER_UPI_VPAS and _validate_upi_vpa(vpa):
         return vpa, "config_module"
 
     if _MERCHANT_UPI_VPA_CACHE and "@" in _MERCHANT_UPI_VPA_CACHE:
@@ -8697,40 +8805,91 @@ def _resolve_merchant_upi_vpa() -> tuple[str, str]:
             return discovered, "razorpay_discover"
 
     fallback = _clean_env_value(getattr(config, "UPI_VPA_FALLBACK", ""))
-    if fallback and "@" in fallback:
+    if fallback and "@" in fallback and _validate_upi_vpa(fallback):
         app.logger.warning("Using UPI_VPA_FALLBACK: %s", fallback)
         return fallback, "fallback_env"
 
     app.logger.error(
-        "No DONATION_UPI_VPA found in environment — using built-in default. "
-        "Set DONATION_UPI_VPA in Railway to your real merchant UPI ID."
+        "No valid DONATION_UPI_VPA in environment. Set your real Razorpay merchant UPI ID "
+        "(Razorpay Dashboard → Settings → UPI)."
     )
-    return "merchant@razorpay", "builtin_default"
+    placeholder = "merchant@razorpay"
+    return placeholder, "builtin_default"
+
+
+def _razorpay_upi_uri_for_donation(amount_paise: int, donation_id: int) -> tuple[str, str]:
+    """Fetch NPCI-compatible UPI URI from Razorpay (best compatibility with UPI apps)."""
+    client = _razorpay_client()
+    if client is None:
+        return "", ""
+    txn_ref = f"QUM{donation_id}"
+    try:
+        qr = client.qrcode.create(
+            {
+                "type": "upi_qr",
+                "name": "QumanityDonation",
+                "usage": "single_use",
+                "fixed_amount": True,
+                "payment_amount": int(amount_paise),
+                "description": f"Donation {txn_ref}",
+                "close_by": int(time.time()) + 900,
+                "notes": {"donation_id": str(donation_id)},
+            }
+        )
+        content = str(qr.get("image_content") or "").strip()
+        qr_id = str(qr.get("id") or "").strip()
+        if content.startswith("upi://"):
+            return content, qr_id
+    except Exception as exc:
+        app.logger.warning("Razorpay UPI URI fetch failed: %s", exc)
+    return "", ""
 
 
 def _generate_upi_qr_simple(amount_rupees: float, donation_id: int) -> dict[str, Any]:
     """
-    Direct static UPI QR — no Razorpay checkout, no redirect URLs.
-    Encodes upi://pay locally so UPI apps open directly.
+    Direct static UPI QR — encodes upi://pay locally for UPI apps.
     """
     vpa, vpa_source = _resolve_merchant_upi_vpa()
+    amount_paise = int(round(float(amount_rupees) * 100))
     txn_ref = f"QUM{donation_id}"
-    txn_note = f"Qumanity donation {donation_id}"
-    upi_uri = _build_upi_pay_uri(
-        vpa,
-        amount_rupees,
-        transaction_note=txn_note,
-        transaction_ref=txn_ref,
+    qr_id = ""
+
+    razorpay_uri, razorpay_qr_id = _razorpay_upi_uri_for_donation(amount_paise, donation_id)
+    if razorpay_uri:
+        upi_uri = razorpay_uri
+        qr_id = razorpay_qr_id
+        vpa_from_uri = _parse_upi_vpa_from_uri(razorpay_uri)
+        if vpa_from_uri and _validate_upi_vpa(vpa_from_uri):
+            vpa = vpa_from_uri
+        vpa_source = "razorpay_image_content"
+    else:
+        if not _validate_upi_vpa(vpa):
+            raise ValueError(f"Invalid UPI VPA: {vpa!r}")
+        upi_uri = _build_upi_pay_uri(
+            vpa,
+            amount_rupees,
+            payee_name="Qumanity",
+            transaction_note=f"Donation {txn_ref}",
+            transaction_ref=txn_ref,
+        )
+
+    app.logger.info(
+        "UPI QR donation=%s vpa_source=%s uri=%s",
+        donation_id,
+        vpa_source,
+        upi_uri,
     )
     qr_b64 = _generate_upi_qr_base64(upi_uri)
     return {
-        "qr_id": "",
+        "qr_id": qr_id,
         "qr_image_base64": qr_b64,
         "upi_vpa": vpa,
         "upi_uri": upi_uri,
         "transaction_ref": txn_ref,
         "vpa_source": vpa_source,
+        "vpa_valid": _validate_upi_vpa(vpa),
         "amount": amount_rupees,
+        "vpa_is_placeholder": vpa.lower() in _PLACEHOLDER_UPI_VPAS,
     }
 
 
@@ -8780,7 +8939,12 @@ def _generate_upi_qr_base64(upi_uri: str) -> str:
 
         import qrcode
 
-        qr = qrcode.QRCode(version=1, box_size=8, border=2)
+        qr = qrcode.QRCode(
+            version=None,
+            error_correction=qrcode.constants.ERROR_CORRECT_M,
+            box_size=10,
+            border=4,
+        )
         qr.add_data(upi_uri)
         qr.make(fit=True)
         img = qr.make_image(fill_color="black", back_color="white")
@@ -8795,6 +8959,62 @@ def _generate_upi_qr_base64(upi_uri: str) -> str:
         ) from exc
 
 
+def _validate_upi_vpa(vpa: str) -> bool:
+    """Validate UPI VPA format (user@psp)."""
+    v = (vpa or "").strip()
+    if not v or " " in v or "@" not in v:
+        return False
+    parts = v.split("@")
+    if len(parts) != 2 or not parts[0] or not parts[1]:
+        return False
+    return bool(re.match(r"^[A-Za-z0-9._-]+@[A-Za-z0-9][A-Za-z0-9.-]*$", v))
+
+
+_PLACEHOLDER_UPI_VPAS = frozenset(
+    {
+        "merchant@razorpay",
+        "yourmerchant@razorpay",
+        "donation@razorpay",
+        "qumanity@razorpay",
+    }
+)
+
+# Razorpay test VPAs work in Checkout / Payment Links, not PhonePe/GPay static QR scan.
+_STATIC_QR_UNRELIABLE_VPAS = frozenset(
+    {
+        "success@razorpay",
+        "failure@razorpay",
+    }
+)
+
+
+def _static_qr_scan_warning(vpa: str, vpa_source: str, used_razorpay_uri: bool) -> str | None:
+    if used_razorpay_uri:
+        return None
+    vpa_lower = (vpa or "").strip().lower()
+    if vpa_lower in _PLACEHOLDER_UPI_VPAS:
+        return (
+            "QR uses a placeholder VPA — set DONATION_UPI_VPA to your real merchant UPI ID, "
+            "or use Pay with UPI Link instead."
+        )
+    if vpa_lower in _STATIC_QR_UNRELIABLE_VPAS:
+        return (
+            "Static QR with success@razorpay often fails in PhonePe / GPay / Paytm. "
+            "Use Pay with UPI Link for reliable test payments."
+        )
+    if vpa_source in ("builtin_default", "fallback_env"):
+        return "Use Pay with UPI Link if QR scan fails in your UPI app."
+    return None
+
+
+def _format_upi_amount(amount_rupees: float) -> str:
+    """Format amount for UPI deep links (NPCI: rupees as decimal string)."""
+    amount = round(float(amount_rupees), 2)
+    if abs(amount - int(amount)) < 0.001:
+        return str(int(amount))
+    return f"{amount:.2f}"
+
+
 def _build_upi_pay_uri(
     vpa: str,
     amount_rupees: float,
@@ -8803,20 +9023,35 @@ def _build_upi_pay_uri(
     transaction_note: str = "",
     transaction_ref: str = "",
 ) -> str:
-    """Build a UPI deep link that opens the payer's UPI app directly (no web redirect)."""
-    vpa = (vpa or "").strip()
-    if not vpa:
-        raise ValueError("UPI VPA is required")
-    params = [
-        f"pa={quote(vpa, safe='')}",
-        f"pn={quote(payee_name, safe='')}",
-        f"am={amount_rupees:.2f}",
-        "cu=INR",
-    ]
-    if transaction_note:
-        params.append(f"tn={quote(transaction_note, safe='')}")
-    if transaction_ref:
-        params.append(f"tr={quote(transaction_ref, safe='')}")
+    """
+    Build a UPI deep link for PhonePe / GPay / Paytm.
+
+    Critical: keep `@` literal in `pa` — encoding as %40 breaks most UPI apps.
+    """
+    vpa = (vpa or "").strip().lower()
+    if not _validate_upi_vpa(vpa):
+        raise ValueError(f"Invalid UPI VPA format: {vpa!r}")
+
+    params: list[str] = [f"pa={vpa}"]
+
+    pn = (payee_name or "").strip()
+    if pn:
+        params.append(f"pn={quote(pn, safe='')}")
+
+    if amount_rupees > 0:
+        params.append(f"am={_format_upi_amount(amount_rupees)}")
+
+    params.append("cu=INR")
+
+    tn = (transaction_note or "").strip()
+    if tn:
+        tn = tn[:80]
+        params.append(f"tn={quote(tn, safe='')}")
+
+    tr = re.sub(r"[^A-Za-z0-9]", "", (transaction_ref or "").strip())[:35]
+    if tr:
+        params.append(f"tr={tr}")
+
     return "upi://pay?" + "&".join(params)
 
 
@@ -9324,6 +9559,11 @@ def api_donation_create_order():
     session["pending_donation_id"] = donation_id
     session["pending_donation_marker"] = session_marker
     conn.commit()
+    scan_warning = _static_qr_scan_warning(
+        str(qr_payload.get("upi_vpa") or ""),
+        str(qr_payload.get("vpa_source") or ""),
+        str(qr_payload.get("vpa_source") or "") == "razorpay_image_content",
+    )
     return jsonify(
         {
             "ok": True,
@@ -9336,6 +9576,174 @@ def api_donation_create_order():
             "upi_vpa": qr_payload.get("upi_vpa"),
             "upi_uri": qr_payload.get("upi_uri"),
             "vpa_source": qr_payload.get("vpa_source"),
+            "vpa_valid": qr_payload.get("vpa_valid"),
+            "vpa_is_placeholder": qr_payload.get("vpa_is_placeholder"),
+            "static_qr_warning": scan_warning,
+            "qr_uses_razorpay_uri": (
+                str(qr_payload.get("vpa_source") or "") == "razorpay_image_content"
+            ),
+        }
+    )
+
+
+@app.post("/api/donation/create-payment-link")
+def api_donation_create_payment_link():
+    """Create Razorpay Payment Link — opens UPI apps reliably (test and production)."""
+    pending = session.get("pending_registration")
+    if not pending and not getattr(g, "current_user", None):
+        return jsonify(
+            {
+                "error": "Complete registration or log in first",
+                "code": "no_pending_registration",
+            }
+        ), 401
+    if _razorpay_client() is None:
+        return jsonify(
+            {
+                "error": "Payment gateway is not configured",
+                "code": "razorpay_not_configured",
+            }
+        ), 503
+    payload = request.get_json(silent=True) or {}
+    try:
+        amount = int(payload.get("amount", 0))
+    except (TypeError, ValueError):
+        return jsonify({"error": "amount must be an integer"}), 400
+    if amount < 1 or amount > 200:
+        return jsonify({"error": "Donation must be between ₹1 and ₹200"}), 400
+
+    customer = _pending_registration_customer_info()
+    name = str(payload.get("name") or customer["name"]).strip() or "Qumanity User"
+    email = str(payload.get("email") or customer["email"]).strip()
+    phone = str(payload.get("phone") or customer["phone"]).strip()
+
+    conn = get_db()
+    session_marker = secrets.token_hex(8)
+    donation_id = sita_platform_core.record_donation(
+        conn,
+        user_private_id=f"{sita_platform_core.PENDING_USER_PREFIX}{session_marker}",
+        user_public_id="PENDING",
+        amount=amount,
+        payment_method="payment_link",
+        status="pending",
+        payment_status="pending",
+        amount_paise=amount * 100,
+    )
+    txn_ref = f"QUM{donation_id}"
+    conn.execute(
+        "UPDATE donations SET transaction_id = ? WHERE id = ?",
+        (txn_ref, int(donation_id)),
+    )
+    try:
+        plink = _create_razorpay_payment_link(
+            amount,
+            donation_id,
+            name=name,
+            email=email,
+            phone=phone,
+        )
+    except Exception as exc:
+        conn.rollback()
+        app.logger.exception("Payment link create failed for donation %s", donation_id)
+        return jsonify({"error": f"Failed to create payment link: {exc}"}), 503
+
+    payment_link_id = str(plink.get("id") or "").strip()
+    short_url = str(plink.get("short_url") or plink.get("shorturl") or "").strip()
+    if not payment_link_id or not short_url:
+        conn.rollback()
+        return jsonify({"error": "Razorpay did not return a payment link URL"}), 503
+
+    conn.execute(
+        "UPDATE donations SET razorpay_payment_link_id = ? WHERE id = ?",
+        (payment_link_id, int(donation_id)),
+    )
+    session["pending_donation_id"] = donation_id
+    session["pending_donation_marker"] = session_marker
+    conn.commit()
+    return jsonify(
+        {
+            "ok": True,
+            "success": True,
+            "donation_id": donation_id,
+            "amount": amount,
+            "payment_link": short_url,
+            "payment_link_id": payment_link_id,
+            "payment_method": "payment_link",
+        }
+    )
+
+
+@app.get("/api/decode-qr-uri")
+def api_decode_qr_uri():
+    """Return the UPI URI that would be encoded in a static donation QR."""
+    amount = request.args.get("amount", 1, type=float)
+    donation_id = request.args.get("donation_id", 999, type=int)
+    vpa, source = _resolve_merchant_upi_vpa()
+    txn_ref = f"QUM{donation_id}"
+    try:
+        upi_uri = _build_upi_pay_uri(
+            vpa,
+            amount,
+            payee_name="Qumanity",
+            transaction_note=f"Donation {txn_ref}",
+            transaction_ref=txn_ref,
+        )
+    except ValueError as exc:
+        return jsonify({"error": str(exc), "vpa": vpa}), 400
+    return jsonify(
+        {
+            "upi_uri": upi_uri,
+            "vpa": vpa,
+            "vpa_source": source,
+            "contains_encoded_at": "%40" in upi_uri.split("pa=", 1)[-1].split("&", 1)[0],
+            "contains_literal_at": "@" in upi_uri,
+            "valid_format": upi_uri.startswith("upi://pay?pa="),
+            "static_qr_warning": _static_qr_scan_warning(vpa, source, False),
+            "suggestion": "Copy upi_uri into a UPI app or use Pay with UPI Link on the registration page.",
+        }
+    )
+
+
+@app.get("/api/test-upi-uri")
+def api_test_upi_uri():
+    """Validate UPI URI format for PhonePe / GPay / Paytm."""
+    from urllib.parse import parse_qs, urlparse
+
+    amount = request.args.get("amount", 1, type=float)
+    vpa, source = _resolve_merchant_upi_vpa()
+    donation_id = 999
+    txn_ref = f"QUM{donation_id}"
+    try:
+        upi_uri = _build_upi_pay_uri(
+            vpa,
+            amount,
+            payee_name="Qumanity",
+            transaction_note=f"Donation {txn_ref}",
+            transaction_ref=txn_ref,
+        )
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc), "vpa": vpa}), 400
+
+    parsed = urlparse(upi_uri)
+    query_params = {k: v[0] if len(v) == 1 else v for k, v in parse_qs(parsed.query).items()}
+    pa_raw = query_params.get("pa", "")
+    pa_encoded_at = "%40" in upi_uri and "@" not in upi_uri.split("pa=", 1)[-1].split("&", 1)[0]
+
+    return jsonify(
+        {
+            "success": True,
+            "upi_uri": upi_uri,
+            "vpa": vpa,
+            "vpa_source": source,
+            "vpa_valid": _validate_upi_vpa(vpa),
+            "vpa_is_placeholder": vpa.lower() in _PLACEHOLDER_UPI_VPAS,
+            "params": query_params,
+            "pa_has_literal_at": "@" in pa_raw,
+            "pa_encoded_as_percent40": pa_encoded_at,
+            "hint": (
+                "If vpa_is_placeholder is true, set DONATION_UPI_VPA to your real "
+                "Razorpay merchant VPA from Dashboard → Settings → UPI."
+            ),
         }
     )
 
@@ -12956,9 +13364,11 @@ def api_register_donate():
     if amount < 0 or amount > 200:
         return jsonify({"error": "Donation must be between ₹0 and ₹200"}), 400
     method = str(payload.get("method") or payload.get("payment_method") or "qr").strip().lower()
-    allowed_methods = ("qr", "cash", "upi", "card", "netbanking")
+    allowed_methods = ("qr", "cash", "upi", "card", "netbanking", "link", "payment_link")
     if method not in allowed_methods:
         return jsonify({"error": "method must be one of: " + ", ".join(allowed_methods)}), 400
+    if method in ("link", "payment_link"):
+        method = "qr"
     agent_private_id = str(
         payload.get("agent_private_id") or payload.get("agent_id") or ""
     ).strip()
@@ -13058,9 +13468,71 @@ def donation_webhook():
     conn = get_db()
     handled = sita_platform_core.process_razorpay_webhook(conn, event, data)
     conn.commit()
-    if event in ("payment.captured", "payment.failed", "payment.authorized", "qr_code.credited") and not handled:
+    if event in (
+        "payment.captured",
+        "payment.failed",
+        "payment.authorized",
+        "qr_code.credited",
+        "payment_link.paid",
+    ) and not handled:
         app.logger.warning("Webhook: no matching pending donation for event %s", event)
     return jsonify({"status": "success"}), 200
+
+
+@app.get("/api/check-payment-status/<payment_link_id>")
+def api_check_payment_status(payment_link_id: str):
+    """Poll Razorpay payment link status (registration donation flow)."""
+    payment_link_id = (payment_link_id or "").strip()
+    if not payment_link_id:
+        return jsonify({"error": "payment_link_id required"}), 400
+    conn = get_db()
+    row = conn.execute(
+        "SELECT * FROM donations WHERE razorpay_payment_link_id = ?",
+        (payment_link_id,),
+    ).fetchone()
+    if not row:
+        return jsonify({"error": "Not found"}), 404
+    donation_id = int(row["id"])
+    allowed = False
+    if session.get("pending_donation_id") == donation_id:
+        allowed = True
+    elif getattr(g, "current_user", None):
+        if str(g.current_user["private_id"]) == str(row["user_private_id"]):
+            allowed = True
+        elif str(row["user_private_id"]).startswith(sita_platform_core.PENDING_USER_PREFIX):
+            marker = session.get("pending_donation_marker")
+            if marker and str(row["user_private_id"]) == (
+                f"{sita_platform_core.PENDING_USER_PREFIX}{marker}"
+            ):
+                allowed = True
+    if not allowed:
+        return jsonify({"error": "Forbidden"}), 403
+
+    _sync_donation_from_payment_link(conn, donation_id, payment_link_id)
+    conn.commit()
+    payload = sita_platform_core.get_donation_status_payload(conn, donation_id)
+    plink_status = ""
+    client = _razorpay_client()
+    if client:
+        try:
+            plink = client.payment_link.fetch(payment_link_id)
+            plink_status = str(plink.get("status") or "").strip().lower()
+        except Exception:
+            pass
+    payment_status = str(payload.get("payment_status") or "pending")
+    status = "completed" if payment_status == "completed" else (
+        plink_status if plink_status else payment_status
+    )
+    return jsonify(
+        {
+            **payload,
+            "paymentStatus": payment_status,
+            "status": status,
+            "payment_link_status": plink_status,
+            "payment_link_id": payment_link_id,
+            "donation_id": donation_id,
+        }
+    )
 
 
 @app.get("/api/registration/status/<int:donation_id>")

@@ -80,6 +80,7 @@ def migrate_sita_platform_schema(conn: sqlite3.Connection) -> None:
         ("razorpay_payment_id", "TEXT"),
         ("razorpay_order_id", "TEXT"),
         ("razorpay_qr_id", "TEXT"),
+        ("razorpay_payment_link_id", "TEXT"),
         ("payment_status", "TEXT DEFAULT 'pending'"),
         ("webhook_verified", "INTEGER NOT NULL DEFAULT 0"),
         ("webhook_payload", "TEXT"),
@@ -177,6 +178,7 @@ def record_donation(
     razorpay_order_id: str | None = None,
     razorpay_payment_id: str | None = None,
     razorpay_qr_id: str | None = None,
+    razorpay_payment_link_id: str | None = None,
     amount_paise: int | None = None,
     payment_status: str | None = None,
 ) -> int:
@@ -199,8 +201,8 @@ def record_donation(
         INSERT INTO donations (
             user_private_id, user_public_id, amount, amount_paise, payment_method,
             referral_id, status, payment_status, transaction_id, razorpay_order_id,
-            razorpay_payment_id, razorpay_qr_id, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            razorpay_payment_id, razorpay_qr_id, razorpay_payment_link_id, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             str(user_private_id).strip(),
@@ -215,6 +217,7 @@ def record_donation(
             (razorpay_order_id or "").strip() or None,
             (razorpay_payment_id or "").strip() or None,
             (razorpay_qr_id or "").strip() or None,
+            (razorpay_payment_link_id or "").strip() or None,
             _now(),
         ),
     )
@@ -280,6 +283,19 @@ def _find_donation_for_qr_id(conn: sqlite3.Connection, qr_id: str) -> sqlite3.Ro
     return conn.execute(
         "SELECT * FROM donations WHERE razorpay_qr_id = ?",
         (qr_id,),
+    ).fetchone()
+
+
+def _find_donation_for_payment_link_id(
+    conn: sqlite3.Connection,
+    payment_link_id: str,
+) -> sqlite3.Row | None:
+    payment_link_id = (payment_link_id or "").strip()
+    if not payment_link_id:
+        return None
+    return conn.execute(
+        "SELECT * FROM donations WHERE razorpay_payment_link_id = ?",
+        (payment_link_id,),
     ).fetchone()
 
 
@@ -583,6 +599,56 @@ def process_razorpay_webhook(
                 payment_id or None,
                 order_id or None,
                 qr_id or None,
+                amount_paise,
+                amount_paise,
+                payload_json,
+                int(row["id"]),
+            ),
+        )
+        return True
+    if event == "payment_link.paid":
+        plink = payload.get("payload", {}).get("payment_link", {}).get("entity", {})
+        payment = payload.get("payload", {}).get("payment", {}).get("entity", {})
+        plink_id = str(plink.get("id") or "").strip()
+        payment_id = str(payment.get("id") or "").strip()
+        order_id = str(payment.get("order_id") or "").strip()
+        amount_paise = int(payment.get("amount") or plink.get("amount") or 0)
+        row = None
+        if plink_id:
+            row = _find_donation_for_payment_link_id(conn, plink_id)
+        if row is None:
+            row = _resolve_donation_for_payment(conn, payment)
+        if row is None:
+            notes = plink.get("notes") or {}
+            if isinstance(notes, dict):
+                donation_id = str(notes.get("donation_id") or "").strip()
+                if donation_id.isdigit():
+                    row = conn.execute(
+                        "SELECT * FROM donations WHERE id = ?",
+                        (int(donation_id),),
+                    ).fetchone()
+        if row is None:
+            return False
+        conn.execute(
+            """
+            UPDATE donations
+            SET status = 'confirmed',
+                payment_status = 'completed',
+                webhook_verified = 1,
+                confirmed_at = ?,
+                confirmed_by = 'razorpay_webhook_payment_link',
+                razorpay_payment_id = COALESCE(?, razorpay_payment_id),
+                razorpay_order_id = COALESCE(razorpay_order_id, ?),
+                razorpay_payment_link_id = COALESCE(razorpay_payment_link_id, ?),
+                amount_paise = CASE WHEN ? > 0 THEN ? ELSE amount_paise END,
+                webhook_payload = ?
+            WHERE id = ?
+            """,
+            (
+                _now(),
+                payment_id or None,
+                order_id or None,
+                plink_id or None,
                 amount_paise,
                 amount_paise,
                 payload_json,
