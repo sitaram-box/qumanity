@@ -658,10 +658,16 @@ def debug_admin_status():
     diag = admin_login_repair.diagnose_admin(conn)
     target = diag.get("target")
     login_verified = admin_login_repair.verify_admin_password(conn)
+    login_simulated = admin_login_repair.simulate_admin_login(conn)
+    null_ids = conn.execute(
+        "SELECT COUNT(*) FROM users WHERE id IS NULL"
+    ).fetchone()[0]
     return jsonify(
         {
             "exists": target is not None,
             "login_verified": login_verified,
+            "login_simulated": login_simulated,
+            "users_with_null_id": int(null_ids or 0),
             "expected_private_id": ADMIN_PRIVATE_ID,
             "login_digits": ADMIN_PRIVATE_ID[len("HU-"):],
             "password_hint": "P@y#umans123",
@@ -1052,6 +1058,12 @@ def migrate_users_app_extensions(conn: sqlite3.Connection) -> None:
             "UPDATE users SET is_active = 1 WHERE COALESCE(is_active, 0) = 0"
         )
     except sqlite3.OperationalError:
+        pass
+    try:
+        import admin_login_repair
+
+        admin_login_repair.repair_null_user_ids(conn)
+    except Exception:
         pass
     conn.commit()
 
@@ -14991,6 +15003,48 @@ def _authenticate_user_login(
     return row
 
 
+def _user_pk_for_login_row(
+    conn: sqlite3.Connection,
+    row: sqlite3.Row,
+) -> int | None:
+    """Resolve session user_pk; repair legacy rows where users.id is NULL."""
+    try:
+        pk = row["id"]
+        if pk is not None:
+            return int(pk)
+    except (KeyError, TypeError, ValueError):
+        pass
+
+    import admin_login_repair
+
+    admin_login_repair.repair_null_user_ids(conn)
+    refreshed = _lookup_user_by_private_id(conn, str(row["private_id"]))
+    if refreshed:
+        try:
+            pk = refreshed["id"]
+            if pk is not None:
+                return int(pk)
+        except (KeyError, TypeError, ValueError):
+            pass
+
+    fb = conn.execute(
+        "SELECT rowid FROM users WHERE private_id = ? COLLATE NOCASE",
+        (str(row["private_id"]),),
+    ).fetchone()
+    if not fb:
+        return None
+    rid = int(fb[0])
+    conn.execute(
+        """
+        UPDATE users SET id = ?
+        WHERE private_id = ? COLLATE NOCASE AND id IS NULL
+        """,
+        (rid, str(row["private_id"])),
+    )
+    conn.commit()
+    return rid
+
+
 def _normalize_login_private_id(raw: str) -> str | None:
     """Legacy helper — first candidate for a Private ID login string."""
     candidates = _private_id_login_candidates(raw)
@@ -15045,9 +15099,20 @@ def login():
                 error="Invalid Private ID or Password.",
             )
 
+        user_pk = _user_pk_for_login_row(conn, row)
+        if not user_pk:
+            app.logger.error(
+                "Login auth ok but user_pk missing for private_id=%s",
+                row["private_id"],
+            )
+            return render_template(
+                "login.html",
+                error="Invalid Private ID or Password.",
+            )
+
         session.clear()
-        session["user_pk"] = int(row["id"])
-        full_user = load_user(conn, int(row["id"]))
+        session["user_pk"] = user_pk
+        full_user = load_user(conn, user_pk)
         _session_sync_admin_flag(full_user)
         app.logger.info("Login successful private_id=%s", row["private_id"])
         dest = request.args.get("next") or ""
@@ -15079,9 +15144,13 @@ def api_login():
     if not row:
         return jsonify({"error": "Invalid login or password"}), 401
 
+    user_pk = _user_pk_for_login_row(conn, row)
+    if not user_pk:
+        return jsonify({"error": "Invalid login or password"}), 401
+
     session.clear()
-    session["user_pk"] = int(row["id"])
-    full_user = load_user(conn, int(row["id"]))
+    session["user_pk"] = user_pk
+    full_user = load_user(conn, user_pk)
     _session_sync_admin_flag(full_user)
     return jsonify(
         {

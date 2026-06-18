@@ -35,6 +35,17 @@ def _load_migrate_module() -> Any | None:
     return mod
 
 
+def repair_null_user_ids(conn: sqlite3.Connection) -> int:
+    """Assign SQLite rowid to users.id where missing (legacy schemas without AUTOINCREMENT)."""
+    null_count = conn.execute(
+        "SELECT COUNT(*) FROM users WHERE id IS NULL"
+    ).fetchone()[0]
+    if null_count:
+        conn.execute("UPDATE users SET id = rowid WHERE id IS NULL")
+        conn.commit()
+    return int(null_count or 0)
+
+
 def diagnose_admin(conn: sqlite3.Connection) -> dict[str, Any]:
     admins = conn.execute(
         """
@@ -61,6 +72,20 @@ def diagnose_admin(conn: sqlite3.Connection) -> dict[str, Any]:
         "target": dict(target) if target else None,
         "legacy": dict(legacy) if legacy else None,
     }
+
+
+def simulate_admin_login(conn: sqlite3.Connection) -> bool:
+    """Exercise the same lookup + password path as the web login form."""
+    try:
+        from app import _authenticate_user_login, _user_pk_for_login_row
+
+        row = _authenticate_user_login(conn, ADMIN_PRIVATE_ID[len("HU-"):], ADMIN_PASSWORD)
+        if not row:
+            return False
+        pk = _user_pk_for_login_row(conn, row)
+        return pk is not None and pk > 0
+    except Exception:
+        return False
 
 
 def verify_admin_password(conn: sqlite3.Connection, password: str = ADMIN_PASSWORD) -> bool:
@@ -165,6 +190,7 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
     import qoin_core
 
     qoin_core.migrate_qoin_economy_tables(conn)
+    repair_null_user_ids(conn)
 
 
 def run_reset() -> dict[str, Any]:
@@ -248,13 +274,20 @@ def run_reset() -> dict[str, Any]:
             conn.close()
             return out
 
+        repaired_ids = repair_null_user_ids(conn)
+        if repaired_ids:
+            log_lines.append(f"Repaired {repaired_ids} user row(s) with NULL id")
+
         out["login_verified"] = verify_admin_password(conn)
+        out["login_simulated"] = simulate_admin_login(conn)
         out["diagnosis"] = diagnose_admin(conn)
         out["log"] = "\n".join(log_lines)
 
-        if out["login_verified"] and out["diagnosis"].get("target"):
+        if out["login_verified"] and out.get("login_simulated") and out["diagnosis"].get("target"):
             out["ok"] = True
             out["message"] = "Admin reset complete and login verified."
+        elif out["login_verified"]:
+            out["message"] = "Admin reset done; password OK but login simulation failed."
         else:
             out["message"] = "Admin reset finished but login verification failed."
         conn.close()
@@ -283,6 +316,7 @@ def format_reset_log(status: dict[str, Any]) -> str:
             f"login_digits: {status.get('login_digits')}",
             f"password: {ADMIN_PASSWORD}",
             f"login_verified: {status.get('login_verified')}",
+            f"login_simulated: {status.get('login_simulated')}",
             "=" * 50,
         ]
     )
@@ -319,12 +353,16 @@ def run_repair(*, reset_password: bool = True, force: bool = True) -> dict[str, 
         conn.row_factory = sqlite3.Row
         try:
             out["login_verified"] = verify_admin_password(conn)
+            out["login_simulated"] = simulate_admin_login(conn)
             out["diagnosis"] = diagnose_admin(conn)
         finally:
             conn.close()
 
-        if out.get("ok") and out["login_verified"]:
+        if out.get("ok") and out["login_verified"] and out.get("login_simulated"):
             out["message"] = "Admin login repaired and verified."
+        elif out.get("ok") and out["login_verified"]:
+            out["message"] = "Password OK but login simulation failed (check users.id)."
+            out["ok"] = False
         elif out.get("ok"):
             out["message"] = "Migration ran but login verification failed."
             out["ok"] = False
@@ -346,6 +384,7 @@ def format_repair_log(status: dict[str, Any]) -> str:
         f"login_digits: {status.get('login_digits')}",
         f"password: {ADMIN_PASSWORD}",
         f"login_verified: {status.get('login_verified')}",
+        f"login_simulated: {status.get('login_simulated')}",
         "=" * 50,
     ]
     return "\n".join(lines)

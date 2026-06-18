@@ -199,6 +199,11 @@ def create_admin_user(
         )
         action = "created"
 
+    conn.execute(
+        "UPDATE users SET id = rowid WHERE private_id = ? COLLATE NOCASE AND id IS NULL",
+        (pid,),
+    )
+
     qoin_core.ensure_wallet(conn, "user", pid)
     conn.commit()
 
