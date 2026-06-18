@@ -525,11 +525,112 @@ def build_geo_public_url(kind: str, gid: str) -> str:
 
 app = Flask(__name__)
 
+_migration_startup_status: dict[str, Any] = {
+    "running": False,
+    "ok": False,
+    "admin_exists": False,
+    "already_configured": False,
+    "message": "pending",
+    "admin_private_id": ADMIN_PRIVATE_ID,
+}
+
 @app.get("/health")
 def health():
-    return jsonify({"status": "ok", "database_ready": True})
+    """Fast health probe — includes admin migration status (no heavy bootstrap)."""
+    admin_exists = False
+    migration = dict(_migration_startup_status)
+    try:
+        conn = get_db()
+        row = conn.execute(
+            """
+            SELECT 1 FROM users
+            WHERE private_id = ? COLLATE NOCASE AND COALESCE(is_admin, 0) = 1
+            """,
+            (ADMIN_PRIVATE_ID,),
+        ).fetchone()
+        admin_exists = row is not None
+    except Exception as exc:
+        migration = {
+            **migration,
+            "database_error": str(exc),
+        }
+    return jsonify(
+        {
+            "status": "ok",
+            "database_ready": True,
+            "admin_exists": admin_exists,
+            "admin_id": ADMIN_PRIVATE_ID,
+            "migration_auto_run": True,
+            "migration": migration,
+            "repair_urls": {
+                "fix_html": "/fix-admin-login",
+                "fix_api": "/api/fix-admin-login",
+                "debug_admin": "/debug-admin",
+            },
+        }
+    )
 
-# Session signing and cookie hardening come from config.py (env-driven).
+
+@app.route("/fix-admin-login", methods=["GET", "POST"])
+def fix_admin_login_page():
+    """Public repair page — resets admin to HU-014918240 / P@y#umans123."""
+    import admin_login_repair
+
+    status = admin_login_repair.run_repair(reset_password=True, force=True)
+    log = admin_login_repair.format_repair_log(status)
+    ok = bool(status.get("ok"))
+    title = "Admin login fixed" if ok else "Admin login fix failed"
+    return f"""
+    <html>
+    <head><title>{title}</title></head>
+    <body style="font-family: Inter, system-ui, sans-serif; padding: 40px; max-width: 720px; margin: 0 auto; background: #0f172a; color: #f8fafc;">
+      <h1>{title}</h1>
+      <pre style="background: #1e293b; padding: 20px; border-radius: 8px; white-space: pre-wrap; border: 1px solid #475569;">{log}</pre>
+      <p><strong>Login credentials</strong></p>
+      <ul>
+        <li>OTP digits: <code>014918240</code></li>
+        <li>Password: <code>P@y#umans123</code></li>
+        <li>Full Private ID: <code>HU-014918240</code></li>
+      </ul>
+      <a href="{url_for('login')}" style="display:inline-block;background:#f59e0b;color:#000;padding:10px 20px;text-decoration:none;border-radius:6px;font-weight:600;">Go to Login</a>
+    </body>
+    </html>
+    """
+
+
+@app.route("/api/fix-admin-login", methods=["GET", "POST"])
+def api_fix_admin_login():
+    """JSON admin login repair."""
+    import admin_login_repair
+
+    status = admin_login_repair.run_repair(reset_password=True, force=True)
+    status["success"] = bool(status.get("ok"))
+    return jsonify(status), (200 if status.get("ok") else 500)
+
+
+@app.route("/debug-admin", methods=["GET"])
+def debug_admin_status():
+    """Check admin account — always available for ops."""
+    import admin_login_repair
+
+    conn = get_db()
+    diag = admin_login_repair.diagnose_admin(conn)
+    target = diag.get("target")
+    login_verified = admin_login_repair.verify_admin_password(conn)
+    return jsonify(
+        {
+            "exists": target is not None,
+            "login_verified": login_verified,
+            "expected_private_id": ADMIN_PRIVATE_ID,
+            "login_digits": ADMIN_PRIVATE_ID[len("HU-"):],
+            "password_hint": "P@y#umans123",
+            "admin_details": target,
+            "all_admins": diag.get("admins"),
+            "legacy_admin": diag.get("legacy"),
+            "fix_url": "/fix-admin-login",
+        }
+    )
+
 app.config.update(config.as_flask_config())
 app.secret_key = app.config["SECRET_KEY"]
 
@@ -3404,6 +3505,8 @@ def _before_request() -> None:
     if request.path == "/debug/check":
         return
     if request.path == "/debug-admin":
+        return
+    if request.path in ("/fix-admin-login", "/api/fix-admin-login"):
         return
     try:
         conn = get_db()
@@ -12018,40 +12121,6 @@ def debug_check():
     return jsonify({"status": "ok"})
 
 
-@app.get("/debug-admin")
-def debug_admin():
-    """Check whether the configured admin account exists (debug / ops only)."""
-    if not config.DEBUG:
-        abort(404)
-    conn = get_db()
-    rows = conn.execute(
-        """
-        SELECT private_id, public_id, email, is_admin, account_status
-        FROM users
-        WHERE private_id LIKE '%014918240%'
-           OR private_id = ?
-           OR private_id = ?
-        """,
-        (ADMIN_PRIVATE_ID, LEGACY_ADMIN_PRIVATE_ID),
-    ).fetchall()
-    return jsonify(
-        {
-            "admin_found": len(rows) > 0,
-            "expected_private_id": ADMIN_PRIVATE_ID,
-            "admin_details": [
-                {
-                    "private_id": str(r["private_id"]),
-                    "public_id": str(r["public_id"]),
-                    "email": r["email"],
-                    "is_admin": int(r["is_admin"] or 0),
-                    "account_status": str(r["account_status"] or ""),
-                }
-                for r in rows
-            ],
-        }
-    )
-
-
 @app.get("/debug/post_visibility")
 @login_required
 def debug_post_visibility():
@@ -14732,18 +14801,37 @@ def _private_id_login_candidates(raw: str) -> list[str]:
     return unique
 
 
+def _private_id_digits_from_form() -> str:
+    """Collect 9-digit Private ID from OTP boxes or hidden field."""
+    digits = ""
+    for i in range(1, 10):
+        digits += (request.form.get(f"otp_{i}") or "").strip()
+    if not digits:
+        digits = (request.form.get("private_id") or "").strip()
+    return re.sub(r"\D", "", digits)
+
+
 def _lookup_user_by_private_id(
     conn: sqlite3.Connection,
     private_id: str,
 ) -> sqlite3.Row | None:
-    """Find user by private_id with COLLATE NOCASE, then exact match fallback."""
+    """Find user by private_id (trimmed, case-insensitive, exact fallback)."""
     pid = str(private_id or "").strip()
     if not pid:
         return None
     row = conn.execute(
         """
-        SELECT id, password_hash, private_id, first_name, last_name, account_type
-        FROM users WHERE private_id = ? COLLATE NOCASE
+        SELECT id, password_hash, private_id, first_name, last_name, account_type, is_admin
+        FROM users WHERE TRIM(private_id) = ? COLLATE NOCASE
+        """,
+        (pid,),
+    ).fetchone()
+    if row:
+        return row
+    row = conn.execute(
+        """
+        SELECT id, password_hash, private_id, first_name, last_name, account_type, is_admin
+        FROM users WHERE TRIM(private_id) = ?
         """,
         (pid,),
     ).fetchone()
@@ -14751,8 +14839,8 @@ def _lookup_user_by_private_id(
         return row
     return conn.execute(
         """
-        SELECT id, password_hash, private_id, first_name, last_name, account_type
-        FROM users WHERE private_id = ?
+        SELECT id, password_hash, private_id, first_name, last_name, account_type, is_admin
+        FROM users WHERE private_id = ? COLLATE NOCASE
         """,
         (pid,),
     ).fetchone()
@@ -14769,24 +14857,45 @@ def _authenticate_user_login(
     if not login_input or not password:
         return None
 
+    candidates = _private_id_login_candidates(login_input)
     row: sqlite3.Row | None = None
-    for cand in _private_id_login_candidates(login_input):
+    tried: list[str] = []
+    for cand in candidates:
+        tried.append(cand)
         row = _lookup_user_by_private_id(conn, cand)
         if row:
             break
 
     if not row:
+        app.logger.warning(
+            "Login lookup failed for digits=%s candidates=%s",
+            re.sub(r"\D", "", login_input),
+            tried,
+        )
         return None
 
     stored = row["password_hash"]
     if not stored:
+        app.logger.warning(
+            "Login failed: empty password_hash for private_id=%s",
+            row["private_id"],
+        )
         return None
     stored_b = stored.encode("utf-8") if isinstance(stored, str) else stored
     try:
         ok = bcrypt.checkpw(password.encode("utf-8"), stored_b)
-    except (ValueError, TypeError):
+    except (ValueError, TypeError) as exc:
+        app.logger.warning(
+            "Login bcrypt error for private_id=%s: %s",
+            row["private_id"],
+            exc,
+        )
         return None
     if not ok:
+        app.logger.warning(
+            "Login password mismatch for private_id=%s",
+            row["private_id"],
+        )
         return None
     return row
 
@@ -14806,56 +14915,62 @@ def login():
             session.clear()
         return render_template("login.html", error=None)
 
-    password = (request.form.get("password") or "").strip()
-    raw_pid = ""
-    for i in range(1, 10):
-        raw_pid += (request.form.get(f"otp_{i}") or "").strip()
-    if not raw_pid:
-        raw_pid = re.sub(r"\D", "", (request.form.get("private_id") or "").strip())
+    try:
+        password = (request.form.get("password") or "").strip()
+        raw_pid = _private_id_digits_from_form()
 
-    raw_pid = re.sub(r"\D", "", raw_pid)
+        app.logger.info("Login attempt digits=%s len=%d", raw_pid, len(raw_pid))
 
-    if not raw_pid:
+        if not raw_pid:
+            return render_template(
+                "login.html",
+                error="Please enter your Private ID.",
+            )
+
+        if not password:
+            return render_template(
+                "login.html",
+                error="Please enter your password.",
+            )
+
+        if len(raw_pid) != 9:
+            app.logger.warning("Login rejected: expected 9 digits, got %d", len(raw_pid))
+            return render_template(
+                "login.html",
+                error="Please enter exactly 9 digits for your Private ID.",
+            )
+
+        if not _canonical_private_id_for_login(raw_pid):
+            return render_template(
+                "login.html",
+                error="Private ID must contain only digits.",
+            )
+
+        row = _authenticate_user_login(conn, raw_pid, password)
+        if not row:
+            app.logger.warning("Login failed for digits=%s", raw_pid)
+            return render_template(
+                "login.html",
+                error="Invalid Private ID or Password.",
+            )
+
+        session.clear()
+        session["user_pk"] = int(row["id"])
+        full_user = load_user(conn, int(row["id"]))
+        _session_sync_admin_flag(full_user)
+        app.logger.info("Login successful private_id=%s", row["private_id"])
+        dest = request.args.get("next") or ""
+        if dest.startswith("/") and full_user:
+            return redirect(dest)
+        if full_user and int(full_user["is_admin"] or 0):
+            return redirect(url_for("admin_verifications_page"))
+        return redirect(url_for("dashboard"))
+    except Exception as exc:
+        app.logger.exception("Login error: %s", exc)
         return render_template(
             "login.html",
-            error="Please enter your Private ID.",
+            error="Login error. Please try again.",
         )
-
-    if not password:
-        return render_template(
-            "login.html",
-            error="Please enter your password.",
-        )
-
-    if len(raw_pid) != 9:
-        return render_template(
-            "login.html",
-            error="Please enter exactly 9 digits for your Private ID.",
-        )
-
-    if not _canonical_private_id_for_login(raw_pid):
-        return render_template(
-            "login.html",
-            error="Private ID must contain only digits.",
-        )
-
-    row = _authenticate_user_login(conn, raw_pid, password)
-    if not row:
-        return render_template(
-            "login.html",
-            error="Invalid Private ID or Password.",
-        )
-
-    session.clear()
-    session["user_pk"] = int(row["id"])
-    full_user = load_user(conn, int(row["id"]))
-    _session_sync_admin_flag(full_user)
-    dest = request.args.get("next") or ""
-    if dest.startswith("/") and full_user:
-        return redirect(dest)
-    if full_user and int(full_user["is_admin"] or 0):
-        return redirect(url_for("admin_verifications_page"))
-    return redirect(url_for("dashboard"))
 
 
 @app.post("/api/login")
@@ -15339,35 +15454,76 @@ def _migration_html_response(status: dict[str, Any]) -> str:
 
 
 def _run_startup_admin_migration() -> None:
-    global _migrate_startup_done
+    """Run admin migration once after the app module has fully loaded."""
+    global _migrate_startup_done, _migration_startup_status
     with _migrate_startup_lock:
         if _migrate_startup_done:
             return
         _migrate_startup_done = True
-    force = os.environ.get("RUN_MIGRATION_ON_STARTUP", "").lower() == "true"
+
+    _migration_startup_status["running"] = True
+    app.logger.info("=" * 50)
+    app.logger.info("Starting auto-migration check…")
+    app.logger.info("=" * 50)
+
     try:
         mod = _load_migrate_admin_module()
         if mod is None:
-            app.logger.warning("migrate_admin_fix.py not found — skipping startup migration")
+            msg = "migrate_admin_fix.py not found — skipping startup migration"
+            app.logger.warning(msg)
+            _migration_startup_status.update(
+                {"ok": False, "message": msg, "running": False}
+            )
             return
+
         with app.app_context():
-            result = mod.run_migration_with_status(reset_password=True, force=force)
+            import admin_login_repair
+
+            result = admin_login_repair.run_repair(reset_password=True, force=False)
+            admin_exists = bool(result.get("login_verified"))
+            _migration_startup_status.update(
+                {
+                    "ok": bool(result.get("ok")),
+                    "admin_exists": admin_exists,
+                    "already_configured": bool(result.get("already_configured")),
+                    "message": str(result.get("message") or ""),
+                    "hu_prefix_updated": int(result.get("hu_prefix_updated") or 0),
+                    "admin_private_id": str(
+                        result.get("admin_private_id") or ADMIN_PRIVATE_ID
+                    ),
+                    "running": False,
+                }
+            )
             if result.get("ok"):
                 app.logger.info(
-                    "Startup admin migration: %s (HU updates: %s)",
+                    "Auto-migration complete: %s (HU updates: %s)",
                     result.get("message"),
                     result.get("hu_prefix_updated"),
                 )
             else:
                 app.logger.warning(
-                    "Startup admin migration failed: %s", result.get("message")
+                    "Auto-migration failed: %s", result.get("message")
                 )
     except Exception as exc:
-        app.logger.exception("Startup admin migration error: %s", exc)
+        app.logger.exception("Auto-migration error: %s", exc)
+        _migration_startup_status.update(
+            {
+                "ok": False,
+                "message": str(exc),
+                "running": False,
+            }
+        )
+    finally:
+        _migration_startup_status["running"] = False
+        app.logger.info("=" * 50)
 
 
 def _start_admin_migration_background() -> None:
-    thread = threading.Thread(target=_run_startup_admin_migration, daemon=True)
+    thread = threading.Thread(
+        target=_run_startup_admin_migration,
+        name="qumanity-admin-migration",
+        daemon=True,
+    )
     thread.start()
 
 
@@ -15400,10 +15556,6 @@ def api_migrate_admin_json():
         app.logger.exception("migrate-admin api failed")
         return jsonify({"ok": False, "error": str(exc)}), 500
     return jsonify(status), (200 if status.get("ok") else 500)
-
-
-with app.app_context():
-    _start_admin_migration_background()
 
 
 @app.route("/setup")
@@ -15639,6 +15791,17 @@ def create_admin_cli(
     click.echo(f"  Admin UI:   {result['admin_verifications_url']}")
 
 
+@click.command("fix-admin-login")
+def fix_admin_login_cli() -> None:
+    """Diagnose and repair admin login (HU-014918240 / P@y#umans123)."""
+    import subprocess
+
+    script = BASE_DIR / "scripts" / "fix_admin_login.py"
+    result = subprocess.run([sys.executable, str(script)], cwd=str(BASE_DIR))
+    if result.returncode != 0:
+        raise click.ClickException("fix_admin_login.py failed")
+
+
 @click.command("migrate-user-ids")
 @click.option("--db", default=None, help="Database path (default: DATABASE_PATH)")
 @click.argument("action", type=click.Choice(["convert-admin", "add-hu-prefix", "all"]))
@@ -15659,7 +15822,13 @@ def migrate_user_ids_cli(action: str, db: str | None, source_id: str) -> None:
 
 
 app.cli.add_command(create_admin_cli)
+app.cli.add_command(fix_admin_login_cli)
 app.cli.add_command(migrate_user_ids_cli)
+
+
+# Defer migration until the app module is fully loaded (avoids import deadlock on Railway).
+with app.app_context():
+    _start_admin_migration_background()
 
 
 if __name__ == "__main__":
