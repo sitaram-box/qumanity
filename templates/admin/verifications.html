@@ -106,22 +106,7 @@
 <div class="qb-admin-verifications container py-3">
   <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
     <h1 class="h4 mb-0">Donation Verifications</h1>
-    <div class="d-flex flex-wrap gap-2">
-      <a href="{{ url_for('migrate_admin_page') }}" class="qb-btn qb-btn-warning btn-sm">Run Admin Migration</a>
-      <a href="{{ url_for('dashboard') }}" class="qb-btn qb-btn-neutral btn-sm">Back to Dashboard</a>
-    </div>
-  </div>
-
-  <div class="qb-panel p-3 mb-3" id="qb-admin-migration-panel">
-    <h2 class="h6 text-secondary mb-2">Admin Account Setup</h2>
-    <p class="small text-muted mb-2">
-      If admin login fails, run migration to create or repair <code>HU-014918240</code>
-      (password: P@y#umans123).
-    </p>
-    <button type="button" class="qb-btn qb-btn-primary btn-sm" id="qb-run-migration-btn">
-      Create / Repair Admin Account
-    </button>
-    <p class="small mt-2 mb-0" id="qb-migration-result" hidden role="status"></p>
+    <a href="{{ url_for('dashboard') }}" class="qb-btn qb-btn-neutral btn-sm">Back to Dashboard</a>
   </div>
 
   <div class="qb-admin-stats">
@@ -352,36 +337,6 @@
   if (refreshBtn) {
     refreshBtn.addEventListener("click", function () {
       window.location.reload();
-    });
-  }
-
-  var migBtn = document.getElementById("qb-run-migration-btn");
-  var migResult = document.getElementById("qb-migration-result");
-  if (migBtn) {
-    migBtn.addEventListener("click", function () {
-      if (migResult) {
-        migResult.hidden = false;
-        migResult.textContent = "Running migration…";
-      }
-      migBtn.disabled = true;
-      fetch("/api/migrate-admin", { credentials: "same-origin", headers: { Accept: "application/json" } })
-        .then(function (r) {
-          return r.json().then(function (b) {
-            return { ok: r.ok, b: b };
-          });
-        })
-        .then(function (x) {
-          var msg = x.b.message || (x.ok ? "Migration complete." : "Migration failed.");
-          if (migResult) migResult.textContent = msg + " Login with HU-014918240 / P@y#umans123";
-          if (window.qbToast) window.qbToast(msg, x.ok ? "success" : "error");
-        })
-        .catch(function (err) {
-          if (migResult) migResult.textContent = err.message || "Migration failed";
-          if (window.qbToast) window.qbToast("Migration failed", "error");
-        })
-        .finally(function () {
-          migBtn.disabled = false;
-        });
     });
   }
 })();

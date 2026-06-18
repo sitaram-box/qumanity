@@ -35,21 +35,17 @@
     </div>
     <a href="{{ url_for('settings_page') }}" role="menuitem">{{ 'settings'|tr }}</a>
     {% if is_admin %}
-    <div class="qb-hamburger-space" role="none">
-      <span class="qb-hamburger-lang-label">Admin Panel</span>
-      <a href="{{ url_for('admin_panel') }}" role="menuitem">All admin tools</a>
-      <a href="{{ url_for('admin_panel') }}#qb-admin-upgrade-users" role="menuitem">Upgrade user accounts</a>
-      <a href="{{ url_for('admin_panel') }}#qb-mentor-mark-deceased" role="menuitem">Ākāśa — mark User deceased</a>
-      <a href="{{ url_for('admin_panel') }}#qb-admin-varna-section" role="menuitem">Varna System Administration</a>
-      <a href="{{ url_for('admin_panel') }}#qb-private-admin-tools" role="menuitem">Family Removal Request</a>
-      <a href="{{ url_for('admin_panel') }}#qb-admin-employment-requests" role="menuitem">Volunteer Applications</a>
-      <a href="{{ url_for('admin_panel') }}#qb-admin-karma-economy" role="menuitem">Karma Points Economy (Council)</a>
-      <a href="{{ url_for('admin_panel') }}#qb-admin-donation-reports" role="menuitem">Donation Reports</a>
-      <a href="{{ url_for('admin_panel') }}#qb-admin-donation-mgmt" role="menuitem">Donation Management</a>
-      <a href="{{ url_for('admin_verifications_page') }}" role="menuitem">Donation Verifications</a>
-      <a href="{{ url_for('admin_panel') }}#qb-admin-edit-requests" role="menuitem">Edit Requests</a>
-      <a href="{{ url_for('admin_panel') }}#qb-private-manage-elections" role="menuitem">Manage Elections</a>
-    </div>
+    <button
+      type="button"
+      class="qb-hamburger-admin-panel-btn"
+      id="qb-admin-panel-open"
+      role="menuitem"
+      aria-haspopup="dialog"
+      aria-expanded="false"
+      aria-controls="qb-admin-panel-modal"
+    >
+      Admin Panel
+    </button>
     {% endif %}
     {% if session.get('user_pk') %}
     <form method="post" action="{{ url_for('logout') }}" class="m-0" role="none">

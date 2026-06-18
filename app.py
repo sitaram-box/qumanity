@@ -15118,8 +15118,6 @@ def login():
         dest = request.args.get("next") or ""
         if dest.startswith("/") and full_user:
             return redirect(dest)
-        if full_user and int(full_user["is_admin"] or 0):
-            return redirect(url_for("admin_verifications_page"))
         return redirect(url_for("dashboard"))
     except Exception as exc:
         app.logger.exception("Login error: %s", exc)

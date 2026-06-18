@@ -1,0 +1,73 @@
+{# Admin Panel modal — opened from hamburger menu (admins only). #}
+<div
+  id="qb-admin-panel-modal"
+  class="qb-admin-panel-modal"
+  hidden
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="qb-admin-panel-title"
+>
+  <div class="qb-admin-panel-content qb-panel">
+    <div class="qb-admin-panel-header">
+      <h2 class="h5 mb-0" id="qb-admin-panel-title">Admin Panel</h2>
+      <button
+        type="button"
+        class="qb-btn qb-btn-neutral btn-sm qb-admin-panel-close"
+        id="qb-admin-panel-close"
+        aria-label="Close admin panel"
+      >
+        ×
+      </button>
+    </div>
+    <div class="qb-admin-panel-grid">
+      <a href="{{ url_for('admin_panel') }}" class="qb-admin-tool-btn">
+        <span class="qb-admin-tool-icon" aria-hidden="true">📋</span>
+        <span>All admin tools</span>
+      </a>
+      <a href="{{ url_for('admin_panel') }}#qb-admin-upgrade-users" class="qb-admin-tool-btn">
+        <span class="qb-admin-tool-icon" aria-hidden="true">⬆️</span>
+        <span>Upgrade user accounts</span>
+      </a>
+      <a href="{{ url_for('admin_panel') }}#qb-mentor-mark-deceased" class="qb-admin-tool-btn">
+        <span class="qb-admin-tool-icon" aria-hidden="true">🕊️</span>
+        <span>Ākāśa — mark User deceased</span>
+      </a>
+      <a href="{{ url_for('admin_panel') }}#qb-admin-varna-section" class="qb-admin-tool-btn">
+        <span class="qb-admin-tool-icon" aria-hidden="true">🔱</span>
+        <span>Varna System Administration</span>
+      </a>
+      <a href="{{ url_for('admin_panel') }}#qb-private-admin-tools" class="qb-admin-tool-btn">
+        <span class="qb-admin-tool-icon" aria-hidden="true">👨‍👩‍👧‍👦</span>
+        <span>Family Removal Request</span>
+      </a>
+      <a href="{{ url_for('admin_panel') }}#qb-admin-employment-requests" class="qb-admin-tool-btn">
+        <span class="qb-admin-tool-icon" aria-hidden="true">🤝</span>
+        <span>Volunteer Applications</span>
+      </a>
+      <a href="{{ url_for('admin_panel') }}#qb-admin-karma-economy" class="qb-admin-tool-btn">
+        <span class="qb-admin-tool-icon" aria-hidden="true">💰</span>
+        <span>Karma Points Economy (Council)</span>
+      </a>
+      <a href="{{ url_for('admin_panel') }}#qb-admin-donation-reports" class="qb-admin-tool-btn">
+        <span class="qb-admin-tool-icon" aria-hidden="true">📊</span>
+        <span>Donation Reports</span>
+      </a>
+      <a href="{{ url_for('admin_panel') }}#qb-admin-donation-mgmt" class="qb-admin-tool-btn">
+        <span class="qb-admin-tool-icon" aria-hidden="true">📦</span>
+        <span>Donation Management</span>
+      </a>
+      <a href="{{ url_for('admin_verifications_page') }}" class="qb-admin-tool-btn">
+        <span class="qb-admin-tool-icon" aria-hidden="true">✅</span>
+        <span>Donation Verifications</span>
+      </a>
+      <a href="{{ url_for('admin_panel') }}#qb-admin-edit-requests" class="qb-admin-tool-btn">
+        <span class="qb-admin-tool-icon" aria-hidden="true">✏️</span>
+        <span>Edit Requests</span>
+      </a>
+      <a href="{{ url_for('admin_panel') }}#qb-private-manage-elections" class="qb-admin-tool-btn">
+        <span class="qb-admin-tool-icon" aria-hidden="true">🗳️</span>
+        <span>Manage Elections</span>
+      </a>
+    </div>
+  </div>
+</div>

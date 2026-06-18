@@ -2489,3 +2489,108 @@ body {
     min-width: 140px;
   }
 }
+
+/* Admin Panel — hamburger trigger + modal grid */
+.qb-hamburger-admin-panel-btn {
+  display: block;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.qb-hamburger-admin-panel-btn:hover,
+.qb-hamburger-admin-panel-btn:focus-visible {
+  background: rgba(245, 158, 11, 0.12);
+  outline: none;
+}
+
+.qb-admin-panel-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(15, 23, 42, 0.75);
+}
+
+.qb-admin-panel-modal[hidden] {
+  display: none;
+}
+
+body.qb-admin-panel-open {
+  overflow: hidden;
+}
+
+.qb-admin-panel-content {
+  width: min(100%, 36rem);
+  max-height: 80vh;
+  overflow-y: auto;
+  padding: 1.5rem;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+}
+
+.qb-admin-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--qb-border);
+}
+
+.qb-admin-panel-close {
+  min-width: 2rem;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.qb-admin-panel-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+@media (max-width: 540px) {
+  .qb-admin-panel-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.qb-admin-tool-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--qb-border);
+  border-radius: 8px;
+  background: var(--qb-bg);
+  color: var(--qb-text);
+  font-size: 0.875rem;
+  text-decoration: none;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+.qb-admin-tool-btn:hover,
+.qb-admin-tool-btn:focus-visible {
+  background: var(--qb-primary-dim);
+  border-color: var(--qb-primary);
+  color: var(--qb-text);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.qb-admin-tool-icon {
+  flex-shrink: 0;
+  font-size: 1.15rem;
+  line-height: 1;
+}
