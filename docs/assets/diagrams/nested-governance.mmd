@@ -1,0 +1,45 @@
+%%{init: {
+  'theme': 'base',
+  'themeVariables': {
+    'fontFamily': 'Arial, sans-serif',
+    'fontSize': '16px',
+    'primaryColor': '#2D5016',
+    'primaryTextColor': '#ffffff',
+    'primaryBorderColor': '#2D5016',
+    'lineColor': '#475569',
+    'secondaryColor': '#C9A84C'
+  }
+}}%%
+
+flowchart TB
+    subgraph Governance["Nested Governance Structure"]
+        direction TB
+        C["Citizen"]
+        V["Village"]
+        T["Tehsil"]
+        D["District"]
+        S["State"]
+        N["Nation"]
+        CT["Continent"]
+        E["Earth"]
+    end
+
+    C --> V
+    V --> T
+    T --> D
+    D --> S
+    S --> N
+    N --> CT
+    CT --> E
+
+    classDef citizen fill:#f0f0f0,stroke:#2D5016,stroke-width:2px,color:#333333
+    classDef local fill:#e8f0e5,stroke:#2D5016,stroke-width:2px,color:#2D5016
+    classDef regional fill:#d4e0d0,stroke:#2D5016,stroke-width:2px,color:#2D5016
+    classDef national fill:#c0d0b8,stroke:#2D5016,stroke-width:2px,color:#2D5016
+    classDef global fill:#2D5016,color:#ffffff,stroke:#1a3009,stroke-width:2px
+
+    class C citizen
+    class V,T,D local
+    class S,N regional
+    class CT national
+    class E global

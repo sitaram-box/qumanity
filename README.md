@@ -89,36 +89,22 @@ Qumanity/
 
 - **Website:** [qumanity.in](https://qumanity.in)
 - **GitHub:** [github.com/sitaram-box/QUMANITY](https://github.com/sitaram-box/QUMANITY)
-- **Organization:** SITA Foundation (Sekyor Intelligence Tantra)
+- **Organization:** SITA Foundation (Sekyor Intelligence Tantra Foundation)
 
 ---
 
-## License & Contact
+## Contact
 
-Open source. See GitHub repository for license details.
-
-**SITA Foundation** — Sekyor Intelligence Tantra Foundation
-
-*Qumanity — For Humanity, Harmony & Peace*
-
-# Qumanity
-
-A Quantum-Informed Governance Protocol for Transparent Civilization.
-
-## Documentation
-
-| Document | Description | Audience |
-|----------|-------------|----------|
-| **[White Paper](docs/white-paper/Qumanity_White_Paper.md)** | Vision, problem, solution, roadmap (12-14 pages) | General public, investors, policymakers, researchers |
-| **[Technical Architecture](docs/technical-architecture/Qumanity_Technical_Architecture.md)** | Complete system specifications, APIs, schemas | Developers, engineers, technical collaborators |
-| **[Context](docs/context/QUMANITY_CONTEXT.md)** | AI priming file | AI assistants (Claude, ChatGPT, DeepSeek) |
-
-## Quick Links
-
-- **Live:** https://qumanity.in
-- **GitHub:** https://github.com/sitaram-box/qumanity
+- **Website:** [https://qumanity.in](https://qumanity.in)
+- **Email:** founder@qumanity.in
 - **Organization:** SITA Foundation (Sekyor Intelligence Tantra Foundation)
+
+---
 
 ## License
 
+Open source. See GitHub repository for license details.
+
 © 2026 SITA Foundation. All rights reserved.
+
+*Qumanity — For Humanity, Harmony & Peace*

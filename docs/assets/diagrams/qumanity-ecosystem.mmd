@@ -1,0 +1,67 @@
+%%{init: {
+  'theme': 'base',
+  'themeVariables': {
+    'fontFamily': 'Arial, sans-serif',
+    'fontSize': '16px',
+    'primaryColor': '#2D5016',
+    'primaryTextColor': '#ffffff',
+    'primaryBorderColor': '#2D5016',
+    'lineColor': '#475569',
+    'secondaryColor': '#C9A84C',
+    'tertiaryColor': '#f8faf8'
+  }
+}}%%
+
+flowchart TB
+    A["Citizens & Communities"]
+
+    B["Website<br>(qumanity.in)<br>Public Transparency"]
+    C["iOS / macOS App<br>Daily Governance"]
+
+    D["Four Timelines"]
+    E["Nested Governance"]
+    F["Dual-Key Identity"]
+    G["Karma Points Ledger"]
+    H["Zodiac Elections"]
+
+    I["Data Sovereignty"]
+    J["Offline-First"]
+    K["Nested Nodes"]
+
+    A --> B
+    A --> C
+    B --> D
+    B --> E
+    B --> F
+    B --> G
+    B --> H
+    C --> D
+    C --> E
+    C --> F
+    C --> G
+    C --> H
+    D --> I
+    E --> I
+    F --> I
+    G --> I
+    H --> I
+    D --> J
+    E --> J
+    F --> J
+    G --> J
+    H --> J
+    D --> K
+    E --> K
+    F --> K
+    G --> K
+    H --> K
+
+    classDef citizen fill:#f0f0f0,stroke:#2D5016,stroke-width:2px,color:#333333
+    classDef interface fill:#fdfaf3,stroke:#C9A84C,stroke-width:2px,color:#333333
+    classDef core fill:#2D5016,color:#ffffff,stroke:#1a3009,stroke-width:2px
+    classDef infra fill:#d4e0d0,stroke:#2D5016,stroke-width:2px,color:#2D5016
+
+    class A citizen
+    class B,C interface
+    class D,E,F,G,H core
+    class I,J,K infra

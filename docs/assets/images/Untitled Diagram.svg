@@ -1,0 +1,109 @@
+<mxfile host="Electron">
+  <diagram name="Page-1" id="yDvqyBCvi0i723vbAnGz">
+    <mxGraphModel dx="1094" dy="600" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1000" pageHeight="700" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1;fontColor=#2D5016;fontFamily=Helvetica;" value="&lt;font style=&quot;font-size: 28px;&quot;&gt;Nested Governance — Quantum Punch Council (Village → Earth)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="28" width="880" x="40" y="12" as="geometry" />
+        </mxCell>
+        <mxCell id="subtitle" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;fontColor=#666666;fontFamily=Helvetica;" value="&lt;font style=&quot;font-size: 16px;&quot;&gt;Eight nested levels · Each level has a Quantum Punch Council with five leadership roles&lt;/font&gt;" vertex="1">
+          <mxGeometry height="20" width="700" x="150" y="44" as="geometry" />
+        </mxCell>
+        <mxCell id="escalates" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=8;fontStyle=1;fontColor=#666666;fontFamily=Helvetica;" value="&lt;font style=&quot;font-size: 14px;&quot;&gt;Escalates →&lt;/font&gt;" vertex="1">
+          <mxGeometry height="16" width="90" x="455" y="64" as="geometry" />
+        </mxCell>
+        <mxCell id="lvl_village" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2D5016;strokeColor=#1a3009;fontColor=#FFFFFF;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=10;fontStyle=1;" value="&lt;b&gt;&lt;font style=&quot;font-size: 18px;&quot;&gt;Village&lt;/font&gt;&lt;/b&gt;" vertex="1">
+          <mxGeometry height="50" width="90" x="40" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="lvl_tehsil" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#3a6a20;strokeColor=#2D5016;fontColor=#FFFFFF;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=10;fontStyle=1;" value="&lt;b&gt;&lt;font style=&quot;font-size: 18px;&quot;&gt;Tehsil&lt;/font&gt;&lt;/b&gt;" vertex="1">
+          <mxGeometry height="50" width="90" x="150" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="lvl_district" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#4a7a3a;strokeColor=#2D5016;fontColor=#FFFFFF;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=10;fontStyle=1;" value="&lt;b&gt;&lt;font style=&quot;font-size: 18px;&quot;&gt;District&lt;/font&gt;&lt;/b&gt;" vertex="1">
+          <mxGeometry height="50" width="90" x="260" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="lvl_state" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#5a8a4a;strokeColor=#3a6a20;fontColor=#FFFFFF;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=10;fontStyle=1;" value="&lt;b&gt;&lt;font style=&quot;font-size: 18px;&quot;&gt;State&lt;/font&gt;&lt;/b&gt;" vertex="1">
+          <mxGeometry height="50" width="90" x="370" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="lvl_zone" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#6a9a5a;strokeColor=#4a7a3a;fontColor=#FFFFFF;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=10;fontStyle=1;" value="&lt;b&gt;&lt;font style=&quot;font-size: 18px;&quot;&gt;Zone&lt;/font&gt;&lt;/b&gt;" vertex="1">
+          <mxGeometry height="50" width="90" x="480" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="lvl_country" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#7aaa6a;strokeColor=#5a8a4a;fontColor=#FFFFFF;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=10;fontStyle=1;" value="&lt;b&gt;&lt;font style=&quot;font-size: 18px;&quot;&gt;Country&lt;/font&gt;&lt;/b&gt;" vertex="1">
+          <mxGeometry height="50" width="90" x="590" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="lvl_continent" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#8aba7a;strokeColor=#6a9a5a;fontColor=#2D5016;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=10;fontStyle=1;" value="&lt;b&gt;&lt;font style=&quot;font-size: 18px;&quot;&gt;Continent&lt;/font&gt;&lt;/b&gt;" vertex="1">
+          <mxGeometry height="50" width="90" x="700" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="lvl_earth" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#9aca8a;strokeColor=#7aaa6a;fontColor=#2D5016;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=10;fontStyle=1;" value="&lt;b&gt;&lt;font style=&quot;font-size: 18px;&quot;&gt;Earth&lt;/font&gt;&lt;/b&gt;" vertex="1">
+          <mxGeometry height="50" width="90" x="810" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="la1" edge="1" parent="1" source="lvl_village" style="edgeStyle=none;rounded=0;html=1;strokeColor=#666666;strokeWidth=2;endArrow=classic;endFill=1;" target="lvl_tehsil" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="la2" edge="1" parent="1" source="lvl_tehsil" style="edgeStyle=none;rounded=0;html=1;strokeColor=#666666;strokeWidth=2;endArrow=classic;endFill=1;" target="lvl_district" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="la3" edge="1" parent="1" source="lvl_district" style="edgeStyle=none;rounded=0;html=1;strokeColor=#666666;strokeWidth=2;endArrow=classic;endFill=1;" target="lvl_state" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="la4" edge="1" parent="1" source="lvl_state" style="edgeStyle=none;rounded=0;html=1;strokeColor=#666666;strokeWidth=2;endArrow=classic;endFill=1;" target="lvl_zone" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="la5" edge="1" parent="1" source="lvl_zone" style="edgeStyle=none;rounded=0;html=1;strokeColor=#666666;strokeWidth=2;endArrow=classic;endFill=1;" target="lvl_country" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="la6" edge="1" parent="1" source="lvl_country" style="edgeStyle=none;rounded=0;html=1;strokeColor=#666666;strokeWidth=2;endArrow=classic;endFill=1;" target="lvl_continent" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="la7" edge="1" parent="1" source="lvl_continent" style="edgeStyle=none;rounded=0;html=1;strokeColor=#666666;strokeWidth=2;endArrow=classic;endFill=1;" target="lvl_earth" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="council_connector" edge="1" parent="1" source="lvl_village" style="edgeStyle=none;rounded=0;html=1;strokeColor=#2D5016;strokeWidth=2;dashed=1;dashPattern=6 6;endArrow=classic;endFill=1;fontSize=8;fontStyle=1;fontColor=#2D5016;labelBackgroundColor=#ffffff;fontFamily=Helvetica;" target="council_container" value="&lt;font style=&quot;font-size: 12px;&quot;&gt;Quantum Punch Council&lt;br&gt;(Village Level)&lt;/font&gt;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="council_container" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F8F5;strokeColor=#2D5016;strokeWidth=2;dashed=1;dashPattern=8 8;arcSize=6;fontFamily=Helvetica;" value="" vertex="1">
+          <mxGeometry height="300" width="880" x="30" y="190" as="geometry" />
+        </mxCell>
+        <mxCell id="council_title" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=12;fontStyle=1;fontColor=#2D5016;fontFamily=Helvetica;" value="&lt;font style=&quot;font-size: 18px;&quot;&gt;Quantum Punch Council — Five Leadership Roles&lt;/font&gt;" vertex="1">
+          <mxGeometry height="22" width="460" x="220" y="190" as="geometry" />
+        </mxCell>
+        <mxCell id="legend_elected" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2D5016;strokeColor=#1a3009;fontColor=#FFFFFF;align=center;verticalAlign=middle;arcSize=20;fontSize=7;fontFamily=Helvetica;" value="&lt;font style=&quot;font-size: 14px;&quot;&gt;🗳️ Elected · 1 Zodiac Year&lt;/font&gt;" vertex="1">
+          <mxGeometry height="18" width="200" x="690" y="218" as="geometry" />
+        </mxCell>
+        <mxCell id="legend_appointed_gold" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C9A84C;strokeColor=#8a7334;fontColor=#FFFFFF;align=center;verticalAlign=middle;arcSize=20;fontSize=7;fontFamily=Helvetica;" value="&lt;font style=&quot;font-size: 14px;&quot;&gt;👤 Appointed · Lifetime&lt;/font&gt;" vertex="1">
+          <mxGeometry height="18" width="200" x="690" y="250" as="geometry" />
+        </mxCell>
+        <mxCell id="legend_appointed_green" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#4a7a3a;strokeColor=#2D5016;fontColor=#FFFFFF;align=center;verticalAlign=middle;arcSize=20;fontSize=7;fontFamily=Helvetica;" value="&lt;font style=&quot;font-size: 14px;&quot;&gt;👤 Appointed · Indefinite&lt;/font&gt;" vertex="1">
+          <mxGeometry height="18" width="200" x="690" y="281" as="geometry" />
+        </mxCell>
+        <mxCell id="role_mentor" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C9A84C;strokeColor=#8a7334;fontColor=#FFFFFF;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;" value="🧘&lt;br&gt;&lt;b&gt;Mentor&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size: 7px; color: #FFE8A0;&quot;&gt;&lt;b&gt;(Appointed · Lifetime)&lt;/b&gt;&lt;/font&gt;&lt;br&gt;&lt;font style=&quot;font-size: 7px;&quot;&gt;Wisdom &amp;amp; ethical guidance&lt;/font&gt;" vertex="1">
+          <mxGeometry height="100" width="160" x="50" y="218" as="geometry" />
+        </mxCell>
+        <mxCell id="role_nayak" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2D5016;strokeColor=#1a3009;fontColor=#FFFFFF;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;" value="👨‍💼&lt;br&gt;&lt;b&gt;Nayak&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size: 7px; color: #C9A84C;&quot;&gt;&lt;b&gt;(Elected · Zodiac Year)&lt;/b&gt;&lt;/font&gt;&lt;br&gt;&lt;font style=&quot;font-size: 7px;&quot;&gt;Male executive leader&lt;/font&gt;" vertex="1">
+          <mxGeometry height="100" width="160" x="230" y="218" as="geometry" />
+        </mxCell>
+        <mxCell id="role_nayika" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2D5016;strokeColor=#1a3009;fontColor=#FFFFFF;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;" value="👩‍💼&lt;br&gt;&lt;b&gt;Nayika&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size: 7px; color: #C9A84C;&quot;&gt;&lt;b&gt;(Elected · Zodiac Year)&lt;/b&gt;&lt;/font&gt;&lt;br&gt;&lt;font style=&quot;font-size: 7px;&quot;&gt;Female executive leader&lt;/font&gt;" vertex="1">
+          <mxGeometry height="100" width="160" x="410" y="218" as="geometry" />
+        </mxCell>
+        <mxCell id="role_manager" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#4a7a3a;strokeColor=#2D5016;fontColor=#FFFFFF;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;" value="📋&lt;br&gt;&lt;b&gt;Manager&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size: 7px; color: #C9A84C;&quot;&gt;&lt;b&gt;(Appointed · Indefinite)&lt;/b&gt;&lt;/font&gt;&lt;br&gt;&lt;font style=&quot;font-size: 7px;&quot;&gt;Daily admin &amp;amp; operations&lt;/font&gt;" vertex="1">
+          <mxGeometry height="100" width="160" x="160" y="340" as="geometry" />
+        </mxCell>
+        <mxCell id="role_agent" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#4a7a3a;strokeColor=#2D5016;fontColor=#FFFFFF;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;" value="🏪&lt;br&gt;&lt;b&gt;Agent&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size: 7px; color: #C9A84C;&quot;&gt;&lt;b&gt;(Appointed · Indefinite)&lt;/b&gt;&lt;/font&gt;&lt;br&gt;&lt;font style=&quot;font-size: 7px;&quot;&gt;Kiosk ops &amp;amp; citizen access&lt;/font&gt;" vertex="1">
+          <mxGeometry height="100" width="160" x="360" y="340" as="geometry" />
+        </mxCell>
+        <mxCell id="council_hint" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=8;fontColor=#888888;fontStyle=2;fontFamily=Helvetica;" value="&lt;font style=&quot;font-size: 14px;&quot;&gt;Same five-role structure at every governance level&lt;/font&gt;" vertex="1">
+          <mxGeometry height="18" width="320" x="570" y="430" as="geometry" />
+        </mxCell>
+        <mxCell id="collective_note" parent="1" style="text;html=1;strokeColor=none;fillColor=#F5F8F5;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=8;fontColor=#555555;fontFamily=Helvetica;spacingLeft=8;spacingRight=8;" value="&lt;font style=&quot;font-size: 14px;&quot;&gt;Each level also has a &lt;b style=&quot;&quot;&gt;Collective Board&lt;/b&gt; — community members who vote, escalate concerns, and hold councils accountable.&lt;/font&gt;" vertex="1">
+          <mxGeometry height="36" width="880" x="30" y="490" as="geometry" />
+        </mxCell>
+        <mxCell id="election_table" parent="1" style="text;html=1;strokeColor=#CCCCCC;fillColor=#FFFFFF;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontFamily=Helvetica;" value="&lt;table cellpadding=&quot;4&quot; style=&quot;font-family: Helvetica; width: 100%;&quot;&gt;&lt;tbody&gt;&lt;tr style=&quot;background: rgb(45, 80, 22); color: rgb(255, 255, 255); font-weight: bold;&quot;&gt;&lt;td&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;Role&lt;/font&gt;&lt;/td&gt;&lt;td&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;Method&lt;/font&gt;&lt;/td&gt;&lt;td&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;Term&lt;/font&gt;&lt;/td&gt;&lt;td&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;Function&lt;/font&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;Nayak&lt;/font&gt;&lt;/td&gt;&lt;td&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;🗳️ Elected&lt;/font&gt;&lt;/td&gt;&lt;td&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;1 Zodiac Year&lt;/font&gt;&lt;/td&gt;&lt;td&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;Male executive leadership&lt;/font&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr style=&quot;background: rgb(240, 244, 240);&quot;&gt;&lt;td&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;Nayika&lt;/font&gt;&lt;/td&gt;&lt;td&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;🗳️ Elected&lt;/font&gt;&lt;/td&gt;&lt;td&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;1 Zodiac Year&lt;/font&gt;&lt;/td&gt;&lt;td&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;Female executive leadership&lt;/font&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;Mentor&lt;/font&gt;&lt;/td&gt;&lt;td&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;👤 Appointed&lt;/font&gt;&lt;/td&gt;&lt;td&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;Lifetime&lt;/font&gt;&lt;/td&gt;&lt;td&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;Wisdom keeper, ethical guide&lt;/font&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr style=&quot;background: rgb(240, 244, 240);&quot;&gt;&lt;td&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;Manager&lt;/font&gt;&lt;/td&gt;&lt;td&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;👤 Appointed&lt;/font&gt;&lt;/td&gt;&lt;td&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;Indefinite&lt;/font&gt;&lt;/td&gt;&lt;td&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;Administrative operations&lt;/font&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;Agent&lt;/font&gt;&lt;/td&gt;&lt;td&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;👤 Appointed&lt;/font&gt;&lt;/td&gt;&lt;td&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;Indefinite&lt;/font&gt;&lt;/td&gt;&lt;td&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;Kiosk and access management&lt;/font&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/tbody&gt;&lt;/table&gt;" vertex="1">
+          <mxGeometry height="170" width="480" x="30" y="520" as="geometry" />
+        </mxCell>
+        <mxCell id="footer" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=8;fontColor=#999999;fontFamily=Helvetica;" value="&lt;font style=&quot;font-size: 14px;&quot;&gt;SITA Foundation · qumanity.in&lt;/font&gt;" vertex="1">
+          <mxGeometry height="18" width="190" x="810" y="680" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

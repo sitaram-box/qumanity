@@ -1,0 +1,44 @@
+flowchart TB
+    subgraph Interfaces["Citizen Interfaces"]
+        direction LR
+        K["Kiosk"]
+        W["Web Browser"]
+        M["Native App"]
+    end
+
+    subgraph Protocol["Qumanity Protocol"]
+        direction TB
+        T["Four Timelines"]
+        G["Nested Governance"]
+        I["Dual-Key Identity"]
+        KP["Karma Points"]
+        Z["Zodiac Elections"]
+    end
+
+    subgraph PLNN["PLNN Data Infrastructure"]
+        direction LR
+        V["Village Node"]
+        R["Regional Node"]
+        N["National Node"]
+        P["Planetary Node"]
+    end
+
+    subgraph Trust["Trust Layer"]
+        E["Encrypted Private Data"]
+        L["Public Ledgers"]
+        A["Audit Trail"]
+    end
+
+    Interfaces --> Protocol
+    Protocol --> PLNN
+    PLNN --> Trust
+
+    classDef interface fill:#fdfaf3,stroke:#C9A84C,stroke-width:2px,color:#333333
+    classDef protocol fill:#e8f0e5,stroke:#2D5016,stroke-width:2px,color:#2D5016
+    classDef infra fill:#d4e0d0,stroke:#2D5016,stroke-width:2px,color:#2D5016
+    classDef trust fill:#2D5016,color:#ffffff,stroke:#1a3009,stroke-width:2px
+
+    class Interfaces interface
+    class Protocol protocol
+    class PLNN infra
+    class Trust trust

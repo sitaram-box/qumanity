@@ -34,7 +34,6 @@ GOOGLE DOCS IMPORT INSTRUCTIONS:
 | **Version** | 3.0 |
 | **Website** | [https://qumanity.in](https://qumanity.in) |
 | **Repository** | [github.com/sitaram-box/QUMANITY](https://github.com/sitaram-box/QUMANITY) |
-| **Email** | founder@qumanity.in |
 | **Classification** | Public |
 
 *Technical specifications are maintained separately in the Qumanity Technical Architecture Document.*
@@ -184,17 +183,13 @@ Every citizen navigates four distinct **timelines** — accounts that separate i
 
 Birth identity is **immutable**; governance rights are **anchored to where one lives**. A citizen who migrates carries their Private timeline forever but joins a new Public timeline at their destination.
 
-![Four Timelines](../assets/images/four-timelines.png)
-
-*Figure 2: Four Timelines — Private → Personal → Public → Global. Each timeline serves a distinct purpose while maintaining separation of identity, relationships, governance, and planetary consciousness.*
-
 ### Nested Governance: Village → Earth
 
 Qumanity organises society into **eight nested levels**:
 
-![Nested Governance Structure](../assets/images/nested-governance.png)
-
-*Figure 3: Nested Governance Structure — Citizen → Village → Tehsil → District → State → Nation → Continent → Earth. Issues escalate upward only when they cannot be resolved locally.*
+```
+Citizen → Village → Tehsil → District → State → Country → Continent → Planet (Earth)
+```
 
 Each level has a **Collective Board** and a **Quantum Punch Council** with **five leadership roles**:
 
@@ -266,15 +261,17 @@ The **website** is the window — open to all, requiring no account to understan
 
 ### High-Level Architecture
 
-![Qumanity Ecosystem Overview](../assets/images/qumanity-ecosystem.png)
-
-*Figure 1: Qumanity Ecosystem Overview — Citizens interact through two interfaces (Website and iOS/macOS App), which connect to the five innovations of the core protocol, all built on the PLNN data infrastructure.*
-
 Citizens interact through **village kiosks**, **web browsers**, or **native apps**. Above the interface layer, the **Qumanity protocol** enforces governance rules: timeline separation, nested escalation, karma verification, and election cycles. Below, **PLNN** distributes data across nested nodes — village, tehsil, district, state, nation, planet — so that no single server owns a community's information. A **trust layer** ensures ledger integrity and encrypted private data without exposing personal information on public boards.
 
-![High-Level Architecture](../assets/images/high-level-architecture.png)
-
-*Figure 4: High-Level Architecture — Citizen interfaces connect to the Qumanity Protocol, which sits on the PLNN data infrastructure, all secured by a trust layer.*
+```
+Citizen Interfaces (Kiosk · Web · App)
+        ↓
+Qumanity Protocol (Timelines · Governance · Karma · Elections)
+        ↓
+PLNN — Planetary Ledger Node Network (Village → Earth)
+        ↓
+Trust Layer (Encrypted Private Data · Public Ledgers · Audit Trail)
+```
 
 ### Technology Stack Summary
 
@@ -403,7 +400,7 @@ Qumanity is **live**. The protocol works. The pilot is underway. What remains is
 
 **SITA Foundation** (Sekyor Intelligence Tantra Foundation) serves as steward, not owner. It develops the protocol, supports pilot deployment, and ensures that Qumanity remains open, ethical, and aligned with **Dharma**. SITA does not monetise citizen data, sell governance access, or claim authority over communities that adopt the protocol.
 
-### 9.5 How to Join
+### How to Join
 
 | Who You Are | What You Can Do |
 | :--- | :--- |
@@ -413,13 +410,6 @@ Qumanity is **live**. The protocol works. The pilot is underway. What remains is
 | **iOS / macOS Developer** | Build the native governance app (SwiftUI, Phase 4) |
 | **Administrator** | Operate a village kiosk or serve as a community Agent |
 | **Philanthropist** | Fund pilot deployment, kiosk hardware, or connectivity for underserved villages |
-
-**Contact:**
-
-- **Register:** [https://qumanity.in](https://qumanity.in)
-- **Contribute:** [https://github.com/sitaram-box/QUMANITY](https://github.com/sitaram-box/QUMANITY)
-- **Email:** founder@qumanity.in
-- **Organization:** SITA Foundation (Sekyor Intelligence Tantra Foundation)
 
 ### Final Reflection
 

@@ -1,0 +1,35 @@
+%%{init: {
+  'theme': 'base',
+  'themeVariables': {
+    'fontFamily': 'Arial, sans-serif',
+    'fontSize': '16px',
+    'primaryColor': '#2D5016',
+    'primaryTextColor': '#ffffff',
+    'primaryBorderColor': '#2D5016',
+    'lineColor': '#475569',
+    'secondaryColor': '#C9A84C'
+  }
+}}%%
+
+flowchart LR
+    subgraph Timelines["Four Timelines"]
+        direction LR
+        P1["Private<br><br>Lifelong identity<br>Wallet · Messages<br>Personal history"]
+        P2["Personal<br><br>Relationships<br>Family tree<br>Social connections"]
+        P3["Public<br><br>Village board<br>Elections · Marketplace<br>Justice · Services"]
+        P4["Global<br><br>Planetary statistics<br>Global collective board<br>Consciousness"]
+    end
+
+    P1 --> P2
+    P2 --> P3
+    P3 --> P4
+
+    classDef private fill:#2D5016,color:#ffffff,stroke:#1a3009,stroke-width:2px
+    classDef personal fill:#4a7a3a,color:#ffffff,stroke:#2D5016,stroke-width:2px
+    classDef public fill:#6a9a5a,color:#ffffff,stroke:#2D5016,stroke-width:2px
+    classDef global fill:#C9A84C,color:#ffffff,stroke:#8a7334,stroke-width:2px
+
+    class P1 private
+    class P2 personal
+    class P3 public
+    class P4 global

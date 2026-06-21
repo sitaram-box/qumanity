@@ -1,0 +1,68 @@
+<mxfile host="app.diagrams.net" modified="2026-06-19T00:00:00.000Z" agent="Qumanity" version="22.1.0" type="device">
+  <diagram id="four-timelines" name="Four Timelines">
+    <mxGraphModel dx="900" dy="500" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="800" pageHeight="400" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- Title -->
+        <mxCell id="title" value="Four Timelines — Private → Personal → Public → Global" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1;fontColor=#2D5016;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="100" y="20" width="600" height="28" as="geometry" />
+        </mxCell>
+
+        <!-- Description -->
+        <mxCell id="description" value="Each timeline serves a distinct purpose while maintaining separation of identity, relationships, governance, and planetary consciousness." style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;fontColor=#333333;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="80" y="50" width="640" height="36" as="geometry" />
+        </mxCell>
+
+        <!-- Private -->
+        <mxCell id="box_private" value="🔒&lt;br&gt;&lt;b&gt;Private&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size: 8px;&quot;&gt;Lifelong identity · Wallet · Messages · Personal history&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2D5016;strokeColor=#2D5016;fontColor=#FFFFFF;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="60" y="120" width="140" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="note_private" value="Birth location · Never changes" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=8;fontColor=#666666;fontFamily=Helvetica;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="60" y="210" width="140" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Personal -->
+        <mxCell id="box_personal" value="👨‍👩‍👧‍👦&lt;br&gt;&lt;b&gt;Personal&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size: 8px;&quot;&gt;Family tree · Social connections · Relationships&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#4a7a3a;strokeColor=#4a7a3a;fontColor=#FFFFFF;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="230" y="120" width="140" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="note_personal" value="Family &amp; social circle" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=8;fontColor=#666666;fontFamily=Helvetica;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="230" y="210" width="140" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Public -->
+        <mxCell id="box_public" value="🏛️&lt;br&gt;&lt;b&gt;Public&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size: 8px;&quot;&gt;Village board · Elections · Marketplace · Justice · Services&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#6a9a5a;strokeColor=#6a9a5a;fontColor=#FFFFFF;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="400" y="120" width="140" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="note_public" value="Present location" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=8;fontColor=#666666;fontFamily=Helvetica;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="400" y="210" width="140" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Global -->
+        <mxCell id="box_global" value="🌍&lt;br&gt;&lt;b&gt;Global&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size: 8px;&quot;&gt;Planetary statistics · Global collective board · Consciousness&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C9A84C;strokeColor=#C9A84C;fontColor=#FFFFFF;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="570" y="120" width="140" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="note_global" value="Earth → Continent → Country" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=8;fontColor=#666666;fontFamily=Helvetica;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="570" y="210" width="140" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Arrows: Private → Personal → Public → Global -->
+        <mxCell id="arrow_1" value="" style="edgeStyle=none;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#666666;strokeWidth=2.5;endArrow=classic;endFill=1;fontFamily=Helvetica;" edge="1" parent="1" source="box_private" target="box_personal">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow_2" value="" style="edgeStyle=none;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#666666;strokeWidth=2.5;endArrow=classic;endFill=1;fontFamily=Helvetica;" edge="1" parent="1" source="box_personal" target="box_public">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow_3" value="" style="edgeStyle=none;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#666666;strokeWidth=2.5;endArrow=classic;endFill=1;fontFamily=Helvetica;" edge="1" parent="1" source="box_public" target="box_global">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Footer -->
+        <mxCell id="footer" value="SITA Foundation · qumanity.in" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=8;fontColor=#999999;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="250" y="360" width="300" height="18" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -203,7 +203,7 @@ def _is_admin_reference_user(
     is_admin: bool = False,
 ) -> bool:
     pid = (private_id or "").strip().upper()
-    if pid == "H_U_ADMIN":
+    if pid == "HU-014918240" or pid == "H_U_ADMIN":
         return True
     if is_admin and str(date_of_birth or "").startswith("1990-07-30"):
         bt = (birth_time or "").strip()

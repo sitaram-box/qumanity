@@ -1,0 +1,89 @@
+%%{init: {
+  'theme': 'base',
+  'themeVariables': {
+    'fontFamily': 'Inter, system-ui, sans-serif',
+    'fontSize': '14px',
+    'lineColor': '#475569',
+    'primaryTextColor': '#333333',
+    'primaryBorderColor': '#2D5016',
+    'clusterBkg': '#f8faf8',
+    'clusterBorder': '#2D5016',
+    'titleColor': '#2D5016'
+  },
+  'flowchart': {
+    'curve': 'basis',
+    'padding': 20,
+    'nodeSpacing': 40,
+    'rankSpacing': 60
+  }
+}}%%
+
+flowchart TD
+    %% ── Citizens ──────────────────────────────────────────
+    CITIZENS(["<b>Citizens & Communities</b><br/>Villages · Towns · Nations"])
+
+    %% ── Middle Layer: Two Interfaces ──────────────────────
+    subgraph INTERFACES["<b>Two Interfaces</b>"]
+        direction LR
+        WEB["<b>Website</b><br/>qumanity.in<br/><i>Public transparency · Education · National statistics</i>"]
+        APP["<b>iOS / macOS App</b><br/><i>Daily governance · Voting · Karma · Services</i>"]
+    end
+
+    %% ── Top Layer: Five Innovations (Core Protocol) ───────
+    subgraph CORE["<b>Five Innovations — Core Protocol</b>"]
+        direction TB
+
+        subgraph ROW1[" "]
+            direction LR
+            TL["<b>Four Timelines</b><br/>Private → Personal<br/>→ Public → Global"]
+            NG["<b>Nested Governance</b><br/>Village → Tehsil → District<br/>→ State → Nation → Earth"]
+        end
+
+        subgraph ROW2[" "]
+            direction LR
+            DKI["<b>Dual-Key Identity</b><br/>Private ID · Public ID"]
+            KPL["<b>Karma Points Ledger</b><br/>Transparent · Verifiable<br/>Non-inflationary"]
+            ZBE["<b>Zodiac-Based Elections</b><br/>Regular · Predictable · Fair"]
+        end
+    end
+
+    %% ── Bottom Layer: PLNN Data Infrastructure ────────────
+    subgraph PLNN["<b>Planetary Ledger Node Network — PLNN</b>"]
+        direction LR
+        DS["<b>Data Sovereignty</b><br/>Community-owned data<br/>at every node"]
+        OFF["<b>Offline-First</b><br/>Local action · Sync<br/>when connected"]
+        NODES["<b>Nested Nodes</b><br/>Village → Regional<br/>→ National → Planetary"]
+    end
+
+    %% ── Flow: Citizens → Interfaces → Core → PLNN ────────
+    CITIZENS --> WEB
+    CITIZENS --> APP
+    WEB --> CORE
+    APP --> CORE
+    ROW1 --> PLNN
+    ROW2 --> PLNN
+
+    %% ── SITA Green: primary / core elements ───────────────
+    classDef primary fill:#2D5016,color:#ffffff,stroke:#1a3009,stroke-width:2px
+    classDef primaryText fill:#2D5016,color:#ffffff,stroke:#1a3009,stroke-width:2px
+
+    %% ── Muted Gold: secondary / interface elements ────────
+    classDef secondary fill:#C9A84C,color:#1a1a1a,stroke:#8a7334,stroke-width:2px
+
+    %% ── PLNN infrastructure (green variant) ───────────────
+    classDef infra fill:#2D5016,color:#ffffff,stroke:#C9A84C,stroke-width:2px
+
+    %% ── Neutral: citizens ─────────────────────────────────
+    classDef citizen fill:#f8faf8,color:#2D5016,stroke:#2D5016,stroke-width:2px
+
+    class CITIZENS citizen
+    class WEB,APP secondary
+    class TL,NG,DKI,KPL,ZBE primary
+    class DS,OFF,NODES infra
+
+    %% ── Subgraph styling ────────────────────────────────────
+    style INTERFACES fill:#fdfaf3,stroke:#C9A84C,stroke-width:2px,color:#2D5016
+    style CORE fill:#f4f7f2,stroke:#2D5016,stroke-width:2px,color:#2D5016
+    style PLNN fill:#eef2eb,stroke:#2D5016,stroke-width:2px,color:#2D5016
+    style ROW1 fill:none,stroke:none
+    style ROW2 fill:none,stroke:none

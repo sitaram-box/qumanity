@@ -370,11 +370,7 @@ def run_migration_with_status(
     print(f"Using database: {db_path}")
     conn = _connect(db_path)
     try:
-        if (
-            not force
-            and not admin_needs_setup(conn)
-            and os.environ.get("RUN_MIGRATION_ON_STARTUP", "").lower() != "true"
-        ):
+        if not force and not admin_needs_setup(conn):
             out["ok"] = True
             out["already_configured"] = True
             out["message"] = "Admin already configured."
