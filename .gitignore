@@ -50,3 +50,79 @@ htmlcov/
 # Node (village-commerce)
 village-commerce/node_modules/
 village-commerce/.next/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment files
+.env
+*.env
+.env.local
+.env.*.local
+
+# Backup files
+*_backup*.db
+*.backup
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Sensitive config
+config.py
+secrets.py
+credentials.py
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment files
+.env
+*.env
+.env.local
+.env.*.local
+
+# Backup files
+*_backup*.db
+*.backup
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Sensitive config
+config.py
+secrets.py
+credentials.py
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
