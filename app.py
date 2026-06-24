@@ -106,7 +106,7 @@ def _run_deferred_startup() -> None:
 
 
 def _schedule_deferred_startup() -> None:
-    delay = max(0, int(os.environ.get("QUMANITY_STARTUP_DELAY_SEC", "20")))
+    delay = max(0, int(os.environ.get("QUMANITY_STARTUP_DELAY_SEC", "30")))
 
     def _delayed() -> None:
         if delay:
@@ -551,7 +551,11 @@ def build_geo_public_url(kind: str, gid: str) -> str:
         return url_for("location_village", village_id=gid)
     abort(404)
 
-app = Flask(__name__)
+app = Flask(
+    __name__,
+    template_folder=str(BASE_DIR / "templates"),
+    static_folder=str(BASE_DIR / "static"),
+)
 
 try:
     from werkzeug.middleware.proxy_fix import ProxyFix
@@ -569,28 +573,45 @@ _migration_startup_status: dict[str, Any] = {
     "admin_private_id": ADMIN_PRIVATE_ID,
 }
 
+@app.route("/health")
 @app.get("/health")
+@app.route("/healthz")
 @app.get("/healthz")
 def health():
-    """Minimal liveness probe — no database access (Railway healthcheck)."""
+    """Railway liveness probe — no database access."""
     return "OK", 200
 
 
+@app.route("/health/details")
 @app.get("/health/details")
 def health_details():
-    """Optional readiness probe with database status."""
-    payload: dict[str, Any] = {
-        "status": "ok",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-    }
+    """Readiness probe with optional database check."""
     try:
         conn = get_db()
         conn.execute("SELECT 1").fetchone()
-        payload["database"] = "connected"
+        return jsonify({"status": "ok", "database": "connected"}), 200
     except Exception as exc:
-        payload["database"] = "error"
-        payload["database_error"] = str(exc)
-    return jsonify(payload)
+        return jsonify({"status": "error", "database": str(exc)}), 500
+
+
+@app.route("/debug")
+@app.get("/debug")
+def debug_status():
+    """Deployment diagnostic — confirms full app (not minimal_app) is running."""
+    template_path = BASE_DIR / "templates" / "index.html"
+    static_css = BASE_DIR / "static" / "style.css"
+    return jsonify(
+        {
+            "status": "ok",
+            "app": "qumanity_full",
+            "flask_app": app.import_name,
+            "USE_MINIMAL_APP": os.environ.get("USE_MINIMAL_APP", ""),
+            "FLASK_ENV": os.environ.get("FLASK_ENV", ""),
+            "templates_loaded": template_path.is_file(),
+            "index_template": str(template_path),
+            "static_css_exists": static_css.is_file(),
+        }
+    )
 
 
 @app.get("/test-admin-login")
@@ -839,7 +860,7 @@ def _check_allowed_host() -> None:
     """Reject unknown host headers in production (custom domain + Railway fallback)."""
     if not config.IS_PRODUCTION:
         return
-    if request.path in ("/health", "/healthz", "/health/details", "/favicon.ico"):
+    if request.path in ("/health", "/healthz", "/health/details", "/debug", "/favicon.ico"):
         return
     if request.endpoint and str(request.endpoint).startswith("static"):
         return
@@ -861,6 +882,7 @@ def _ensure_admin_self_heal() -> None:
         "/health",
         "/healthz",
         "/health/details",
+        "/debug",
         "/setup",
         "/logout",
         "/webhook/donation",
@@ -890,7 +912,7 @@ def _prune_invalid_session() -> None:
     """Drop stale session cookies when the user row no longer exists."""
     if request.endpoint and str(request.endpoint).startswith("static"):
         return
-    if request.path in ("/health", "/healthz", "/health/details", "/setup", "/logout"):
+    if request.path in ("/health", "/healthz", "/health/details", "/debug", "/setup", "/logout"):
         return
     pk = session.get("user_pk")
     if not pk:
@@ -906,7 +928,7 @@ def _prune_invalid_session() -> None:
 
 @app.before_request
 def _bind_ui_language() -> None:
-    if request.path in ("/health", "/healthz", "/health/details"):
+    if request.path in ("/health", "/healthz", "/health/details", "/debug"):
         g.ui_language = "en"
         return
     if request.path == "/setup":
@@ -3816,7 +3838,7 @@ def _before_request() -> None:
     """
     if request.endpoint and str(request.endpoint).startswith("static"):
         return
-    if request.path in ("/health", "/healthz", "/health/details"):
+    if request.path in ("/health", "/healthz", "/health/details", "/debug"):
         return
     if request.path == "/setup":
         return
