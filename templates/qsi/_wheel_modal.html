@@ -1,0 +1,62 @@
+{# QSI Sacred Spin modal — included on dashboard #}
+<div class="qb-modal-backdrop qb-qsi-modal" id="qb-qsi-modal" hidden aria-hidden="true">
+  <div class="qb-modal-dialog qb-qsi-modal" role="dialog" aria-modal="true" aria-labelledby="qsi-modal-title">
+    <div class="qb-modal-head">
+      <h2 class="h5 mb-0" id="qsi-modal-title">Quantum Spiritual Interface</h2>
+      <button type="button" class="qb-modal-close" data-qb-close-modal="qb-qsi-modal" aria-label="Close">×</button>
+    </div>
+    <p class="small text-muted mb-2">
+      Spin the sacred wheel to discover a Naam service. All Names are equal — choose your own path.
+    </p>
+
+    <div class="qb-qsi-name-form mb-3">
+      <label for="qsi-chosen-name" class="form-label">Your chosen Name of God</label>
+      <input
+        type="text"
+        id="qsi-chosen-name"
+        class="form-control form-control-sm"
+        placeholder="Ram, Krishna, Allah, Jesus, Waheguru…"
+        maxlength="100"
+      />
+    </div>
+
+    <div class="qb-qsi-wheel-wrap" id="qsi-wheel-wrap">
+      <div class="qb-qsi-wheel-pointer" aria-hidden="true"></div>
+      <div class="qb-qsi-wheel" id="qsi-wheel" role="img" aria-label="Sacred spin wheel with twelve Naam services"></div>
+      <div class="qb-qsi-wheel-center">QSI</div>
+    </div>
+
+    <div class="d-flex flex-wrap gap-2 justify-content-center mb-2">
+      <button type="button" class="qb-btn qb-btn-primary" id="qsi-spin-btn">Spin the Wheel</button>
+      <a href="#" class="qb-btn qb-btn-neutral btn-sm" id="qsi-history-link">History</a>
+    </div>
+
+    <div class="qb-qsi-service-card" id="qsi-service-card" hidden>
+      <div class="d-flex align-items-start gap-2">
+        <span id="qsi-svc-icon" class="fs-4" aria-hidden="true"></span>
+        <div>
+          <h3 id="qsi-svc-en" class="mb-0"></h3>
+          <div class="qb-qsi-service-hi" id="qsi-svc-hi"></div>
+          <div class="small" id="qsi-svc-trans"></div>
+        </div>
+      </div>
+      <p class="small mt-2 mb-1" id="qsi-svc-desc"></p>
+      <p class="small mb-0">
+        With Name: <strong id="qsi-svc-name"></strong>
+      </p>
+
+      <div id="qsi-duration-wrap" class="mt-2" hidden>
+        <label for="qsi-duration-days" class="form-label">Duration (days)</label>
+        <input type="number" id="qsi-duration-days" class="form-control form-control-sm" min="1" value="7" />
+      </div>
+
+      <div class="qb-qsi-details-form mt-2" id="qsi-details-form" hidden></div>
+
+      <div class="qb-qsi-mode-btns">
+        <button type="button" class="qb-btn qb-btn-secondary btn-sm" id="qsi-get-btn">Get (Receive — Free)</button>
+        <button type="button" class="qb-btn qb-btn-outline btn-sm" id="qsi-provide-btn">Provide (Offer)</button>
+        <button type="button" class="qb-btn qb-btn-warning btn-sm" id="qsi-complete-btn" hidden>Mark Complete</button>
+      </div>
+    </div>
+  </div>
+</div>

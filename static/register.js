@@ -476,6 +476,44 @@
     }
   }
 
+  function formatRegStat(value) {
+    var num = Number(value);
+    if (!Number.isFinite(num)) return "—";
+    return num.toLocaleString("en-IN");
+  }
+
+  function setRegStatText(id, value) {
+    var el = document.getElementById(id);
+    if (el) el.textContent = formatRegStat(value);
+  }
+
+  function loadRegistrationStats() {
+    if (!document.getElementById("reg-stats-grid")) return;
+    fetch("/api/registration-stats")
+      .then(function (response) {
+        if (!response.ok) throw new Error("stats unavailable");
+        return response.json();
+      })
+      .then(function (data) {
+        setRegStatText("total-users", data.total_users);
+        setRegStatText("india-users", data.india_users);
+        setRegStatText("active-villages", data.active_villages);
+        setRegStatText("total-villages", data.total_villages);
+        setRegStatText("active-tehsils", data.active_tehsils);
+        setRegStatText("total-tehsils", data.total_tehsils);
+        setRegStatText("active-districts", data.active_districts);
+        setRegStatText("total-districts", data.total_districts);
+        setRegStatText("active-states", data.active_states);
+        setRegStatText("total-states", data.total_states);
+        setRegStatText("empty-villages-callout", data.empty_villages);
+      })
+      .catch(function () {
+        /* keep placeholder dashes */
+      });
+  }
+
+  document.addEventListener("DOMContentLoaded", loadRegistrationStats);
+
   document.addEventListener("DOMContentLoaded", function () {
     var form = document.getElementById("register-form");
     if (!form) return;

@@ -111,6 +111,16 @@
         btn.focus();
       }
     });
+
+    menu.addEventListener("click", function (e) {
+      var item = e.target.closest("a[role='menuitem'], button[role='menuitem']");
+      if (!item) return;
+      if (item.id === "qb-admin-panel-open") {
+        closeMenu();
+        return;
+      }
+      closeMenu();
+    });
   }
 
   function init() {

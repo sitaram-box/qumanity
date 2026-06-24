@@ -143,6 +143,7 @@ def apply_migrations(conn: sqlite3.Connection, *, verbose: bool = True) -> None:
         ("admin profile patch (H_U_ADMIN)", migrate_admin_user_profile),
         ("blockchain schema", migrate_blockchain_schema),
         ("donations / edit_requests", sita_platform_core.migrate_sita_platform_schema),
+        ("qsi schema", lambda c: __import__("qsi_core").migrate_qsi_schema(c)),
     ]
 
     for label, fn in steps:

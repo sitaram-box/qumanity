@@ -2783,6 +2783,146 @@ def count_homepage_india_users(conn: sqlite3.Connection) -> int:
     return int(row["c"]) if row else 0
 
 
+REGISTRATION_TOTAL_VILLAGES = 620000
+REGISTRATION_TOTAL_STATES = 28
+
+
+def _geo_table_row_count(conn: sqlite3.Connection, table: str) -> int:
+    if not _geo_table_exists(conn, table):
+        return 0
+    row = conn.execute(f"SELECT COUNT(*) AS c FROM {table}").fetchone()
+    return int(row["c"]) if row else 0
+
+
+def registration_stats_bundle(conn: sqlite3.Connection) -> dict[str, int]:
+    """Counts for the registration page statistics panel."""
+    total_users = count_registered_users(conn)
+    india_users = count_homepage_india_users(conn)
+
+    if geography_has_relational_fks(conn) and _geo_table_exists(conn, "village"):
+        active_villages, active_tehsils, active_districts, active_states = (
+            _active_location_counts_join(conn)
+        )
+    else:
+        active_villages, active_tehsils, active_districts, active_states = (
+            _active_location_counts_path(conn)
+        )
+
+    total_villages = REGISTRATION_TOTAL_VILLAGES
+    total_tehsils = _geo_table_row_count(conn, "tehsil")
+    total_districts = _geo_table_row_count(conn, "district")
+    state_table_count = _geo_table_row_count(conn, "state")
+    total_states = (
+        state_table_count if state_table_count > 0 else REGISTRATION_TOTAL_STATES
+    )
+
+    return {
+        "total_users": total_users,
+        "india_users": india_users,
+        "active_villages": active_villages,
+        "active_tehsils": active_tehsils,
+        "active_districts": active_districts,
+        "active_states": active_states,
+        "total_villages": total_villages,
+        "total_tehsils": total_tehsils,
+        "total_districts": total_districts,
+        "total_states": total_states,
+        "empty_villages": max(0, total_villages - active_villages),
+        "empty_tehsils": max(0, total_tehsils - active_tehsils),
+        "empty_districts": max(0, total_districts - active_districts),
+        "empty_states": max(0, total_states - active_states),
+    }
+
+
+def _active_location_counts_join(
+    conn: sqlite3.Connection,
+) -> tuple[int, int, int, int]:
+    row = conn.execute(
+        """
+        SELECT COUNT(DISTINCT TRIM(u.current_location_id)) AS c
+        FROM users u
+        INNER JOIN village v ON v.id = TRIM(u.current_location_id)
+        """
+    ).fetchone()
+    active_villages = int(row["c"]) if row else 0
+
+    active_tehsils = 0
+    active_districts = 0
+    active_states = 0
+
+    if _geo_table_exists(conn, "tehsil"):
+        row = conn.execute(
+            """
+            SELECT COUNT(DISTINCT v.tehsil_id) AS c
+            FROM users u
+            INNER JOIN village v ON v.id = TRIM(u.current_location_id)
+            WHERE TRIM(COALESCE(v.tehsil_id, '')) != ''
+            """
+        ).fetchone()
+        active_tehsils = int(row["c"]) if row else 0
+
+        if _geo_table_exists(conn, "district"):
+            row = conn.execute(
+                """
+                SELECT COUNT(DISTINCT t.district_id) AS c
+                FROM users u
+                INNER JOIN village v ON v.id = TRIM(u.current_location_id)
+                INNER JOIN tehsil t ON t.id = v.tehsil_id
+                WHERE TRIM(COALESCE(t.district_id, '')) != ''
+                """
+            ).fetchone()
+            active_districts = int(row["c"]) if row else 0
+
+            if _geo_table_exists(conn, "state"):
+                row = conn.execute(
+                    """
+                    SELECT COUNT(DISTINCT d.state_id) AS c
+                    FROM users u
+                    INNER JOIN village v ON v.id = TRIM(u.current_location_id)
+                    INNER JOIN tehsil t ON t.id = v.tehsil_id
+                    INNER JOIN district d ON d.id = t.district_id
+                    WHERE TRIM(COALESCE(d.state_id, '')) != ''
+                    """
+                ).fetchone()
+                active_states = int(row["c"]) if row else 0
+
+    return active_villages, active_tehsils, active_districts, active_states
+
+
+def _active_location_counts_path(
+    conn: sqlite3.Connection,
+) -> tuple[int, int, int, int]:
+    villages: set[str] = set()
+    tehsils: set[str] = set()
+    districts: set[str] = set()
+    states: set[str] = set()
+
+    cur = conn.execute(
+        """
+        SELECT TRIM(current_location_id) AS loc
+        FROM users
+        WHERE TRIM(COALESCE(current_location_id, '')) != ''
+        """
+    )
+    for row in cur:
+        vid = str(row["loc"] or "").strip()
+        if not vid or not village_exists(conn, vid):
+            continue
+        villages.add(vid)
+        raw = raw_path(vid)
+        tehsil_raw = path_parent_suffix(raw)
+        if tehsil_raw:
+            tehsils.add(full_id_from_raw(tehsil_raw))
+            district_raw = path_parent_suffix(tehsil_raw)
+            if district_raw:
+                districts.add(full_id_from_raw(district_raw))
+        state_raw = geo_path_to_state_path(raw)
+        if state_raw:
+            states.add(full_id_from_raw(state_raw))
+
+    return len(villages), len(tehsils), len(districts), len(states)
+
+
 def count_homepage_asia_users(conn: sqlite3.Connection) -> int:
     """Users whose current country maps to Asia, plus legacy India-path users."""
     if not _geo_table_exists(conn, "country"):
@@ -3713,6 +3853,13 @@ def _before_request() -> None:
         element_core.migrate_element_core_schema(conn)
         migrate_blockchain_schema(conn)
         sita_platform_core.migrate_sita_platform_schema(conn)
+        import qsi_core
+
+        qsi_core.migrate_qsi_schema(conn)
+        try:
+            qsi_core.process_pending_karma_awards(conn)
+        except sqlite3.Error:
+            app.logger.exception("qsi karma award processing failed")
         if elections_are_enabled():
             try:
                 election_scheduler.process_election_cycles(
@@ -13217,6 +13364,12 @@ def _continent_country_valid(conn: sqlite3.Connection, cont: str, ctry: str) -> 
     return row is not None
 
 
+@app.route("/api/registration-stats")
+def registration_stats():
+    conn = get_db()
+    return jsonify(registration_stats_bundle(conn))
+
+
 @app.route("/register", methods=["GET", "POST"])
 def register():
     # Registration page is always English — mother tongue is stored for dashboard only.
@@ -15712,6 +15865,17 @@ register_varna_routes(app, get_db, login_required, admin_required)
 from space_routes import register_space_routes
 
 register_space_routes(app, get_db, login_required, is_admin_user_fn=is_admin_user)
+
+from qsi_routes import register_qsi_routes
+
+register_qsi_routes(
+    app,
+    get_db,
+    login_required,
+    admin_required,
+    admin_page_required,
+    is_admin_user,
+)
 
 _geography_seeded = False
 _geography_seed_lock = threading.Lock()

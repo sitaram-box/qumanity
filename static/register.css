@@ -243,3 +243,104 @@
   font-size: 0.8125rem;
   color: var(--qb-text);
 }
+
+/* Registration statistics panel */
+.reg-stats {
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--qb-border);
+}
+
+.reg-stats__title {
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: clamp(1.75rem, 4vw, 2.25rem);
+  font-weight: 700;
+  text-align: center;
+  margin: 0 0 0.5rem;
+  color: var(--qb-text);
+  line-height: 1.2;
+}
+
+.reg-stats__subtitle {
+  text-align: center;
+  color: var(--qb-muted);
+  margin: 0 0 1.5rem;
+  font-size: 1.05rem;
+}
+
+.reg-stats__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.reg-stats__card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 1rem 0.75rem;
+  border-radius: 12px;
+  border: 1px solid var(--qb-border);
+  background: var(--qb-surface);
+  text-align: center;
+}
+
+.reg-stats__card--saffron {
+  border-top: 3px solid #ff9933;
+}
+
+.reg-stats__card--white {
+  border-top: 3px solid #ffffff;
+}
+
+.reg-stats__card--green {
+  border-top: 3px solid #138808;
+}
+
+.reg-stats__icon {
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.reg-stats__label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--qb-muted);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.reg-stats__value {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--qb-text);
+  line-height: 1.35;
+}
+
+.reg-stats__callout {
+  text-align: center;
+  font-size: 1.05rem;
+  font-weight: 500;
+  color: var(--qb-text);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.reg-stats__callout #empty-villages-callout {
+  color: var(--qb-primary);
+  font-weight: 700;
+}
+
+.register-header__title {
+  font-size: clamp(1.35rem, 3vw, 1.65rem);
+  margin: 0 0 0.5rem;
+  font-weight: 600;
+}
+
+@media (max-width: 720px) {
+  .reg-stats__grid {
+    grid-template-columns: 1fr;
+  }
+}

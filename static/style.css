@@ -158,7 +158,7 @@ p, li, label, td, th, span, div {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
   position: sticky;
   top: 0;
-  z-index: 100;
+  z-index: 3000;
   color: var(--qb-topbar-text);
 }
 
@@ -1523,11 +1523,12 @@ body.qb-page-home #about.qb-about {
   color: var(--qb-primary);
 }
 
-/* Hamburger menu (top-right) — uses Qumanity design tokens */
+/* Hamburger menu — uses Qumanity design tokens */
 .qb-hamburger-wrap {
   position: relative;
   display: inline-flex;
   align-items: center;
+  z-index: 3001;
 }
 
 .hamburger {
@@ -1553,15 +1554,27 @@ body.qb-page-home #about.qb-about {
 .dropdown-menu.qb-hamburger-menu {
   position: absolute;
   top: calc(100% + 8px);
-  right: 0;
+  left: 0;
+  right: auto;
   background: var(--qb-surface);
   border: 1px solid var(--qb-border);
   border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  min-width: 200px;
-  z-index: 1000;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+  min-width: 220px;
+  max-width: min(280px, calc(100vw - 16px));
+  max-height: min(70vh, 480px);
+  overflow-y: auto;
+  z-index: 3002;
   display: none;
   padding: 6px 0;
+}
+
+/* When hamburger sits in trailing cluster (dashboard), align menu to the right */
+.qb-home-header-trailing .qb-hamburger-wrap .dropdown-menu.qb-hamburger-menu,
+.qb-nav-cluster .qb-hamburger-wrap .dropdown-menu.qb-hamburger-menu,
+.qb-dash-header-actions .qb-hamburger-wrap .dropdown-menu.qb-hamburger-menu {
+  left: auto;
+  right: 0;
 }
 
 .dropdown-menu.qb-hamburger-menu.show {
@@ -1610,11 +1623,13 @@ body.qb-page-home #about.qb-about {
 
 @media (max-width: 575.98px) {
   .dropdown-menu.qb-hamburger-menu {
-    position: fixed;
-    top: auto;
-    right: 8px;
-    left: 8px;
-    min-width: 0;
+    min-width: 200px;
+    max-width: min(280px, calc(100vw - 16px));
+  }
+
+  .qb-home-header-leading .qb-hamburger-wrap .dropdown-menu.qb-hamburger-menu {
+    left: 0;
+    right: auto;
   }
 }
 
@@ -2593,4 +2608,598 @@ body.qb-admin-panel-open {
   flex-shrink: 0;
   font-size: 1.15rem;
   line-height: 1;
+}
+
+/* ==========================================================================
+   Storytelling homepage (index.html)
+   Palette: Saffron #FF9933, White #FFFFFF, Green #138808, Navy #0A1929, Gold #FFD700
+   ========================================================================== */
+
+body.qb-page-home-story {
+  --qb-india-saffron: #ff9933;
+  --qb-india-white: #ffffff;
+  --qb-india-green: #138808;
+  --qb-india-navy: #0a1929;
+  --qb-india-navy-mid: #1a2a4a;
+  --qb-india-gold: #ffd700;
+  --qb-india-saffron-light: #fff3e0;
+  background-color: var(--qb-india-navy);
+}
+
+@keyframes qb-hero-float-a {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  33% {
+    transform: translate(12px, -18px) rotate(8deg);
+  }
+  66% {
+    transform: translate(-8px, 10px) rotate(-6deg);
+  }
+}
+
+@keyframes qb-hero-float-b {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  50% {
+    transform: translate(-14px, 16px) rotate(-12deg);
+  }
+}
+
+@keyframes qb-hero-float-c {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(45deg);
+  }
+  40% {
+    transform: translate(10px, -12px) rotate(52deg);
+  }
+  80% {
+    transform: translate(-6px, 8px) rotate(38deg);
+  }
+}
+
+@keyframes qb-hero-sun-pulse {
+  0%,
+  100% {
+    opacity: 0.85;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+}
+
+@keyframes qb-spin-chakra-inline {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes qb-hero-india-glow {
+  0%,
+  100% {
+    opacity: 0.08;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  50% {
+    opacity: 0.12;
+    transform: translate(-50%, -50%) scale(1.02);
+  }
+}
+
+body.qb-page-home-story header.qb-navbar {
+  background: rgba(10, 25, 41, 0.92);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+body.qb-page-home-story .qb-main {
+  background: transparent;
+  max-width: none;
+  padding-bottom: 4.5rem;
+}
+
+.qb-home-header-row--story {
+  align-items: center;
+}
+
+.qb-home-header-leading {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem 1rem;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.qb-home-brand--compact .qb-qumanity-logo {
+  font-size: 1.05rem;
+}
+
+.qb-home-story {
+  width: 100%;
+}
+
+.qb-story-hero {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: clamp(4rem, 10vw, 6rem) clamp(1.25rem, 4vw, 2.5rem);
+  color: var(--qb-india-white);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+/* ── Layered pure-CSS hero background ── */
+.qb-story-hero__bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.qb-story-hero__base {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, #0a0a1a 0%, #050510 100%);
+}
+
+.qb-story-hero__starfield {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.qb-hero-star {
+  position: absolute;
+  display: block;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 0 4px rgba(255, 255, 255, 0.45);
+}
+
+.qb-story-hero__constellations {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+.qb-story-hero__chakra-stage {
+  width: min(280px, 55vw);
+  height: min(280px, 55vw);
+  margin: 0.25rem auto 0.5rem;
+  flex-shrink: 0;
+}
+
+.qb-story-hero__chakra-wrap {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  animation: qb-spin-chakra-inline 15s linear infinite;
+}
+
+.qb-story-hero__sun-rays {
+  position: absolute;
+  inset: -8%;
+  border-radius: 50%;
+  background:
+    conic-gradient(
+      from 0deg at 50% 50%,
+      rgba(255, 215, 0, 0.14) 0deg,
+      transparent 10deg,
+      rgba(255, 200, 50, 0.1) 20deg,
+      transparent 30deg,
+      rgba(255, 215, 0, 0.12) 40deg,
+      transparent 50deg,
+      rgba(255, 180, 40, 0.1) 60deg,
+      transparent 70deg,
+      rgba(255, 215, 0, 0.11) 80deg,
+      transparent 90deg,
+      rgba(255, 200, 50, 0.1) 100deg,
+      transparent 110deg,
+      rgba(255, 215, 0, 0.12) 120deg,
+      transparent 130deg,
+      rgba(255, 180, 40, 0.1) 140deg,
+      transparent 150deg,
+      rgba(255, 215, 0, 0.11) 160deg,
+      transparent 170deg,
+      rgba(255, 200, 50, 0.1) 180deg,
+      transparent 190deg,
+      rgba(255, 215, 0, 0.12) 200deg,
+      transparent 210deg,
+      rgba(255, 180, 40, 0.1) 220deg,
+      transparent 230deg,
+      rgba(255, 215, 0, 0.11) 240deg,
+      transparent 250deg,
+      rgba(255, 200, 50, 0.1) 260deg,
+      transparent 270deg,
+      rgba(255, 215, 0, 0.12) 280deg,
+      transparent 290deg,
+      rgba(255, 180, 40, 0.1) 300deg,
+      transparent 310deg,
+      rgba(255, 215, 0, 0.11) 320deg,
+      transparent 330deg,
+      rgba(255, 200, 50, 0.1) 340deg,
+      transparent 350deg
+    ),
+    radial-gradient(
+      circle at center,
+      rgba(255, 215, 0, 0.5) 0%,
+      rgba(255, 140, 0, 0.28) 22%,
+      rgba(255, 100, 0, 0.1) 40%,
+      transparent 58%
+    );
+  filter: blur(1px);
+}
+
+.qb-story-hero__sun-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 28%;
+  height: 28%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    #ffd700 0%,
+    #ff8c00 45%,
+    rgba(255, 140, 0, 0.35) 70%,
+    transparent 100%
+  );
+  box-shadow:
+    0 0 40px rgba(255, 215, 0, 0.55),
+    0 0 80px rgba(255, 140, 0, 0.35);
+  opacity: 0.75;
+}
+
+.qb-ashok-chakra {
+  display: block;
+  width: 100%;
+  height: 100%;
+  color: #ffd700;
+  opacity: 0.82;
+  filter: drop-shadow(0 0 12px rgba(255, 215, 0, 0.35));
+}
+
+.qb-story-hero__overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: linear-gradient(
+    180deg,
+    rgba(5, 5, 16, 0.55) 0%,
+    rgba(5, 5, 16, 0.2) 35%,
+    rgba(5, 5, 16, 0.15) 55%,
+    rgba(5, 5, 16, 0.45) 100%
+  );
+  pointer-events: none;
+}
+
+.qb-story-hero__inner {
+  position: relative;
+  z-index: 3;
+  max-width: 52rem;
+  margin: 0 auto;
+}
+
+.qb-story-hero__inner--stacked {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(1rem, 2.5vw, 1.5rem);
+}
+
+.qb-story-hero__title {
+  font-family: "Playfair Display", Georgia, "Times New Roman", serif;
+  font-weight: 700;
+  font-size: clamp(2rem, 5.5vw, 4rem);
+  line-height: 1.15;
+  margin: 0;
+  letter-spacing: -0.02em;
+  color: var(--qb-india-white);
+  text-shadow: 0 2px 28px rgba(10, 25, 41, 0.75);
+}
+
+.qb-story-hero__emph {
+  color: var(--qb-india-saffron);
+  text-shadow: 0 0 48px rgba(255, 153, 51, 0.3);
+}
+
+.qb-story-hero__lead {
+  font-family: Inter, system-ui, -apple-system, "DM Sans", sans-serif;
+  font-size: clamp(1.2rem, 2.4vw, 1.5rem);
+  line-height: 1.6;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.9);
+  margin: 0;
+  max-width: 40rem;
+  text-shadow: 0 1px 16px rgba(10, 25, 41, 0.65);
+}
+
+.qb-story-hero__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.qb-story-join-btn {
+  font-family: Inter, system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 1.05rem;
+  padding: 0.85rem 2.25rem;
+  border: none;
+  border-radius: 999px;
+  background: var(--qb-india-saffron);
+  color: var(--qb-india-white);
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+  box-shadow: 0 8px 28px rgba(255, 153, 51, 0.35);
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.qb-story-join-btn:hover,
+.qb-story-join-btn:focus-visible {
+  background: #e88a2e;
+  color: var(--qb-india-white);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(255, 153, 51, 0.45);
+  outline: none;
+}
+
+.qb-story-hero__credit {
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.6);
+  margin: 0;
+  letter-spacing: 0.04em;
+}
+
+.qb-story-section {
+  padding: 0;
+}
+
+.qb-story-section__inner {
+  width: min(800px, 68vw);
+  max-width: 800px;
+  margin: 0 auto;
+  padding: clamp(3rem, 7vw, 4.5rem) clamp(2rem, 5vw, 2.5rem);
+}
+
+.qb-story-section__title {
+  font-family: "Playfair Display", Georgia, serif;
+  font-weight: 600;
+  font-size: clamp(1.75rem, 4vw, 2.25rem);
+  margin: 0 0 1.25rem;
+  color: var(--qb-india-navy);
+  line-height: 1.2;
+}
+
+.qb-story-section__text {
+  font-family: Inter, system-ui, sans-serif;
+  font-size: clamp(1rem, 2vw, 1.125rem);
+  line-height: 1.75;
+  color: var(--qb-india-navy);
+  margin: 0 0 1rem;
+}
+
+.qb-story-section__text:last-child {
+  margin-bottom: 0;
+}
+
+.qb-story-section--saffron-flag {
+  background: var(--qb-india-saffron);
+}
+
+.qb-story-section--saffron-flag .qb-story-section__title,
+.qb-story-section--saffron-flag .qb-story-section__text {
+  color: var(--qb-india-navy);
+}
+
+.qb-story-section--white-flag {
+  background: var(--qb-india-white);
+}
+
+.qb-story-section--white-flag .qb-story-section__title,
+.qb-story-section--white-flag .qb-story-section__text {
+  color: var(--qb-india-navy);
+}
+
+.qb-story-section--green-flag {
+  background: var(--qb-india-green);
+  padding-bottom: clamp(4rem, 10vw, 6rem);
+}
+
+.qb-story-section--green-flag .qb-story-section__title,
+.qb-story-section--green-flag .qb-story-section__text {
+  color: var(--qb-india-white);
+}
+
+.qb-story-section--green-flag .qb-story-search__hint {
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.qb-story-section--green-flag .qb-story-search__input {
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--qb-india-navy);
+}
+
+.qb-story-section--green-flag .qb-story-search__input::placeholder {
+  color: rgba(10, 25, 41, 0.45);
+}
+
+.qb-story-section--green-flag .qb-story-search__input:focus {
+  border-color: var(--qb-india-white);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.35);
+}
+
+.qb-story-section--green-flag .qb-story-search__hit a {
+  color: var(--qb-india-white);
+}
+
+.qb-story-section--green-flag .qb-story-search__hit:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.qb-story-section--green-flag .qb-story-search__kind {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.qb-story-section--green-flag .qb-story-search__empty {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.qb-story-section--green-flag .qb-story-search__empty--error {
+  color: #fecaca;
+}
+
+/* Legacy section modifiers (other pages) */
+.qb-story-section--light {
+  background: var(--qb-india-white);
+}
+
+.qb-story-section--saffron {
+  background: var(--qb-india-saffron-light);
+}
+
+.qb-story-section--search {
+  background: linear-gradient(180deg, #f5f5f5 0%, var(--qb-india-white) 100%);
+  border-top: 3px solid var(--qb-india-green);
+  padding-bottom: clamp(4rem, 10vw, 6rem);
+}
+
+.qb-story-search__inner {
+  max-width: 36rem;
+}
+
+.qb-story-search__hint {
+  font-size: 0.95rem;
+  color: rgba(10, 25, 41, 0.75);
+  margin-bottom: 1.25rem;
+}
+
+.qb-story-search__input {
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 1rem;
+  padding: 0.75rem 1rem;
+  border: 2px solid rgba(10, 25, 41, 0.15);
+  border-radius: 10px;
+  background: var(--qb-india-white);
+  color: var(--qb-india-navy);
+}
+
+.qb-story-search__input:focus {
+  border-color: var(--qb-india-saffron);
+  box-shadow: 0 0 0 3px rgba(255, 153, 51, 0.25);
+  outline: none;
+}
+
+.qb-story-search__results {
+  margin: 0;
+}
+
+.qb-story-search__hit {
+  padding: 0.5rem 0.65rem;
+  border-radius: 8px;
+  transition: background 0.15s ease;
+}
+
+.qb-story-search__hit:hover {
+  background: var(--qb-india-saffron-light);
+}
+
+.qb-story-search__hit a {
+  color: var(--qb-india-navy);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.qb-story-search__hit a:hover {
+  color: var(--qb-india-green);
+  text-decoration: underline;
+}
+
+.qb-story-search__kind {
+  color: rgba(10, 25, 41, 0.55);
+  font-weight: 400;
+}
+
+.qb-story-search__empty {
+  padding: 0.5rem 0.65rem;
+  color: rgba(10, 25, 41, 0.6);
+  font-size: 0.9rem;
+}
+
+.qb-story-search__empty--error {
+  color: #b91c1c;
+}
+
+body.qb-page-home-story .qb-footer {
+  background: rgba(10, 25, 41, 0.95);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+@media (max-width: 768px) {
+  .qb-home-header-row--story {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .qb-home-header-leading {
+    justify-content: flex-start;
+  }
+
+  .qb-home-header-trailing {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .qb-home-timebox {
+    width: 100%;
+    max-width: none;
+  }
+
+  .qb-story-hero {
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding-top: clamp(5rem, 14vw, 7rem);
+  }
+
+  .qb-story-hero__chakra-wrap {
+    width: min(92vmin, 420px);
+    height: min(92vmin, 420px);
+  }
+
+  .qb-story-section__inner {
+    width: min(800px, 92vw);
+    padding: clamp(2.5rem, 8vw, 3.5rem) clamp(1.25rem, 5vw, 1.75rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qb-story-hero__chakra-wrap {
+    animation: none !important;
+  }
 }

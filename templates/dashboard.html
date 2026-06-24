@@ -15,6 +15,7 @@
   rel="stylesheet"
   href="{{ url_for('static', filename='dashboard.css') }}?v=17"
 />
+<link rel="stylesheet" href="{{ url_for('static', filename='qsi.css') }}?v=1" />
 {% endblock %}
 
 {% block header_inner %}
@@ -82,6 +83,13 @@
         <p class="small text-muted mb-0" id="qb-notification-empty">No pending requests.</p>
       </div>
     </div>
+    <button
+      type="button"
+      class="qb-qsi-trigger"
+      id="qb-qsi-trigger"
+      title="Quantum Spiritual Interface — Sacred Spin"
+      aria-label="Open QSI Sacred Spin wheel"
+    >🕉️</button>
     {% include '_hamburger_menu.html' %}
   </div>
 </div>
@@ -2351,11 +2359,14 @@
   </div>
 </div>
 
+{% include "qsi/_wheel_modal.html" %}
+
 {% endblock %}
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
 <script src="{{ url_for('static', filename='family_tree.js') }}"></script>
 <script src="{{ url_for('static', filename='planetary.js') }}?v=8"></script>
+<script src="{{ url_for('static', filename='qsi.js') }}?v=1"></script>
 <script src="{{ url_for('static', filename='dashboard.js') }}?v=14"></script>
 {% endblock %}

@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block title %}QSI Admin — Qumanity{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='qsi.css') }}?v=1" />
+{% endblock %}
+
+{% block header_inner %}
+<div class="d-flex flex-wrap align-items-center justify-content-between w-100 gap-2">
+  <a href="{{ url_for('admin_panel') }}" class="qb-btn qb-btn-neutral btn-sm">← Admin Panel</a>
+  <h1 class="h5 mb-0">QSI — Verifications</h1>
+</div>
+{% endblock %}
+
+{% block body %}
+<main id="qb-main-content" class="container py-4" style="max-width: 1100px">
+  <section class="mb-4">
+    <h2 class="h6">Pending verification (Services 4–11)</h2>
+    {% if pending %}
+    <table class="qb-qsi-history-table">
+      <thead>
+        <tr>
+          <th>User</th>
+          <th>Service</th>
+          <th>Days</th>
+          <th>Attendance</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in pending %}
+        <tr data-spin-id="{{ item.id }}">
+          <td>{{ item.display_name or item.public_id }}</td>
+          <td>{{ item.service.service_name_en if item.service else item.service_id }}</td>
+          <td>{{ item.duration_days }}</td>
+          <td>{{ item.attendance }}</td>
+          <td>
+            <button type="button" class="qb-btn qb-btn-primary btn-sm qsi-approve-btn" data-id="{{ item.id }}">Approve</button>
+            <button type="button" class="qb-btn qb-btn-danger btn-sm qsi-reject-btn" data-id="{{ item.id }}">Reject</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted small">No pending verifications.</p>
+    {% endif %}
+  </section>
+
+  <section>
+    <h2 class="h6">Recent spins</h2>
+    <table class="qb-qsi-history-table">
+      <thead>
+        <tr>
+          <th>User</th>
+          <th>Service</th>
+          <th>Status</th>
+          <th>Karma</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in spins[:50] %}
+        <tr>
+          <td>{{ item.display_name or item.public_id }}</td>
+          <td>{{ item.service.service_name_en if item.service else item.service_id }}</td>
+          <td>{{ item.status }}</td>
+          <td>{{ item.karma_points_value or 0 }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  function verify(id, approve) {
+    fetch("/api/qsi/service/verify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({
+        spin_id: id,
+        approve: approve,
+        punctuality_score: 4,
+        passion_score: 4,
+        reason: approve ? "" : "Rejected by admin",
+      }),
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d.success) {
+          window.qbToast && window.qbToast("Updated", "success");
+          location.reload();
+        } else {
+          window.qbToast && window.qbToast(d.error || "Failed", "error");
+        }
+      });
+  }
+  document.querySelectorAll(".qsi-approve-btn").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      verify(parseInt(btn.dataset.id, 10), true);
+    });
+  });
+  document.querySelectorAll(".qsi-reject-btn").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      verify(parseInt(btn.dataset.id, 10), false);
+    });
+  });
+})();
+</script>
+{% endblock %}

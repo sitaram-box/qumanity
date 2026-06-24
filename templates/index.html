@@ -1,47 +1,43 @@
 {% extends "base.html" %}
 
-{% block title %}Qumanity — Explore{% endblock %}
+{% block title %}Qumanity — India's Quantum Governance Platform{% endblock %}
 
-{% block body_class %}qb-page-home{% endblock %}
+{% block body_class %}qb-page-home qb-page-home-story{% endblock %}
 
 {% block head_extra %}
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link
-  href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;600&display=swap"
+  href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@600;700&display=swap"
   rel="stylesheet"
 />
-<link
-  rel="stylesheet"
-  href="{{ url_for('static', filename='dashboard.css') }}"
-/>
+<link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}" />
 {% endblock %}
 
 {% block header_inner %}
 <div class="qb-home-header-inner w-100">
-  <div class="qb-home-header-row">
-    <a
-      href="{{ url_for('index') }}"
-      class="qb-brand qb-brand-with-logo text-decoration-none qb-home-brand"
-      aria-label="Qumanity home"
-    >
-      {% include "_brand_logo.html" %}
-    </a>
+  <div class="qb-home-header-row qb-home-header-row--story">
+    <div class="qb-home-header-leading">
+      {% include '_hamburger_menu.html' %}
+      <a
+        href="{{ url_for('index') }}"
+        class="qb-brand qb-brand-with-logo text-decoration-none qb-home-brand qb-home-brand--compact"
+        aria-label="Qumanity home"
+      >
+        {% include "_brand_logo.html" %}
+      </a>
+    </div>
 
     <div class="qb-home-header-trailing">
       <div class="qb-home-auth">
         {% if session.get('user_pk') and not show_public_nav %}
         <a href="{{ url_for('dashboard') }}" class="qb-btn qb-btn-outline qb-home-btn-auth"
-          >{{ 'dashboard'|tr }}</a
-        >
+          >{{ 'dashboard'|tr }}</a>
         {% else %}
-        <a href="{{ url_for('login') }}" class="qb-btn qb-btn-outline qb-home-btn-auth">{{ 'login'|tr }}</a>
-        <a href="{{ url_for('register') }}" class="qb-btn qb-btn-primary qb-home-btn-auth"
-          >{{ 'register'|tr }}</a
-        >
+        <a href="{{ url_for('login') }}" class="qb-btn qb-btn-outline qb-home-btn-auth">Sign In</a>
+        <a href="{{ url_for('register') }}" class="qb-btn qb-btn-primary qb-home-btn-auth">Register</a>
         {% endif %}
       </div>
-      {% include '_hamburger_menu.html' %}
       <div
         id="qb-advanced-timebox"
         class="qb-timebox qb-home-timebox"
@@ -62,7 +58,7 @@
           </button>
         </div>
         <div class="qb-timebox-controls d-flex align-items-center gap-1 mt-1 flex-wrap">
-          <span class="qb-timebox-cal-label small text-muted">Calendar</span>
+          <span class="qb-timebox-cal-label small">Calendar</span>
           <div class="qb-segmented" role="group" aria-label="Calendar mode">
             <button type="button" class="qb-segmented-btn is-active" data-cal-mode="gregorian">
               Gregorian
@@ -81,393 +77,160 @@
 {% endblock %}
 
 {% block body %}
-<div class="homepage-hero" aria-labelledby="hero-heading">
-  <div class="hero-overlay-shade"></div>
-  <div class="hero-content">
-    <div class="hero-logo">
-      <img
-        src="{{ url_for('static', filename='images/logo-qumanity.png') }}"
-        alt="Qumanity logo"
-        width="96"
-        height="96"
-      />
-    </div>
-    <h1 id="hero-heading" class="hero-title">Qumanity</h1>
-    <p class="hero-subtitle">Quantum Governance for a Conscious Civilisation</p>
-    <p class="hero-description">
-      A transparent, karma-based governance platform built on ancient Vedic wisdom and modern
-      quantum technology.
-    </p>
-    <div class="hero-buttons">
-      {% if session.get('user_pk') and not show_public_nav %}
-      <a href="{{ url_for('dashboard') }}" class="qb-btn qb-btn-primary btn-large">Open Dashboard</a>
-      {% else %}
-      <a href="{{ url_for('login') }}" class="qb-btn qb-btn-outline btn-large">Login</a>
-      <a href="{{ url_for('register') }}" class="qb-btn qb-btn-primary btn-large">Join the Movement</a>
-      {% endif %}
-      <a href="{{ url_for('about') }}" class="qb-btn qb-btn-secondary btn-large">Learn More</a>
-    </div>
-  </div>
-</div>
+<div class="qb-home-story">
 
-<section class="pillars-section" aria-labelledby="pillars-heading">
-  <h2 id="pillars-heading">The Four Pillars of Qumanity</h2>
-  <div class="pillars-grid">
-    <div class="pillar-card">
-      <div class="pillar-icon" aria-hidden="true">🏛️</div>
-      <h3>Nested Governance</h3>
-      <p>
-        From Village to Earth, every community has a Quantum Punch Council with rotating,
-        merit-based leadership.
+  {# ── Hero — deep space with stars, sun-centered Ashok Chakra ── #}
+  <section class="qb-story-hero" aria-labelledby="story-hero-heading">
+    <div class="qb-story-hero__bg" aria-hidden="true">
+      <div class="qb-story-hero__base"></div>
+      <div class="qb-story-hero__starfield" id="qb-hero-starfield"></div>
+      <svg
+        class="qb-story-hero__constellations"
+        viewBox="0 0 1200 800"
+        preserveAspectRatio="xMidYMid slice"
+        xmlns="http://www.w3.org/2000/svg"
+        focusable="false"
+      >
+        <g fill="none" stroke="rgba(255, 255, 255, 0.14)" stroke-width="1">
+          <polyline points="80,120 140,95 210,110 260,70" />
+          <polyline points="920,90 980,130 1040,100 1100,140" />
+          <polyline points="150,520 220,480 280,510 340,460" />
+          <polyline points="780,540 850,500 920,530 1000,490" />
+          <line x1="400" y1="80" x2="460" y2="140" />
+          <line x1="460" y1="140" x2="520" y2="100" />
+          <line x1="700" y1="200" x2="760" y2="160" />
+          <line x1="300" y1="650" x2="360" y2="600" />
+        </g>
+        <g fill="rgba(255, 215, 0, 0.35)">
+          <circle cx="140" cy="95" r="2" />
+          <circle cx="260" cy="70" r="1.5" />
+          <circle cx="980" cy="130" r="2" />
+          <circle cx="460" cy="140" r="1.5" />
+          <circle cx="760" cy="160" r="2" />
+        </g>
+      </svg>
+      <div class="qb-story-hero__overlay"></div>
+    </div>
+    <div class="qb-story-hero__inner qb-story-hero__inner--stacked">
+      <h1 id="story-hero-heading" class="qb-story-hero__title">
+        The silent majority has found <span class="qb-story-hero__emph">its voice.</span>
+      </h1>
+      <div class="qb-story-hero__chakra-stage" aria-hidden="true">
+        <div class="qb-story-hero__chakra-wrap">
+          <div class="qb-story-hero__sun-rays"></div>
+          <div class="qb-story-hero__sun-center"></div>
+          <svg
+            class="qb-ashok-chakra"
+            viewBox="0 0 200 200"
+            xmlns="http://www.w3.org/2000/svg"
+            focusable="false"
+          >
+            <g transform="translate(100, 100)">
+              <circle r="92" fill="none" stroke="currentColor" stroke-width="4" />
+              <circle r="14" fill="currentColor" />
+              {% for i in range(24) %}
+              <line
+                x1="0"
+                y1="-18"
+                x2="0"
+                y2="-92"
+                stroke="currentColor"
+                stroke-width="3.5"
+                stroke-linecap="round"
+                transform="rotate({{ i * 15 }})"
+              />
+              {% endfor %}
+            </g>
+          </svg>
+        </div>
+      </div>
+      <p class="qb-story-hero__lead">
+        Qumanity is the roar of 1.4 billion citizens demanding transparency, accountability, and
+        dignity.
+      </p>
+      <div class="qb-story-hero__actions">
+        <a href="{{ url_for('register') }}" class="qb-btn qb-story-join-btn" id="qb-story-join-btn">
+          Join Qumanity
+        </a>
+        <p class="qb-story-hero__credit">by SITA Foundation</p>
+      </div>
+    </div>
+  </section>
+
+  {# ── Origin story (saffron band) ── #}
+  <section class="qb-story-section qb-story-section--saffron-flag" aria-labelledby="story-born-heading">
+    <div class="qb-story-section__inner">
+      <h2 id="story-born-heading" class="qb-story-section__title">How Qumanity Was Born</h2>
+      <p class="qb-story-section__text">
+        For 15 years, a single mind worked in isolation — designing a system that could heal India's
+        broken governance. The idea was simple: create a transparent, karma-based platform where every
+        citizen has a voice, every action is recorded, and every service is accessible.
+      </p>
+      <p class="qb-story-section__text">
+        Today, Qumanity is ready. It is not just software. It is a companion — from birth to death, in
+        good times and bad, for every citizen of India.
       </p>
     </div>
-    <div class="pillar-card">
-      <div class="pillar-icon" aria-hidden="true">🪙</div>
-      <h3>Karma Economy</h3>
-      <p>Earn Karma Points through verified ethical actions. Every good deed builds your karma ledger.</p>
-    </div>
-    <div class="pillar-card">
-      <div class="pillar-icon" aria-hidden="true">📖</div>
-      <h3>Transparent Ledger</h3>
-      <p>All transactions, votes, and decisions are recorded on an immutable public ledger.</p>
-    </div>
-    <div class="pillar-card">
-      <div class="pillar-icon" aria-hidden="true">🕉️</div>
-      <h3>Conscious AI</h3>
-      <p>Artificial Aatmic Intelligence guides without controlling — technology that serves humanity.</p>
-    </div>
-  </div>
-</section>
+  </section>
 
-<section class="features-section" aria-labelledby="features-heading">
-  <h2 id="features-heading">What Makes Qumanity Different?</h2>
-  <div class="features-list">
-    <div class="feature-item">
-      <span class="feature-icon" aria-hidden="true">⚖️</span>
-      <span>Not based on birth or caste — only on your actions (Karma) and qualities (Guna)</span>
+  {# ── Urgency (white band) ── #}
+  <section class="qb-story-section qb-story-section--white-flag" aria-labelledby="story-matters-heading">
+    <div class="qb-story-section__inner">
+      <h2 id="story-matters-heading" class="qb-story-section__title">Why It Matters</h2>
+      <p class="qb-story-section__text">
+        India has 620,000 villages. Each one deserves transparent governance. Each citizen deserves a
+        voice. Each life deserves dignity. Qumanity is the bridge.
+      </p>
     </div>
-    <div class="feature-item">
-      <span class="feature-icon" aria-hidden="true">🗳️</span>
-      <span>Monthly zodiac-based elections — fresh leadership every month</span>
-    </div>
-    <div class="feature-item">
-      <span class="feature-icon" aria-hidden="true">🔄</span>
-      <span>Weekly settlement of Karma Points — no real-time transaction fees</span>
-    </div>
-    <div class="feature-item">
-      <span class="feature-icon" aria-hidden="true">🔍</span>
-      <span>Complete transparency — every citizen can audit any public transaction</span>
-    </div>
-    <div class="feature-item">
-      <span class="feature-icon" aria-hidden="true">🗣️</span>
-      <span>Multi-language support — use Qumanity in your mother tongue</span>
-    </div>
-  </div>
-</section>
+  </section>
 
-<section class="stats-section" aria-label="Qumanity in numbers">
-  <div class="stat-card">
-    <div class="stat-number">{{ total_users_earth }}</div>
-    <div class="stat-label">Human Members</div>
-  </div>
-  <div class="stat-card">
-    <div class="stat-number">{{ total_villages }}</div>
-    <div class="stat-label">Villages Connected</div>
-  </div>
-  <div class="stat-card">
-    <div class="stat-number">{{ total_qoins }}</div>
-    <div class="stat-label">Karma Points in Circulation</div>
-  </div>
-</section>
+  {# ── Search location (only interactive element) ── #}
+  <section
+    id="home-search-location"
+    class="qb-story-section qb-story-section--green-flag"
+    aria-labelledby="story-search-heading"
+  >
+    <div class="qb-story-section__inner qb-story-search__inner">
+      <h2 id="story-search-heading" class="qb-story-section__title">Find a place</h2>
+      <p class="qb-story-section__text qb-story-search__hint">
+        Type at least two letters of any zone, state, district, tehsil, or village name — then choose a
+        result to open its statistics page.
+      </p>
+      <label class="form-label visually-hidden" for="geo-q">Search geography</label>
+      <input
+        type="search"
+        id="geo-q"
+        class="form-control qb-form-control qb-story-search__input"
+        placeholder="Search e.g. Delhi, Odisha, your village…"
+        autocomplete="off"
+      />
+      <ul id="geo-results" class="list-unstyled mt-3 qb-story-search__results"></ul>
+    </div>
+  </section>
 
-<div class="qb-home-mega-hero">
-  <div class="qb-humans-band">
-    <div class="qb-cards qb-cards-humans" aria-label="Total human beings by region">
-    <div class="qb-card">
-      <div class="qb-card-stat">{{ total_users_earth }}</div>
-      <div class="qb-card-label qb-card-label-sentence">Total Human Beings on Earth</div>
-    </div>
-    <div class="qb-card">
-      <div class="qb-card-stat">{{ total_users_asia }}</div>
-      <div class="qb-card-label qb-card-label-sentence">Total Human Beings in Asia</div>
-    </div>
-    <div class="qb-card">
-      <div class="qb-card-stat">{{ total_users_india }}</div>
-      <div class="qb-card-label qb-card-label-sentence">Total Human Beings in India</div>
-    </div>
-  </div>
-  </div>
-
-  <section class="qb-panel qb-explorer qb-explorer--mega mb-4" aria-labelledby="explorer-heading">
-  <h2 id="explorer-heading" class="h4 mb-3">Global data explorer</h2>
-  <p class="text-muted small mb-3 qb-home-mega-muted">
-    Explore registered participants by continent and country (counts use each person’s
-    <strong>current country</strong>).
-  </p>
-  <form method="get" action="{{ url_for('index') }}" class="row g-3 align-items-end">
-    <div class="col-md-4">
-      <label class="form-label small" for="explorer_continent">Continent</label>
-      <select
-        class="form-select qb-form-control"
-        id="explorer_continent"
-        name="explorer_continent"
-        onchange="this.form.submit()"
-      >
-        {% for c in continents_list %}
-        <option value="{{ c.id }}" {% if c.id == explorer.continent_id %}selected{% endif %}>
-          {{ c.name }}
-        </option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="col-md-4">
-      <label class="form-label small" for="explorer_country">Country</label>
-      <select
-        class="form-select qb-form-control"
-        id="explorer_country"
-        name="explorer_country"
-        onchange="this.form.submit()"
-      >
-        {% for c in countries_list %}
-        <option value="{{ c.id }}" {% if c.id == explorer.country_id %}selected{% endif %}>
-          {{ c.name }}
-        </option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="col-md-4">
-      <button type="submit" class="qb-btn qb-btn-outline w-100">Refresh</button>
-    </div>
-  </form>
-  <div class="row g-3 mt-2">
-    <div class="col-md-6">
-      <div class="qb-card mb-0">
-        <div class="qb-card-stat">{{ explorer.continent_users }}</div>
-        <div class="qb-card-label qb-card-label-sentence">Total in {{ explorer.continent_name }}</div>
-      </div>
-    </div>
-    <div class="col-md-6">
-      <div class="qb-card mb-0">
-        <div class="qb-card-stat">{{ explorer.country_users }}</div>
-        <div class="qb-card-label qb-card-label-sentence">Total in {{ explorer.country_name }}</div>
-      </div>
-    </div>
-  </div>
-  <p class="text-muted small mt-3 mb-0 qb-home-mega-muted">
-    Explore the growing global community of Qumanity.
-  </p>
-</section>
 </div>
-
-<section id="about" class="qb-about mb-4">
-  <h2>About Qumanity</h2>
-  <div class="qb-about-intro">
-    <p>
-      Qumanity is a public digital governance system designed to give every citizen a voice,
-      every village transparency, and every community the power to participate in decisions that
-      affect their lives.
-    </p>
-    <p>
-      It is not a private app, not a social media platform, and not a government portal. It is a
-      shared public infrastructure placed in villages and towns to make governance visible,
-      participatory, and accountable.
-    </p>
-  </div>
-
-  <div class="qb-about-card">
-    <h3>
-      <svg class="qb-about-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <circle cx="12" cy="12" r="10" />
-        <path d="M12 16v-4M12 8h.01" />
-      </svg>
-      <span>Why Qumanity Exists</span>
-    </h3>
-    <p>
-      Today, many citizens feel disconnected from governance. Public funds are hard to track.
-      Raising issues is difficult. Decision-making feels distant.
-    </p>
-    <p class="mb-0">Qumanity exists to remove this gap between people and power.</p>
-  </div>
-
-  <div class="qb-about-card">
-    <h3>
-      <svg class="qb-about-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
-      </svg>
-      <span>How It Works</span>
-    </h3>
-    <ul>
-      <li>A public Qumanity kiosk is placed in every village or locality.</li>
-      <li>Every citizen receives a secure digital identity.</li>
-      <li>Citizens can vote regularly, raise issues, and track public funds.</li>
-      <li>Every action is recorded transparently.</li>
-      <li>No middlemen. No hidden processes.</li>
-    </ul>
-  </div>
-
-  <div class="qb-about-card">
-    <h3>
-      <svg class="qb-about-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-      </svg>
-      <span>What Makes It Different</span>
-    </h3>
-    <ul>
-      <li>Track every rupee of public spending</li>
-      <li>Participate in decision-making regularly, not once in five years</li>
-      <li>Local digital economy support through Karma Points</li>
-      <li>Recognition of community service and participation</li>
-      <li>Equal access for people without smartphones or technical skills</li>
-    </ul>
-  </div>
-
-  <div class="qb-about-card">
-    <h3>
-      <svg class="qb-about-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
-      </svg>
-      <span>For Villages. For Citizens. For Transparency.</span>
-    </h3>
-    <p class="mb-0">
-      Qumanity is designed so that a farmer, a teacher, a worker, or a student can walk to the
-      kiosk, speak their concern, and be heard at the right level of administration.
-    </p>
-  </div>
-
-  <div class="qb-about-card">
-    <h3>
-      <svg class="qb-about-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <circle cx="12" cy="12" r="3" />
-        <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
-      </svg>
-      <span>Built by SITA Foundation</span>
-    </h3>
-    <p class="mb-0">
-      Qumanity is developed by SITA Foundation (Sekyor Intelligence Tantra), a research initiative
-      working on ethical technology, transparent governance, and community-driven systems for the
-      public good.
-    </p>
-  </div>
-
-  <hr class="qb-about-rule" />
-
-  <p class="qb-about-closing">
-    Qumanity invites every citizen to be a participant, not just a spectator, in the governance of
-    their community.
-  </p>
-  <p class="qb-about-cta">
-    <a class="qb-btn qb-btn-primary" href="{{ url_for('about_details') }}">Learn More</a>
-  </p>
-</section>
-
-<div class="qb-panel">
-  <h2>National view</h2>
-  <p class="text-muted small mb-3">
-    See every registered participant (all current villages pooled) with the same demographics charts
-    used on geography pages.
-  </p>
-  <p>
-    <a
-      class="qb-btn qb-btn-primary"
-      href="{{ url_for('location_country', country_id='IND') }}"
-      >India statistics</a
-    >
-  </p>
-</div>
-
-<div class="qb-panel mb-4">
-  <h2>Jump to a place</h2>
-  <p class="text-muted small mb-2">
-    Type at least two letters of any zone, state, district, tehsil, or village name; pick a hit to
-    open its stats page.
-  </p>
-  <label class="form-label visually-hidden" for="geo-q">Search geography</label>
-  <input
-    type="search"
-    id="geo-q"
-    class="form-control qb-form-control"
-    placeholder="Search e.g. Delhi, Odisha…"
-    autocomplete="off"
-  />
-  <ul id="geo-results" class="list-unstyled mt-3 small qb-search-hit-list"></ul>
-</div>
-
-<div class="qb-panel">
-  <h2>Registered users by state</h2>
-  <p class="text-muted small mb-3">
-    Based on each user’s current village, rolled up to state (requires valid geography links in
-    <code class="text-secondary">indiaq.db</code>).
-  </p>
-  <div class="qb-chart-wrap">
-    <canvas id="landingStateChart" aria-label="Users per state chart"></canvas>
-  </div>
-</div>
-
-<section class="cta-section" aria-labelledby="cta-heading">
-  <h2 id="cta-heading">Ready to Join the Conscious Revolution?</h2>
-  <p>Create your account today. It takes less than 5 minutes.</p>
-  {% if session.get('user_pk') and not show_public_nav %}
-  <a href="{{ url_for('dashboard') }}" class="qb-btn btn-large cta-register-btn">Open Your Dashboard</a>
-  {% else %}
-  <a href="{{ url_for('register') }}" class="qb-btn btn-large cta-register-btn">Register Now</a>
-  <p class="cta-note">Already have an account? <a href="{{ url_for('login') }}">Sign in</a></p>
-  {% endif %}
-</section>
-
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
-<script id="landing-chart-json" type="application/json">{{ chart_states|tojson }}</script>
-<script>
-  (function () {
-    var el = document.getElementById("landing-chart-json");
-    var data = JSON.parse(el.textContent);
-    var ctx = document.getElementById("landingStateChart");
-    var labels = data.labels || [];
-    var values = data.values || [];
-    new Chart(ctx, {
-      type: "bar",
-      data: {
-        labels: labels,
-        datasets: [
-          {
-            label: "Users",
-            data: values,
-            backgroundColor: "rgba(94, 234, 212, 0.45)",
-            borderColor: "rgba(45, 212, 191, 0.95)",
-            borderWidth: 1,
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-        },
-        scales: {
-          x: {
-            ticks: {
-              maxRotation: 65,
-              minRotation: 45,
-              color: "#8b9cb3",
-            },
-            grid: { color: "rgba(141, 156, 179, 0.12)" },
-          },
-          y: {
-            beginAtZero: true,
-            ticks: { color: "#8b9cb3", precision: 0 },
-            grid: { color: "rgba(141, 156, 179, 0.12)" },
-          },
-        },
-      },
-    });
-  })();
-</script>
 {% endblock %}
 
 {% block scripts %}
 <script src="{{ url_for('static', filename='dashboard.js') }}"></script>
 <script>
   (function () {
+    var starfield = document.getElementById("qb-hero-starfield");
+    if (starfield) {
+      var count = 160;
+      for (var i = 0; i < count; i++) {
+        var star = document.createElement("span");
+        star.className = "qb-hero-star";
+        var size = 1 + Math.random() * 2;
+        star.style.left = (Math.random() * 100).toFixed(2) + "%";
+        star.style.top = (Math.random() * 100).toFixed(2) + "%";
+        star.style.width = size + "px";
+        star.style.height = size + "px";
+        star.style.opacity = (0.25 + Math.random() * 0.75).toFixed(2);
+        starfield.appendChild(star);
+      }
+    }
+
     var inp = document.getElementById("geo-q");
     var ul = document.getElementById("geo-results");
     if (!inp || !ul) return;
@@ -486,25 +249,23 @@
       if (q.length < 2) return;
       t = setTimeout(function () {
         fetch("/api/geo-search?q=" + encodeURIComponent(q))
-          .then(function (r) {
-            return r.json();
-          })
+          .then(function (r) { return r.json(); })
           .then(function (rows) {
             ul.innerHTML = "";
             if (!rows.length) {
               ul.innerHTML =
-                '<li class="text-muted px-2 py-1">No matches — try another spelling.</li>';
+                '<li class="qb-story-search__empty">No matches — try another spelling.</li>';
               return;
             }
             rows.forEach(function (row) {
               var li = document.createElement("li");
-              li.className = "px-2 py-1 qb-search-hit";
+              li.className = "qb-story-search__hit";
               li.innerHTML =
-                '<a class="link-info text-decoration-none" href="' +
+                '<a href="' +
                 escapeHtml(row.url) +
                 '">' +
                 escapeHtml(row.name) +
-                ' <span class="text-muted">(' +
+                ' <span class="qb-story-search__kind">(' +
                 escapeHtml(row.kind) +
                 ")</span></a>";
               ul.appendChild(li);
@@ -512,7 +273,7 @@
           })
           .catch(function () {
             ul.innerHTML =
-              '<li class="text-danger px-2 py-1">Search failed — try again.</li>';
+              '<li class="qb-story-search__empty qb-story-search__empty--error">Search failed — try again.</li>';
           });
       }, 220);
     });

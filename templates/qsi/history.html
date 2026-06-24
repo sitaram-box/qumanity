@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}QSI History — Qumanity{% endblock %}
+
+{% block body_class %}qb-page-qsi-history{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='qsi.css') }}?v=1" />
+{% endblock %}
+
+{% block header_inner %}
+<div class="d-flex flex-wrap align-items-center justify-content-between w-100 gap-2">
+  <a href="{{ url_for('dashboard') }}" class="qb-brand text-decoration-none">← Dashboard</a>
+  <h1 class="h5 mb-0">QSI — Spin History</h1>
+</div>
+{% endblock %}
+
+{% block body %}
+<main id="qb-main-content" class="container py-4" style="max-width: 960px">
+  {% if name_preference %}
+  <p class="small text-muted mb-3">
+    Chosen Name: <strong>{{ name_preference.chosen_name }}</strong>
+  </p>
+  {% else %}
+  <p class="small text-muted mb-3">Set your chosen Name on the dashboard wheel.</p>
+  {% endif %}
+
+  {% if history %}
+  <table class="qb-qsi-history-table">
+    <thead>
+      <tr>
+        <th>Service</th>
+        <th>Mode</th>
+        <th>Status</th>
+        <th>Karma</th>
+        <th>Date</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in history %}
+      <tr>
+        <td>
+          {% if item.service %}
+          {{ item.service.service_name_en }}
+          <span class="qb-qsi-service-hi small">{{ item.service.service_name_hi }}</span>
+          {% else %}
+          Service #{{ item.service_id }}
+          {% endif %}
+        </td>
+        <td>{{ item.mode }}</td>
+        <td><span class="qb-qsi-status-badge">{{ item.status }}</span></td>
+        <td>
+          {% if item.service and item.service.karma_visible %}
+          ₹{{ item.karma_points_value or 0 }}
+          {% elif item.hidden_karma_counter %}
+          <span class="text-muted">(silent)</span>
+          {% else %}
+          —
+          {% endif %}
+        </td>
+        <td class="small">{{ item.created_at[:10] if item.created_at else '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="text-muted">No spins yet. Open the Sacred Wheel on your dashboard.</p>
+  {% endif %}
+
+  {% if is_admin %}
+  <p class="mt-4">
+    <a href="{{ url_for('qsi_admin_page') }}" class="qb-btn qb-btn-outline btn-sm">Admin QSI Panel</a>
+  </p>
+  {% endif %}
+</main>
+{% endblock %}
