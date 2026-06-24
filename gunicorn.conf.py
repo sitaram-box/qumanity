@@ -2,7 +2,6 @@
 
 import os
 import sys
-import threading
 
 bind = f"0.0.0.0:{os.environ.get('PORT', '8080')}"
 workers = int(os.environ.get("WEB_CONCURRENCY", "1"))
@@ -28,18 +27,8 @@ def when_ready(server):
 
 
 def post_worker_init(worker):
-    print(f"[gunicorn] worker pid={worker.pid} listening (wsgi lazy-load)", flush=True)
+    print(f"[gunicorn] worker pid={worker.pid} ready (lazy wsgi)", flush=True)
     sys.stdout.flush()
-
-    def _bg_preload() -> None:
-        try:
-            from wsgi import preload_full_app
-
-            preload_full_app()
-        except Exception as exc:
-            print(f"[gunicorn] background preload failed: {exc}", flush=True)
-
-    threading.Thread(target=_bg_preload, name="qumanity-preload", daemon=True).start()
 
 
 def worker_abort(worker):

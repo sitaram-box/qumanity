@@ -1,50 +1,80 @@
 """
 Production WSGI entry for Railway / Docker / Gunicorn.
 
-Responds to /health and /healthz immediately without importing app.py.
-All other routes lazy-load the full Qumanity Flask application on first use.
+/health and /healthz respond instantly without importing app.py.
+All other routes lazy-load the full Flask application.
 
 Usage:
     gunicorn -c gunicorn.conf.py wsgi:application
+
+Emergency fallback (loads app.py at worker boot — slower healthcheck):
+    USE_SIMPLE_WSGI=true → gunicorn app:app
 """
 
 from __future__ import annotations
 
+import json
+import logging
+import sys
 import threading
-from typing import Any, Callable
+import traceback
+from typing import Any
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("qumanity.wsgi")
 
 _HEALTH_PATHS = frozenset({"/health", "/healthz"})
+_WSGI_DEBUG_PATH = "/wsgi-debug"
 
-_full_wsgi: Callable[..., Any] | None = None
+_flask_app: Any = None
 _load_lock = threading.Lock()
+_load_error: str | None = None
 
 
-def _ensure_full_app() -> Callable[..., Any]:
-    """Import app.py once and return its WSGI callable."""
-    global _full_wsgi
-    if _full_wsgi is not None:
-        return _full_wsgi
+def get_app() -> Any:
+    """Lazy-load the Flask application from app.py."""
+    global _flask_app, _load_error
+    if _flask_app is not None:
+        return _flask_app
     with _load_lock:
-        if _full_wsgi is None:
-            print("[wsgi] loading full Qumanity app (app.py)…", flush=True)
+        if _flask_app is not None:
+            return _flask_app
+        logger.info("WSGI: loading full Qumanity app (app.py)…")
+        try:
             from app import app as flask_app
 
-            _full_wsgi = flask_app.wsgi_app
-            print("[wsgi] full Qumanity app ready", flush=True)
-    return _full_wsgi
+            _flask_app = flask_app
+            _load_error = None
+            logger.info("WSGI: full Qumanity app loaded successfully")
+        except Exception as exc:
+            _load_error = f"{type(exc).__name__}: {exc}"
+            logger.exception("WSGI: failed to load app.py")
+            traceback.print_exc()
+            raise
+    return _flask_app
 
 
 def preload_full_app() -> None:
-    """Optional background preload after worker is listening."""
+    """Background preload after worker is listening (optional)."""
     try:
-        _ensure_full_app()
+        get_app()
     except Exception as exc:
-        print(f"[wsgi] preload warning: {exc}", flush=True)
+        logger.warning("WSGI preload warning: %s", exc)
+
+
+def _wsgi_debug_body() -> bytes:
+    payload = {
+        "wsgi": "ok",
+        "app_loaded": _flask_app is not None,
+        "load_error": _load_error,
+    }
+    return json.dumps(payload).encode("utf-8")
 
 
 def application(environ, start_response):
-    """Gunicorn WSGI entry — fast health, lazy full app."""
+    """Gunicorn WSGI entry — fast health, lazy full Flask app."""
     path = environ.get("PATH_INFO") or ""
+
     if path in _HEALTH_PATHS:
         body = b"OK"
         start_response(
@@ -56,7 +86,33 @@ def application(environ, start_response):
         )
         return [body]
 
-    return _ensure_full_app()(environ, start_response)
+    if path == _WSGI_DEBUG_PATH:
+        body = _wsgi_debug_body()
+        start_response(
+            "200 OK",
+            [
+                ("Content-Type", "application/json"),
+                ("Content-Length", str(len(body))),
+            ],
+        )
+        return [body]
+
+    try:
+        flask_app = get_app()
+        return flask_app(environ, start_response)
+    except Exception as exc:
+        logger.exception("WSGI application error for %s", path)
+        traceback.print_exc(file=sys.stderr)
+        msg = f"Internal Server Error\n\n{_load_error or exc}\n"
+        body = msg.encode("utf-8", errors="replace")[:4000]
+        start_response(
+            "500 Internal Server Error",
+            [
+                ("Content-Type", "text/plain; charset=utf-8"),
+                ("Content-Length", str(len(body))),
+            ],
+        )
+        return [body]
 
 
 # Alias for configs that expect `app`

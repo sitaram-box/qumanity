@@ -70,8 +70,7 @@ village-commerce/.next/
 .DS_Store
 Thumbs.db
 
-# Sensitive config
-config.py
+# Sensitive local modules (secrets only — config.py is tracked; values come from env)
 secrets.py
 credentials.py
 
@@ -108,8 +107,7 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
-# Sensitive config
-config.py
+# Sensitive local modules (secrets only — config.py is tracked; values come from env)
 secrets.py
 credentials.py
 
