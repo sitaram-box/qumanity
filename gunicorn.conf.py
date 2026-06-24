@@ -16,7 +16,7 @@ preload_app = False
 
 
 def when_ready(server):
-    print(f"[gunicorn] listening on {server.addresses}", flush=True)
+    print(f"[gunicorn] listening on {server.address}", flush=True)
 
 
 def post_worker_init(worker):
