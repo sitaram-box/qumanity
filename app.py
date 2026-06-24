@@ -67,7 +67,6 @@ BASE_DIR = Path(__file__).resolve().parent
 
 DATABASE_PATH = str(resolve_database_path(BASE_DIR))
 DB_PATH = Path(DATABASE_PATH)
-ensure_database_parent(DB_PATH)
 
 
 def _init_db_if_needed() -> None:
@@ -91,13 +90,42 @@ def _init_db_if_needed() -> None:
         print(f"Database init warning: {exc}", flush=True)
 
 
-threading.Thread(target=_init_db_if_needed, daemon=True).start()
+def _run_deferred_startup() -> None:
+    """Background DB init, geography seed, and admin migration — after healthcheck window."""
+    try:
+        ensure_database_parent(DB_PATH)
+    except OSError as exc:
+        logger.warning("ensure_database_parent deferred: %s", exc)
+    _init_db_if_needed()
+    try:
+        with app.app_context():
+            _start_geography_background()
+            _start_admin_migration_background()
+    except Exception:
+        logger.exception("Deferred startup failed")
 
-if os.environ.get("ENABLE_BLOCKCHAIN", "false").lower() == "true":
-    blockchain.enabled = True
+
+def _schedule_deferred_startup() -> None:
+    delay = max(0, int(os.environ.get("QUMANITY_STARTUP_DELAY_SEC", "20")))
+
+    def _delayed() -> None:
+        if delay:
+            logger.info("Deferred startup in %ss (healthcheck-first)", delay)
+            time.sleep(delay)
+        _run_deferred_startup()
+
+    threading.Thread(
+        target=_delayed,
+        name="qumanity-deferred-startup",
+        daemon=True,
+    ).start()
+
 
 PATH_PREFIX = "0.राम|"
 _GEO_CHILD_TABLES = frozenset({"district", "tehsil", "village"})
+
+if os.environ.get("ENABLE_BLOCKCHAIN", "false").lower() == "true":
+    blockchain.enabled = True
 
 ZODIAC_SIGNS_ORDER = (
     "Aries",
@@ -544,7 +572,13 @@ _migration_startup_status: dict[str, Any] = {
 @app.get("/health")
 @app.get("/healthz")
 def health():
-    """Fast liveness probe for Railway/Docker — always returns 200 when the process is up."""
+    """Minimal liveness probe — no database access (Railway healthcheck)."""
+    return "OK", 200
+
+
+@app.get("/health/details")
+def health_details():
+    """Optional readiness probe with database status."""
     payload: dict[str, Any] = {
         "status": "ok",
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -805,7 +839,7 @@ def _check_allowed_host() -> None:
     """Reject unknown host headers in production (custom domain + Railway fallback)."""
     if not config.IS_PRODUCTION:
         return
-    if request.path in ("/health", "/healthz", "/favicon.ico"):
+    if request.path in ("/health", "/healthz", "/health/details", "/favicon.ico"):
         return
     if request.endpoint and str(request.endpoint).startswith("static"):
         return
@@ -826,9 +860,11 @@ def _ensure_admin_self_heal() -> None:
     skip = {
         "/health",
         "/healthz",
+        "/health/details",
         "/setup",
         "/logout",
         "/webhook/donation",
+        "/api/contact",
         "/debug/check",
         "/test-admin-login",
         "/emergency-login",
@@ -854,7 +890,7 @@ def _prune_invalid_session() -> None:
     """Drop stale session cookies when the user row no longer exists."""
     if request.endpoint and str(request.endpoint).startswith("static"):
         return
-    if request.path in ("/health", "/healthz", "/setup", "/logout"):
+    if request.path in ("/health", "/healthz", "/health/details", "/setup", "/logout"):
         return
     pk = session.get("user_pk")
     if not pk:
@@ -870,7 +906,7 @@ def _prune_invalid_session() -> None:
 
 @app.before_request
 def _bind_ui_language() -> None:
-    if request.path in ("/health", "/healthz"):
+    if request.path in ("/health", "/healthz", "/health/details"):
         g.ui_language = "en"
         return
     if request.path == "/setup":
@@ -996,6 +1032,10 @@ except ImportError:
 
 def get_db() -> sqlite3.Connection:
     if "db" not in g:
+        try:
+            ensure_database_parent(DB_PATH)
+        except OSError as exc:
+            app.logger.warning("ensure_database_parent: %s", exc)
         conn = sqlite3.connect(DB_PATH, timeout=15)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
@@ -3776,11 +3816,13 @@ def _before_request() -> None:
     """
     if request.endpoint and str(request.endpoint).startswith("static"):
         return
-    if request.path in ("/health", "/healthz"):
+    if request.path in ("/health", "/healthz", "/health/details"):
         return
     if request.path == "/setup":
         return
     if request.path == "/webhook/donation":
+        return
+    if request.path == "/api/contact":
         return
     if request.path == "/logout":
         return
@@ -12534,6 +12576,66 @@ def contact():
     return render_template("contact.html")
 
 
+CONTACT_INBOX_EMAIL = "founder@qumanity.in"
+
+
+@app.route("/api/contact", methods=["POST"])
+def contact_submit():
+    """Accept contact form submissions and email founder@qumanity.in."""
+    data = request.get_json(silent=True) or {}
+
+    if (data.get("website") or "").strip():
+        return jsonify({"ok": True, "message": "Thank you for your message."})
+
+    name = (data.get("name") or "").strip()
+    email = (data.get("email") or "").strip()
+    message = (data.get("message") or "").strip()
+
+    errors: dict[str, str] = {}
+    if not name:
+        errors["name"] = "Name is required."
+    if not email or "@" not in email:
+        errors["email"] = "A valid email address is required."
+    if not message:
+        errors["message"] = "Message is required."
+    if errors:
+        return jsonify({"ok": False, "errors": errors}), 400
+
+    subject = f"Qumanity contact from {name}"
+    body = (
+        f"Contact form submission on Qumanity\n\n"
+        f"Name: {name}\n"
+        f"Email: {email}\n\n"
+        f"Message:\n{message}\n"
+    )
+
+    try:
+        identity_core.send_email_notification(
+            CONTACT_INBOX_EMAIL,
+            subject,
+            body,
+            reply_to=email,
+        )
+    except Exception:
+        app.logger.exception("Contact form email failed")
+        return jsonify(
+            {
+                "ok": False,
+                "error": (
+                    "We could not send your message right now. "
+                    "Please email founder@qumanity.in directly."
+                ),
+            }
+        ), 500
+
+    return jsonify(
+        {
+            "ok": True,
+            "message": "Thank you! Your message has been sent to founder@qumanity.in.",
+        }
+    )
+
+
 @app.route("/settings")
 def settings_page():
     """Settings placeholder — mother tongue & notification preferences (coming soon)."""
@@ -15900,10 +16002,6 @@ def _start_geography_background() -> None:
     thread.start()
 
 
-with app.app_context():
-    _start_geography_background()
-
-
 _migrate_startup_lock = threading.Lock()
 _migrate_startup_done = False
 
@@ -16345,9 +16443,8 @@ app.cli.add_command(fix_admin_login_cli)
 app.cli.add_command(migrate_user_ids_cli)
 
 
-# Defer migration until the app module is fully loaded (avoids import deadlock on Railway).
-with app.app_context():
-    _start_admin_migration_background()
+# Defer heavy startup until after Railway healthcheck window.
+_schedule_deferred_startup()
 
 
 if __name__ == "__main__":
