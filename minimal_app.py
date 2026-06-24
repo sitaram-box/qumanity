@@ -15,9 +15,23 @@ def health():
     return "OK", 200
 
 
+@app.route("/debug")
+def debug():
+    return {"app": "minimal", "hint": "Set ALLOW_MINIMAL_APP=false and redeploy for full site"}
+
+
 @app.route("/")
 def index():
     return "Qumanity is running", 200
+
+
+@app.errorhandler(404)
+def minimal_not_found(_err):
+    return (
+        "404 — minimal_app is active (only / and /health exist). "
+        "On Railway: delete USE_MINIMAL_APP and ALLOW_MINIMAL_APP, then redeploy.",
+        404,
+    )
 
 
 if __name__ == "__main__":
