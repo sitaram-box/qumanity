@@ -1,1 +1,1 @@
-web: sh -c 'gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 120 --access-logfile - --error-logfile -'
+web: sh scripts/railway_start.sh

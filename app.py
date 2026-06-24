@@ -542,44 +542,21 @@ _migration_startup_status: dict[str, Any] = {
 }
 
 @app.get("/health")
+@app.get("/healthz")
 def health():
-    """Fast health probe — includes admin migration status (no heavy bootstrap)."""
-    admin_exists = False
-    migration = dict(_migration_startup_status)
+    """Fast liveness probe for Railway/Docker — always returns 200 when the process is up."""
+    payload: dict[str, Any] = {
+        "status": "ok",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
     try:
         conn = get_db()
-        row = conn.execute(
-            """
-            SELECT 1 FROM users
-            WHERE private_id = ? COLLATE NOCASE AND COALESCE(is_admin, 0) = 1
-            """,
-            (ADMIN_PRIVATE_ID,),
-        ).fetchone()
-        admin_exists = row is not None
+        conn.execute("SELECT 1").fetchone()
+        payload["database"] = "connected"
     except Exception as exc:
-        migration = {
-            **migration,
-            "database_error": str(exc),
-        }
-    return jsonify(
-        {
-            "status": "ok",
-            "database_ready": True,
-            "admin_exists": admin_exists,
-            "admin_id": ADMIN_PRIVATE_ID,
-            "migration_auto_run": True,
-            "migration": migration,
-            "repair_urls": {
-                "fix_html": "/fix-admin-login",
-                "fix_api": "/api/fix-admin-login",
-                "reset_html": "/reset-admin",
-                "reset_api": "/api/reset-admin",
-                "debug_admin": "/debug-admin",
-                "test_admin_login": "/test-admin-login",
-                "emergency_login": "/emergency-login",
-            },
-        }
-    )
+        payload["database"] = "error"
+        payload["database_error"] = str(exc)
+    return jsonify(payload)
 
 
 @app.get("/test-admin-login")
@@ -828,7 +805,7 @@ def _check_allowed_host() -> None:
     """Reject unknown host headers in production (custom domain + Railway fallback)."""
     if not config.IS_PRODUCTION:
         return
-    if request.path in ("/health", "/favicon.ico"):
+    if request.path in ("/health", "/healthz", "/favicon.ico"):
         return
     if request.endpoint and str(request.endpoint).startswith("static"):
         return
@@ -848,6 +825,7 @@ def _ensure_admin_self_heal() -> None:
         return
     skip = {
         "/health",
+        "/healthz",
         "/setup",
         "/logout",
         "/webhook/donation",
@@ -876,7 +854,7 @@ def _prune_invalid_session() -> None:
     """Drop stale session cookies when the user row no longer exists."""
     if request.endpoint and str(request.endpoint).startswith("static"):
         return
-    if request.path in ("/health", "/setup", "/logout"):
+    if request.path in ("/health", "/healthz", "/setup", "/logout"):
         return
     pk = session.get("user_pk")
     if not pk:
@@ -892,7 +870,7 @@ def _prune_invalid_session() -> None:
 
 @app.before_request
 def _bind_ui_language() -> None:
-    if request.path == "/health":
+    if request.path in ("/health", "/healthz"):
         g.ui_language = "en"
         return
     if request.path == "/setup":
@@ -1018,7 +996,7 @@ except ImportError:
 
 def get_db() -> sqlite3.Connection:
     if "db" not in g:
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(DB_PATH, timeout=15)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
         g.db = conn
@@ -3798,7 +3776,7 @@ def _before_request() -> None:
     """
     if request.endpoint and str(request.endpoint).startswith("static"):
         return
-    if request.path == "/health":
+    if request.path in ("/health", "/healthz"):
         return
     if request.path == "/setup":
         return
