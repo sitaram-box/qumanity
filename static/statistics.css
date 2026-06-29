@@ -1,0 +1,35 @@
+/* Statistics detail pages — tables only, no charts */
+.qb-page-statistics .qb-statistics-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1rem 1.25rem 2rem;
+}
+
+.qb-stats-table,
+.qb-stats-child-table {
+  color: var(--qb-text, #f8fafc);
+}
+
+.qb-stats-table thead th,
+.qb-stats-child-table thead th {
+  color: var(--qb-muted, #94a3b8);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom-color: var(--qb-border, #475569);
+}
+
+.qb-stats-child-table tbody td {
+  border-bottom-color: rgba(71, 85, 105, 0.45);
+  vertical-align: middle;
+}
+
+.qb-stats-zodiac-cell {
+  max-width: 18rem;
+  white-space: normal;
+  line-height: 1.35;
+}
+
+.qb-stats-actions {
+  margin-top: 1.5rem;
+}

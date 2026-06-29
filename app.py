@@ -34,6 +34,8 @@ from db_path import ensure_database_parent, resolve_database_path
 import birth_chart
 import calendar_time
 import election_scheduler
+import election_automation
+import demo_user_core
 import language_core
 import leadership_core
 import identity_core
@@ -50,6 +52,7 @@ import element_core
 import global_core
 import deceased_core
 import zodiac_calendar
+import statistics_core
 from flask import (
     Flask,
     abort,
@@ -551,6 +554,7 @@ def build_geo_public_url(kind: str, gid: str) -> str:
         return url_for("location_village", village_id=gid)
     abort(404)
 
+
 app = Flask(
     __name__,
     template_folder=str(BASE_DIR / "templates"),
@@ -599,17 +603,28 @@ def health_details():
 def debug_status():
     """Deployment diagnostic — confirms full app (not minimal_app) is running."""
     template_path = BASE_DIR / "templates" / "index.html"
+    register_template = BASE_DIR / "templates" / "register.html"
     static_css = BASE_DIR / "static" / "style.css"
+    has_register_route = any(
+        rule.rule == "/register" for rule in app.url_map.iter_rules()
+    )
     return jsonify(
         {
             "status": "ok",
             "app": "qumanity_full",
             "flask_app": app.import_name,
             "USE_MINIMAL_APP": os.environ.get("USE_MINIMAL_APP", ""),
+            "ALLOW_MINIMAL_APP": os.environ.get("ALLOW_MINIMAL_APP", ""),
             "FLASK_ENV": os.environ.get("FLASK_ENV", ""),
             "templates_loaded": template_path.is_file(),
+            "register_template_exists": register_template.is_file(),
+            "register_route_registered": has_register_route,
             "index_template": str(template_path),
             "static_css_exists": static_css.is_file(),
+            "hint": (
+                "If homepage shows 'Qumanity is running', minimal_app is active — "
+                "remove USE_MINIMAL_APP and ALLOW_MINIMAL_APP on Railway."
+            ),
         }
     )
 
@@ -1015,6 +1030,11 @@ def inject_donation_display() -> dict[str, str]:
         "donation_bank_account": getattr(config, "DONATION_BANK_ACCOUNT", "41711366837"),
         "donation_ifsc": getattr(config, "DONATION_IFSC", "SBIN0011551"),
     }
+
+
+@app.context_processor
+def inject_election_ui() -> dict[str, Any]:
+    return {"elections_are_enabled": elections_are_enabled}
 
 
 app.logger.setLevel(logging.INFO)
@@ -1801,6 +1821,74 @@ def zone_code_from_village_location_id(location_id: str) -> str | None:
     return letters.upper() if letters else None
 
 
+def zone_code_from_zone_full_id(zone_full_id: str) -> str | None:
+    """Extract zone code (e.g. CS) from ``IND.CS`` or ``0.राम|IND.CS``."""
+    raw = raw_path((zone_full_id or "").strip())
+    if not raw:
+        return None
+    upper = raw.upper()
+    if upper.startswith("IND."):
+        tail = raw.split(".", 1)[1]
+        letters = "".join(ch for ch in tail if ch.isalpha())
+        return letters.upper() if letters else None
+    if upper.startswith("IND/"):
+        head = raw.split("/", 1)[1]
+        letters = "".join(ch for ch in head if ch.isalpha())
+        return letters.upper() if letters else None
+    letters = "".join(ch for ch in raw if ch.isalpha())
+    return letters.upper() if len(letters) >= 2 else None
+
+
+def _zone_users_location_predicate(
+    conn: sqlite3.Connection, full_id: str | None
+) -> tuple[str, tuple]:
+    """Users whose current village lies in an Indian zone (path + relational)."""
+    fid = (
+        _resolve_geo_entity_id(conn, (full_id or "").strip())
+        or (full_id or "").strip()
+    )
+    zcode = zone_code_from_zone_full_id(fid)
+    clauses: list[str] = []
+    params: list[Any] = []
+
+    if zcode:
+        clauses.append("INSTR(u.current_location_id, ?) > 0")
+        params.append(f"IND/{zcode}/")
+        pref = zone_like_prefix_full(fid)
+        clauses.append("u.current_location_id LIKE ?")
+        params.append(pref + "/%")
+        state_dot_prefix = full_id_from_raw(f"IND/{zcode}.")
+        clauses.append("u.current_location_id LIKE ?")
+        params.append(state_dot_prefix + "%")
+
+    if geography_has_relational_fks(conn):
+        if state_table_has_zone_fk(conn):
+            clauses.append(
+                """u.current_location_id IN (
+                SELECT v.id FROM village v
+                JOIN tehsil t ON v.tehsil_id = t.id
+                JOIN district d ON t.district_id = d.id
+                JOIN state s ON d.state_id = s.id
+                WHERE TRIM(COALESCE(s.zone_id, '')) = ?)"""
+            )
+            params.append(fid)
+        if zcode:
+            state_like = full_id_from_raw(f"IND/{zcode}.")
+            clauses.append(
+                """u.current_location_id IN (
+                SELECT v.id FROM village v
+                JOIN tehsil t ON v.tehsil_id = t.id
+                JOIN district d ON t.district_id = d.id
+                JOIN state s ON d.state_id = s.id
+                WHERE s.id LIKE ?)"""
+            )
+            params.append(state_like + "%")
+
+    if not clauses:
+        return "1=0", ()
+    return "(" + " OR ".join(clauses) + ")", tuple(params)
+
+
 def user_zone_info(
     conn: sqlite3.Connection, user_row: sqlite3.Row
 ) -> dict[str, str | None]:
@@ -1984,31 +2072,11 @@ def user_location_predicate(
         return "1=1", ()
 
     fid = (full_id or "").strip()
+    if scope == "zone":
+        return _zone_users_location_predicate(conn, fid)
     if geography_has_relational_fks(conn):
-        if scope == "zone" and state_table_has_zone_fk(conn):
-            return (
-                "(u.current_location_id IN ("
-                "SELECT v.id FROM village v "
-                "JOIN tehsil t ON v.tehsil_id = t.id "
-                "JOIN district d ON t.district_id = d.id "
-                "JOIN state s ON d.state_id = s.id "
-                "WHERE s.zone_id = ?))",
-                (fid,),
-            )
-        if scope == "zone":
-            pref = zone_like_prefix_full(fid)
-            return (
-                "(u.current_location_id = ? OR u.current_location_id LIKE ?)",
-                (fid, pref + ".%"),
-            )
         return user_location_predicate_fk(scope, fid)
 
-    if scope == "zone":
-        pref = zone_like_prefix_full(fid)
-        return (
-            "(u.current_location_id = ? OR u.current_location_id LIKE ?)",
-            (fid, pref + ".%"),
-        )
     if scope == "state":
         dist_pref = full_id_from_raw(state_raw_to_district_base(raw_path(fid)))
         return (
@@ -3331,6 +3399,8 @@ def user_public_allowed_location_ids_present(
 
 
 def elections_are_enabled() -> bool:
+    if getattr(config, "DEMO_MODE", False) or getattr(config, "ELECTIONS_ENABLED", False):
+        return True
     return bool(getattr(election_scheduler, "ELECTIONS_ENABLED", False))
 
 
@@ -3730,7 +3800,7 @@ def api_global_locations_children_rows(
 ) -> list[dict[str, str]]:
     pid = (parent_id or "").strip()
     pup = pid.upper()
-    if pup == "EARTH":
+    if pup in ("EARTH", "0") or pid == full_id_from_raw("0"):
         if _geo_table_exists(conn, "continent"):
             cur = conn.execute(
                 "SELECT id, name FROM continent ORDER BY name COLLATE NOCASE ASC"
@@ -3752,6 +3822,23 @@ def api_global_locations_children_rows(
     if pid.upper() == "IND" and _geo_table_exists(conn, "zone"):
         cur = conn.execute("SELECT id, name FROM zone ORDER BY name COLLATE NOCASE ASC")
         return [{"id": str(r["id"]), "name": str(r["name"])} for r in cur]
+    if _geo_table_exists(conn, "country"):
+        crow = conn.execute(
+            "SELECT 1 FROM country WHERE id = ?",
+            (pid,),
+        ).fetchone()
+        if crow and pid.upper() != "IND" and _geo_table_exists(conn, "state"):
+            state_cols = _table_columns(conn, "state")
+            if "country_id" in state_cols:
+                cur = conn.execute(
+                    """
+                    SELECT id, name FROM state
+                     WHERE country_id = ?
+                     ORDER BY name COLLATE NOCASE ASC
+                    """,
+                    (pid,),
+                )
+                return [{"id": str(r["id"]), "name": str(r["name"])} for r in cur]
     return []
 
 
@@ -3875,6 +3962,8 @@ def _before_request() -> None:
         migrate_user_education_work_v2(conn)
         migrate_connection_requests_life_stage(conn)
         election_scheduler.migrate_election_tables(conn)
+        election_automation.migrate_election_automation_schema(conn)
+        demo_user_core.migrate_demo_schema(conn)
         leadership_core.migrate_leadership_council(conn)
         leadership_core.seed_mentor_slots(conn)
         language_core.migrate_and_seed(conn)
@@ -3938,6 +4027,10 @@ def _before_request() -> None:
             )
         except sqlite3.Error:
             app.logger.exception("daily age category update failed")
+        try:
+            qoin_scheduler.run_monthly_election_if_due(conn)
+        except sqlite3.Error:
+            app.logger.exception("monthly election automation failed")
         social_core.ensure_wallet_and_vote_tables(conn)
         social_core.ensure_posts_escalation_columns(conn)
         migrate_posts_deletion_columns(conn)
@@ -3951,6 +4044,43 @@ def _before_request() -> None:
         app.logger.exception("before_request schema bootstrap failed")
     except Exception:
         app.logger.exception("before_request bootstrap failed")
+
+
+def _location_children_with_user_counts(
+    conn: sqlite3.Connection, parent_scope: str, parent_id: str
+) -> list[dict[str, Any]]:
+    """Child geographies under a parent scope with registered user totals."""
+    scope = (parent_scope or "").strip().lower()
+    pid = (parent_id or "").strip()
+    child_scope = statistics_core.CHILD_SCOPE.get(scope)
+    if scope == "country" and pid.upper() != "IND":
+        child_scope = "state"
+    if not child_scope:
+        return []
+
+    if scope in ("earth", "continent", "country"):
+        children_meta = api_global_locations_children_rows(conn, pid)
+    else:
+        children_meta = statistics_core.child_locations_for_parent(
+            conn,
+            scope,
+            pid,
+            global_children_fn=api_global_locations_children_rows,
+            india_children_fn=api_locations_children_rows,
+        )
+    rows: list[dict[str, Any]] = []
+    for ch in children_meta:
+        cid = str(ch["id"])
+        bundle = location_statistics_bundle(conn, child_scope, cid)
+        rows.append(
+            {
+                "id": cid,
+                "name": str(ch.get("name") or cid),
+                "user_count": int(bundle.get("total_users") or 0),
+            }
+        )
+    rows.sort(key=lambda r: (-int(r["user_count"]), str(r["name"]).casefold()))
+    return rows
 
 
 def _geo_statistics_page(scope: str, geo_id: str) -> str:
@@ -3974,6 +4104,7 @@ def _geo_statistics_page(scope: str, geo_id: str) -> str:
         "tehsil",
         "district",
         "state",
+        "zone",
         "country",
         "continent",
         "earth",
@@ -4014,9 +4145,50 @@ def _geo_statistics_page(scope: str, geo_id: str) -> str:
             location_type=scope,
             location_id=geo_id.strip(),
         )
+    districts: list[dict[str, Any]] = []
+    tehsils: list[dict[str, Any]] = []
+    villages: list[dict[str, Any]] = []
+    states: list[dict[str, Any]] = []
+    zones: list[dict[str, Any]] = []
+    continents: list[dict[str, Any]] = []
+    countries: list[dict[str, Any]] = []
+    country_children: list[dict[str, Any]] = []
+    country_child_scope = ""
+    if scope == "earth":
+        continents = _location_children_with_user_counts(conn, scope, geo_id)
+    elif scope == "continent":
+        countries = _location_children_with_user_counts(conn, scope, geo_id)
+    elif scope == "state":
+        districts = _location_children_with_user_counts(conn, scope, geo_id)
+    elif scope == "district":
+        tehsils = _location_children_with_user_counts(conn, scope, geo_id)
+    elif scope == "tehsil":
+        villages = _location_children_with_user_counts(conn, scope, geo_id)
+    elif scope == "zone":
+        states = _location_children_with_user_counts(conn, scope, geo_id)
+    elif scope == "country":
+        cid = geo_id.strip().upper()
+        country_children = _location_children_with_user_counts(conn, scope, geo_id)
+        if cid == "IND":
+            country_child_scope = "zone"
+            zones = country_children
+        else:
+            country_child_scope = "state"
+            states = country_children
+    location_wallet_qoins = 0
+    location_wallet_rupees = 0
+    location_wallet_karma = int(wallet_balance or 0)
+    if scope == "village":
+        location_wallet_qoins = int(village_wallet_qoins or 0)
+        location_wallet_rupees = int(village_wallet_rupees or 0)
+    elif scope in ("tehsil", "district", "state", "zone", "country", "continent", "earth"):
+        qoin_core.ensure_wallet(conn, scope, geo_id.strip())
+        location_wallet_qoins = qoin_core.wallet_balance(conn, scope, geo_id.strip())
+        location_wallet_rupees = qoin_core.wallet_rupee_total(conn, scope, geo_id.strip())
     return render_template(
         "location.html",
         scope=scope,
+        location_level=scope,
         location_name=meta["name"],
         breadcrumbs=crumbs,
         stats=bundle,
@@ -4029,7 +4201,21 @@ def _geo_statistics_page(scope: str, geo_id: str) -> str:
         admin_members_list_url=admin_members_list_url,
         village_wallet_qoins=village_wallet_qoins,
         village_wallet_rupees=village_wallet_rupees,
+        location_wallet_qoins=location_wallet_qoins,
+        location_wallet_rupees=location_wallet_rupees,
+        location_wallet_karma=location_wallet_karma,
         location_id=geo_id.strip(),
+        voting_machine_level=scope,
+        voting_machine_location_id=geo_id.strip(),
+        districts=districts,
+        tehsils=tehsils,
+        villages=villages,
+        states=states,
+        zones=zones,
+        continents=continents,
+        countries=countries,
+        country_child_scope=country_child_scope,
+        country_children=country_children,
     )
 
 
@@ -5973,10 +6159,22 @@ def api_election_status():
     return jsonify(payload)
 
 
+@app.get("/api/election/widget")
+@_api_handle_errors
+def api_election_widget():
+    """Public election status for the floating voting machine widget."""
+    if not elections_are_enabled():
+        return jsonify({"elections_enabled": False, "phase": "paused"})
+    level_type = (request.args.get("level_type") or "village").strip().lower()
+    location_id = (request.args.get("location_id") or "").strip()
+    conn = get_db()
+    payload = election_automation.get_widget_payload(conn, level_type, location_id)
+    return jsonify(payload)
+
+
 @app.get("/api/election/history")
 @login_required
 def api_election_history():
-    """Prototype placeholder — past cycles will be listed here later."""
     if not elections_are_enabled():
         return jsonify(
             {
@@ -5990,14 +6188,98 @@ def api_election_history():
                 ),
             }
         )
+    conn = get_db()
+    level_type = (request.args.get("level_type") or "village").strip().lower()
+    location_id = (
+        request.args.get("location_id") or election_scheduler.TARGET_VILLAGE_ID
+    ).strip()
+    widget = election_automation.get_widget_payload(conn, level_type, location_id)
     return jsonify(
         {
+            "past_voting_results": widget.get("past_results", []),
+            "past_winners": widget.get("current_leaders", []),
             "past_nominations": [],
-            "past_voting_results": [],
-            "past_winners": [],
-            "message": "No data available",
+            "level_type": level_type,
+            "location_id": location_id,
         }
     )
+
+
+@app.post("/api/admin/demo/generate-users")
+@admin_required
+@_api_handle_errors
+def api_admin_demo_generate_users():
+    payload = request.get_json(silent=True) or {}
+    users_per = int(payload.get("users_per_village") or 1000)
+    max_villages = payload.get("max_villages")
+    max_v = int(max_villages) if max_villages is not None else 5
+    village_id = str(payload.get("village_id") or "").strip() or None
+    all_states = bool(payload.get("all_states"))
+    state_name = str(payload.get("state_name") or payload.get("state") or "Delhi").strip() or "Delhi"
+    conn = get_db()
+    result = demo_user_core.generate_demo_users_batch(
+        conn,
+        users_per_village=users_per,
+        max_villages=max_v if not village_id else None,
+        village_id=village_id,
+        state_name=None if all_states or village_id else state_name,
+    )
+    return jsonify({"ok": True, **result})
+
+
+@app.post("/api/admin/demo/run-election")
+@admin_required
+@_api_handle_errors
+def api_admin_demo_run_election():
+    payload = request.get_json(silent=True) or {}
+    conn = get_db()
+    if payload.get("location_id"):
+        today = date.today()
+        sign = election_automation.sun_sign_for_date(today)
+        result = election_automation.run_election_for_location(
+            conn,
+            str(payload.get("level_type") or "village"),
+            str(payload["location_id"]),
+            sign,
+            today.year,
+            today.month,
+            simulate=True,
+        )
+        return jsonify({"ok": True, "result": result})
+    summary = election_automation.run_monthly_election_job(
+        conn,
+        include_hierarchy=bool(payload.get("include_hierarchy", False)),
+        simulate=True,
+    )
+    return jsonify({"ok": True, "summary": summary})
+
+
+@app.get("/api/admin/demo/logs")
+@admin_required
+def api_admin_demo_logs():
+    conn = get_db()
+    limit = int(request.args.get("limit") or 50)
+    logs = election_automation.get_automation_logs(conn, limit=limit)
+    return jsonify({"logs": logs})
+
+
+@app.post("/api/admin/demo/reset")
+@admin_required
+@_api_handle_errors
+def api_admin_demo_reset():
+    conn = get_db()
+    result = demo_user_core.delete_all_demo_users(conn)
+    return jsonify({"ok": True, **result})
+
+
+@app.post("/api/admin/demo/remove-all")
+@admin_required
+@_api_handle_errors
+def api_admin_demo_remove_all():
+    """Remove all demo users (is_demo=1); preserve admin accounts."""
+    conn = get_db()
+    result = demo_user_core.delete_all_demo_users(conn)
+    return jsonify({"ok": True, "success": True, **result})
 
 
 @app.post("/api/election/nominate")
@@ -12518,6 +12800,14 @@ def debug_post_visibility():
     )
 
 
+@app.route("/logo-redirect")
+def logo_redirect():
+    """Logo click: dashboard when logged in, homepage when logged out (no logout)."""
+    if session.get("user_pk"):
+        return redirect(url_for("dashboard"))
+    return redirect(url_for("index"))
+
+
 @app.route("/")
 def index():
     conn = get_db()
@@ -12577,6 +12867,8 @@ def index():
         explorer=explorer,
         continents_list=continents_list,
         countries_list=countries_list,
+        voting_machine_level="earth",
+        voting_machine_location_id=full_id_from_raw("0"),
     )
 
 
@@ -12938,6 +13230,27 @@ def api_locations_children_rows(conn: sqlite3.Connection, parent_id: str) -> lis
     if not norm:
         return []
     scope = infer_geo_scope_from_full_id(conn, norm)
+    if scope == "zone":
+        if geography_has_relational_fks(conn) and state_table_has_zone_fk(conn):
+            cur = conn.execute(
+                """
+                SELECT id, name FROM state
+                 WHERE zone_id = ?
+                 ORDER BY name COLLATE NOCASE
+                """,
+                (norm,),
+            )
+            return [{"id": str(r["id"]), "name": str(r["name"])} for r in cur]
+        pref = zone_like_prefix_full(norm)
+        cur = conn.execute(
+            """
+            SELECT id, name FROM state
+             WHERE id LIKE ?
+             ORDER BY name COLLATE NOCASE
+            """,
+            (pref + ".%",),
+        )
+        return [{"id": str(r["id"]), "name": str(r["name"])} for r in cur]
     if scope == "state":
         if geography_has_relational_fks(conn):
             cur = conn.execute(
@@ -13013,20 +13326,6 @@ def api_locations_children():
     return jsonify(rows)
 
 
-@app.get("/api/locations/stats_link")
-@login_required
-def api_locations_stats_link():
-    """Resolve a geography row id to the canonical statistics page URL."""
-    conn = get_db()
-    lid = (request.args.get("location_id") or "").strip()
-    if not lid:
-        return jsonify({"error": "location_id is required"}), 400
-    scope = infer_geo_scope_from_full_id(conn, lid)
-    if not scope:
-        return jsonify({"error": "location not found"}), 404
-    return jsonify({"scope": scope, "stats_url": build_geo_public_url(scope, lid)})
-
-
 @app.get("/api/locations/tab_strip")
 @login_required
 def api_locations_tab_strip():
@@ -13048,74 +13347,6 @@ def api_locations_global_children():
         return jsonify({"error": "parent_id is required"}), 400
     rows = api_global_locations_children_rows(conn, parent_id)
     return jsonify(rows)
-
-
-@app.get("/api/dashboard/public_stats")
-@login_required
-@_api_handle_errors
-def api_dashboard_public_stats():
-    conn = get_db()
-    if not identity_core.user_show_public_account(g.current_user):
-        return jsonify({"error": "Public Account is not available for your profile."}), 403
-    if not user_has_full_dashboard(conn, g.current_user):
-        return jsonify({"error": "Public timeline requires an India birth or present location."}), 403
-    lid = (request.args.get("location_id") or "").strip()
-    if not lid:
-        lid = present_village_id(g.current_user)
-    if not lid:
-        return jsonify({"error": "location_id is required"}), 400
-    allowed = user_public_allowed_location_ids_present(conn, g.current_user)
-    if lid not in allowed:
-        return jsonify({"error": "location_id must be your present-location hierarchy"}), 403
-    scope = infer_geo_scope_from_full_id(conn, lid)
-    if not scope:
-        return jsonify({"error": "location not found"}), 404
-    bundle = location_statistics_bundle(conn, scope, lid)
-    return jsonify(
-        {
-            "total_users": bundle["total_users"],
-            "gender_counts": {str(r["label"]): int(r["count"]) for r in bundle["gender"]},
-            "element_counts": {str(r["label"]): int(r["count"]) for r in bundle["sun_element"]},
-            "life_stage_counts": {str(r["label"]): int(r["count"]) for r in bundle["age_group"]},
-            "stats_url": build_geo_public_url(scope, lid),
-            "scope": scope,
-            "location_mode": "present",
-        }
-    )
-
-
-@app.get("/api/location/member_count")
-@app.get("/api/location/stats")
-@login_required
-@_api_handle_errors
-def api_location_member_count():
-    """Member count for a village/tehsil/district/etc. (JSON alias for dashboard stats)."""
-    conn = get_db()
-    if not user_has_full_dashboard(conn, g.current_user):
-        return jsonify({"error": "Dashboard features are limited to India residents."}), 403
-    lid = (request.args.get("location_id") or "").strip()
-    if not lid:
-        return jsonify({"error": "location_id is required"}), 400
-    allowed = user_public_allowed_location_ids(conn, g.current_user)
-    if lid not in allowed:
-        return jsonify({"error": "location_id must be your profile hierarchy"}), 403
-    scope = infer_geo_scope_from_full_id(conn, lid)
-    if not scope:
-        return jsonify({"error": "location not found"}), 404
-    bundle = location_statistics_bundle(conn, scope, lid)
-    total = int(bundle["total_users"])
-    return jsonify(
-        {
-            "count": total,
-            "total_users": total,
-            "location_id": lid,
-            "scope": scope,
-            "gender_counts": {str(r["label"]): int(r["count"]) for r in bundle["gender"]},
-            "element_counts": {str(r["label"]): int(r["count"]) for r in bundle["sun_element"]},
-            "life_stage_counts": {str(r["label"]): int(r["count"]) for r in bundle["age_group"]},
-            "stats_url": build_geo_public_url(scope, lid),
-        }
-    )
 
 
 @app.get("/api/dashboard/geo_feed")
@@ -13145,73 +13376,6 @@ def api_dashboard_geo_feed():
             continue
         feed.append(post_row_to_feed_json(r, conn, g.current_user))
     return jsonify({"posts": feed})
-
-
-@app.get("/api/dashboard/global_stats")
-@login_required
-def api_dashboard_global_stats():
-    return _api_global_stats_response()
-
-
-@app.get("/api/global/stats")
-@login_required
-def api_global_stats():
-    """Alias for dashboard global statistics (Earth / Continent / Country / Zone)."""
-    return _api_global_stats_response()
-
-
-def _api_global_stats_response():
-    conn = get_db()
-    _ = conn
-    scope = (request.args.get("scope") or "earth").strip().lower()
-    geo_id = (request.args.get("geo_id") or "").strip()
-
-    if scope == "earth":
-        eid = geo_id or "0"
-        bundle = location_statistics_bundle(conn, "earth", eid)
-        url_id = eid
-    elif scope == "continent":
-        if not geo_id:
-            return jsonify({"error": "geo_id is required for continent scope"}), 400
-        bundle = location_statistics_bundle(conn, "continent", geo_id)
-        url_id = geo_id
-    elif scope == "country":
-        if not geo_id:
-            return jsonify({"error": "geo_id is required for country scope"}), 400
-        bundle = location_statistics_bundle(conn, "country", geo_id)
-        url_id = geo_id
-    elif scope == "zone":
-        if not geo_id:
-            return jsonify({"error": "geo_id is required for zone scope"}), 400
-        bundle = location_statistics_bundle(conn, "zone", geo_id)
-        url_id = geo_id
-    else:
-        return jsonify({"error": "invalid scope"}), 400
-
-    zone_name: str | None = None
-    zone_code: str | None = None
-    if scope == "zone":
-        rp = raw_path(geo_id)
-        if "." in rp:
-            zone_code = rp.split(".", 1)[1].upper()
-        zone_name = INDIA_ZONE_NAMES.get(zone_code or "", zone_code)
-        if _geo_table_exists(conn, "zone"):
-            meta = _geo_row_optional_meta(conn, "zone", geo_id)
-            if meta.get("name"):
-                zone_name = str(meta["name"])
-
-    return jsonify(
-        {
-            "total_users": bundle["total_users"],
-            "gender_counts": {str(r["label"]): int(r["count"]) for r in bundle["gender"]},
-            "element_counts": {str(r["label"]): int(r["count"]) for r in bundle["sun_element"]},
-            "life_stage_counts": {str(r["label"]): int(r["count"]) for r in bundle["age_group"]},
-            "stats_url": build_geo_public_url(scope, url_id),
-            "scope": scope,
-            "zone_name": zone_name,
-            "zone_code": zone_code,
-        }
-    )
 
 
 @app.get("/api/messages/unread_count")
@@ -13475,6 +13639,7 @@ def registration_stats():
 @app.route("/register", methods=["GET", "POST"])
 def register():
     # Registration page is always English — mother tongue is stored for dashboard only.
+    app.logger.info("Register route %s", request.method)
     session["preferred_language"] = "en"
     g.ui_language = "en"
 
@@ -15325,11 +15490,6 @@ def _private_id_login_candidates(raw: str) -> list[str]:
         candidates.append(LEGACY_ADMIN_PRIVATE_ID)
     if digits == ADMIN_PRIVATE_ID[len(HUMAN_PRIVATE_ID_PREFIX):]:
         candidates.extend([ADMIN_PRIVATE_ID, LEGACY_ADMIN_PRIVATE_ID])
-    backup_digits = admin_login_repair.BACKUP_PRIVATE_ID[len(HUMAN_PRIVATE_ID_PREFIX):]
-    if digits == backup_digits:
-        candidates.extend(
-            [admin_login_repair.BACKUP_PRIVATE_ID, backup_digits]
-        )
     # Preserve order, drop duplicates (case-insensitive).
     seen: set[str] = set()
     unique: list[str] = []
@@ -15680,10 +15840,6 @@ def dashboard():
     )
     qoin_transactions_recent = [dict(r) for r in tx_cur]
 
-    user_village_stats_url = "#"
-    if default_vid:
-        user_village_stats_url = build_geo_public_url("village", str(default_vid).strip())
-
     user_life_stage = life_stage_from_age(int(user_row["age"]))
 
     active_zodiac = _election_active_zodiac_sign()
@@ -15709,10 +15865,95 @@ def dashboard():
     varna_profile = varna_core.profile_for_user(conn, pid)
     conn.commit()
 
+    user_present_village_id = present_village_id(user_row) or default_vid or ""
+    user_present_tehsil_id = ""
+    user_present_district_id = ""
+    user_present_state_id = ""
+    for hierarchy_item in current_hierarchy:
+        item_scope = str(hierarchy_item.get("scope") or "").lower()
+        item_id = str(hierarchy_item.get("id") or "").strip()
+        if item_scope == "tehsil" and not user_present_tehsil_id:
+            user_present_tehsil_id = item_id
+        elif item_scope == "district" and not user_present_district_id:
+            user_present_district_id = item_id
+        elif item_scope == "state" and not user_present_state_id:
+            user_present_state_id = item_id
+    user_village_stats_url = (
+        build_geo_public_url("village", user_present_village_id)
+        if user_present_village_id
+        else ""
+    )
+    user_tehsil_stats_url = (
+        build_geo_public_url("tehsil", user_present_tehsil_id)
+        if user_present_tehsil_id
+        else ""
+    )
+    user_district_stats_url = (
+        build_geo_public_url("district", user_present_district_id)
+        if user_present_district_id
+        else ""
+    )
+    user_state_stats_url = (
+        build_geo_public_url("state", user_present_state_id)
+        if user_present_state_id
+        else ""
+    )
+    show_public_location_statistics = bool(
+        show_public_account
+        and user_has_full_dashboard(conn, user_row)
+        and (
+            user_present_village_id
+            or user_present_tehsil_id
+            or user_present_district_id
+            or user_present_state_id
+        )
+    )
+    user_zone_id = str(geo_displays.get("user_zone_id") or "").strip()
+    user_country_id = str(geo_displays.get("user_country_id") or "").strip()
+    user_continent_id = str(geo_displays.get("user_continent_id") or "").strip()
+    user_earth_id = "0"
+    user_zone_stats_url = (
+        build_geo_public_url("zone", user_zone_id) if user_zone_id else ""
+    )
+    user_country_stats_url = (
+        build_geo_public_url("country", user_country_id)
+        if user_country_id
+        else ""
+    )
+    user_continent_stats_url = (
+        build_geo_public_url("continent", user_continent_id)
+        if user_continent_id
+        else ""
+    )
+    user_earth_stats_url = build_geo_public_url("earth", user_earth_id)
+    show_global_earth_statistics = bool(user_has_full_dashboard(conn, user_row))
+    show_global_continent_statistics = bool(
+        user_continent_id and user_has_full_dashboard(conn, user_row)
+    )
+    show_global_zone_statistics = bool(
+        geo_displays.get("user_show_zone_tab")
+        and user_zone_id
+        and user_has_full_dashboard(conn, user_row)
+    )
+    show_global_country_statistics = bool(
+        user_country_id and user_has_full_dashboard(conn, user_row)
+    )
+    show_global_location_statistics = bool(
+        show_global_earth_statistics
+        or show_global_continent_statistics
+        or show_global_country_statistics
+        or show_global_zone_statistics
+    )
+
     dash_client_config: dict[str, Any] = {
         "userHierarchy": [dict(item) for item in current_hierarchy],
-        "villageStatsUrl": user_village_stats_url,
         "defaultVillageId": default_vid or "",
+        "showPublicLocationStatistics": show_public_location_statistics,
+        "showGlobalEarthStatistics": show_global_earth_statistics,
+        "showGlobalContinentStatistics": show_global_continent_statistics,
+        "showGlobalZoneStatistics": show_global_zone_statistics,
+        "showGlobalCountryStatistics": show_global_country_statistics,
+        "showGlobalLocationStatistics": show_global_location_statistics,
         "quantumPunchVillageId": election_scheduler.TARGET_VILLAGE_ID,
         "userContinentId": geo_displays.get("user_continent_id") or "",
         "userContinentName": geo_displays.get("user_continent_name") or "",
@@ -15770,7 +16011,24 @@ def dashboard():
         current_location_label=current_location_label,
         current_hierarchy=current_hierarchy,
         default_active_location_id=default_vid,
+        user_present_village_id=user_present_village_id,
+        user_present_tehsil_id=user_present_tehsil_id,
+        user_present_district_id=user_present_district_id,
+        user_present_state_id=user_present_state_id,
         user_village_stats_url=user_village_stats_url,
+        user_tehsil_stats_url=user_tehsil_stats_url,
+        user_district_stats_url=user_district_stats_url,
+        user_state_stats_url=user_state_stats_url,
+        user_zone_stats_url=user_zone_stats_url,
+        user_country_stats_url=user_country_stats_url,
+        user_continent_stats_url=user_continent_stats_url,
+        user_earth_stats_url=user_earth_stats_url,
+        show_public_location_statistics=show_public_location_statistics,
+        show_global_earth_statistics=show_global_earth_statistics,
+        show_global_continent_statistics=show_global_continent_statistics,
+        show_global_zone_statistics=show_global_zone_statistics,
+        show_global_country_statistics=show_global_country_statistics,
+        show_global_location_statistics=show_global_location_statistics,
         user_life_stage=user_life_stage,
         wallet_balance=wallet_balance,
         qoins_earned_total=qoins_earned_total,

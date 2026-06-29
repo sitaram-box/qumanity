@@ -218,19 +218,11 @@ def ensure_admin_healthy(
             actions.append("repaired_primary_admin")
             healthy = verify_admin_password(conn) and simulate_admin_login(conn)
 
-        backup_created = ensure_backup_admin(conn)
-        if backup_created:
-            actions.append("created_backup_admin")
-        else:
-            actions.append("backup_admin_exists")
-
         return {
             "skipped": False,
             "ok": healthy,
             "login_verified": verify_admin_password(conn),
             "login_simulated": simulate_admin_login(conn),
-            "backup_private_id": BACKUP_PRIVATE_ID,
-            "backup_login_digits": BACKUP_PRIVATE_ID[len("HU-"):],
             "actions": actions,
         }
     except Exception as exc:

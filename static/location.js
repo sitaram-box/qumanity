@@ -12,6 +12,16 @@
   }
 
   document.addEventListener("DOMContentLoaded", function () {
+    var backLink = document.getElementById("qb-location-back-link");
+    if (backLink) {
+      backLink.addEventListener("click", function (e) {
+        if (window.history.length > 1) {
+          e.preventDefault();
+          window.history.back();
+        }
+      });
+    }
+
     var cfg = window.QBLocationDonate || {};
     var openBtn = document.getElementById("qb-location-donate-open");
     var closeBtn = document.getElementById("qb-location-donate-close");

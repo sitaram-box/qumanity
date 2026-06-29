@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link
-  href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@600;700&display=swap"
+  href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+Devanagari:wght@700&family=Playfair+Display:wght@600;700&display=swap"
   rel="stylesheet"
 />
 <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}" />
@@ -18,11 +18,10 @@
 <div class="qb-home-header-inner w-100">
   <div class="qb-home-header-row qb-home-header-row--story">
     <div class="qb-home-header-leading">
-      {% include '_hamburger_menu.html' %}
       <a
-        href="{{ url_for('index') }}"
+        href="{{ url_for('logo_redirect') }}"
         class="qb-brand qb-brand-with-logo text-decoration-none qb-home-brand qb-home-brand--compact"
-        aria-label="Qumanity home"
+        aria-label="Qumanity"
       >
         {% include "_brand_logo.html" %}
       </a>
@@ -71,6 +70,7 @@
           <div id="qb-timebox-line3" class="qb-timebox-extra-line qb-timebox-extra-line--vs"></div>
         </div>
       </div>
+      {% include '_hamburger_menu.html' %}
     </div>
   </div>
 </div>
@@ -83,6 +83,10 @@
   <section class="qb-story-hero" aria-labelledby="story-hero-heading">
     <div class="qb-story-hero__bg" aria-hidden="true">
       <div class="qb-story-hero__base"></div>
+      <div
+        class="qb-story-hero__earth"
+        style="background-image: url('{{ url_for('static', filename='images/earth13.png') }}');"
+      ></div>
       <div class="qb-story-hero__starfield" id="qb-hero-starfield"></div>
       <svg
         class="qb-story-hero__constellations"
@@ -111,31 +115,65 @@
       </svg>
       <div class="qb-story-hero__overlay"></div>
     </div>
-    <div class="qb-story-hero__inner qb-story-hero__inner--stacked">
-      <h1 id="story-hero-heading" class="qb-story-hero__title">
-        The silent majority has found <span class="qb-story-hero__emph">its voice.</span>
+
+    <div class="qb-story-hero__title-top-right">
+      <h1 id="story-hero-heading" class="qb-story-hero__brand">
+        <span class="qb-story-hero__qu">QU</span><span class="qb-story-hero__manity">MANITY</span>
       </h1>
+      <p class="qb-story-hero__tagline">
+        <span class="qb-story-hero__tag-quantum">Quantum</span>
+        <span class="qb-story-hero__tag-plus"> + </span>
+        <span class="qb-story-hero__tag-humanity">Humanity</span>
+      </p>
+    </div>
+
+    <div class="qb-story-hero__chakra-wrapper">
       <div class="qb-story-hero__chakra-stage" aria-hidden="true">
-        <div class="qb-story-hero__chakra-wrap">
-          <div class="qb-story-hero__sun-rays"></div>
-          <div class="qb-story-hero__sun-center"></div>
+        <div class="qb-story-hero__chakra-static">
           <svg
-            class="qb-ashok-chakra"
+            class="qb-ashok-chakra qb-ashok-chakra--centre"
             viewBox="0 0 200 200"
             xmlns="http://www.w3.org/2000/svg"
             focusable="false"
+            aria-hidden="true"
+          >
+            <defs>
+              <clipPath id="qb-chakra-surya-clip">
+                <circle cx="100" cy="100" r="34" />
+              </clipPath>
+            </defs>
+            <circle class="qb-chakra-centre-fill" cx="100" cy="100" r="34" fill="#000000" />
+            <image
+              class="qb-chakra-surya-image"
+              href="{{ url_for('static', filename='images/surya.png') }}"
+              x="66"
+              y="66"
+              width="68"
+              height="68"
+              preserveAspectRatio="xMidYMid slice"
+              clip-path="url(#qb-chakra-surya-clip)"
+            />
+          </svg>
+        </div>
+        <div class="qb-story-hero__chakra-spin">
+          <svg
+            class="qb-ashok-chakra qb-ashok-chakra--ring"
+            viewBox="0 0 200 200"
+            xmlns="http://www.w3.org/2000/svg"
+            focusable="false"
+            aria-hidden="true"
           >
             <g transform="translate(100, 100)">
-              <circle r="92" fill="none" stroke="currentColor" stroke-width="4" />
-              <circle r="14" fill="currentColor" />
+              <circle class="qb-chakra-outer-ring" r="92" fill="none" stroke="#000000" stroke-width="4" />
               {% for i in range(24) %}
               <line
+                class="qb-chakra-spoke"
                 x1="0"
-                y1="-18"
+                y1="-34"
                 x2="0"
                 y2="-92"
-                stroke="currentColor"
-                stroke-width="3.5"
+                stroke="#000000"
+                stroke-width="3"
                 stroke-linecap="round"
                 transform="rotate({{ i * 15 }})"
               />
@@ -144,17 +182,19 @@
           </svg>
         </div>
       </div>
-      <p class="qb-story-hero__lead">
-        Qumanity is the roar of 1.4 billion citizens demanding transparency, accountability, and
-        dignity.
-      </p>
-      <div class="qb-story-hero__actions">
-        <a href="{{ url_for('register') }}" class="qb-btn qb-story-join-btn" id="qb-story-join-btn">
-          Join Qumanity
-        </a>
-        <p class="qb-story-hero__credit">by SITA Foundation</p>
-      </div>
     </div>
+
+    <div class="qb-story-hero__bottom-left">
+      <p class="qb-story-hero__lead-bottom-left">
+        <span class="qb-story-hero__lead-em">India's 1.4 billion souls</span>
+        <span class="qb-story-hero__lead-rest"> demanding transparency, accountability, and dignity</span>
+      </p>
+      <a href="{{ url_for('register') }}" class="qb-btn qb-story-join-btn" id="qb-story-join-btn">
+        Join Qumanity
+      </a>
+    </div>
+
+    <p class="qb-story-hero__credit-right">by SITA Foundation</p>
   </section>
 
   {# ── Origin story (saffron band) ── #}
@@ -184,17 +224,66 @@
     </div>
   </section>
 
-  {# ── Search location (only interactive element) ── #}
+  {# ── Vision (Indian flag green band) ── #}
+  <section class="qb-story-section qb-story-section--vision-green" aria-labelledby="story-abstract-heading">
+    <div class="qb-story-section__inner qb-story-abstract__inner">
+      <h2 id="story-abstract-heading" class="qb-story-section__title">The Qumanity Vision</h2>
+      <div class="qb-story-abstract__body">
+        <p class="qb-story-abstract__text">
+          Human civilization stands at a critical juncture. Despite unprecedented technological and
+          material progress, governance systems at every level—from villages to nations—remain plagued
+          by corruption, opacity, inequality, ecological destruction, and the manipulation of democratic
+          processes. These failures are not accidental; they are structural consequences of centralized,
+          unaccountable power.
+        </p>
+        <p class="qb-story-abstract__text">
+          This white paper introduces Qumanity, a decentralized governance protocol designed to address
+          these systemic failures by embedding transparency, accountability, and participatory
+          decision-making into the architecture of governance itself. Built at the intersection of Vedic
+          eternal principles and modern quantum information theory, Qumanity operationalizes the insight
+          that consciousness, interconnectedness, and self-correction are fundamental to sustainable human
+          organization.
+        </p>
+        <p class="qb-story-abstract__text">
+          The protocol implements four interconnected timelines—Private, Personal, Public, and
+          Global—that allow individual reflection to escalate naturally into collective action. A nested
+          governance structure ensures that decisions are made at the appropriate scale. A dual-key
+          identity system separates public accountability from personal privacy. A transparent Karma
+          Points ledger rewards verified positive actions and enables participatory governance.
+        </p>
+      </div>
+      <div class="qb-story-whitepaper__inner qb-story-whitepaper__inner--vision">
+        <a
+          class="qb-story-whitepaper__link qb-story-whitepaper__link--compact"
+          href="{{ url_for('static', filename='files/Qumanity_White_Paper_v3.0.pdf') }}"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Read the White Paper
+        </a>
+        <p class="qb-story-whitepaper__note qb-story-whitepaper__note--compact">
+          Learn about the vision, technology, and impact of Qumanity
+        </p>
+      </div>
+    </div>
+  </section>
+
+  {# ── Search location (cosmos background, no chakra) ── #}
   <section
     id="home-search-location"
-    class="qb-story-section qb-story-section--green-flag"
+    class="qb-story-section qb-story-section--cosmos"
     aria-labelledby="story-search-heading"
   >
-    <div class="qb-story-section__inner qb-story-search__inner">
+    <div class="qb-story-section__cosmos-bg" aria-hidden="true">
+      <div class="qb-story-section__cosmos-base"></div>
+      <div class="qb-story-section__starfield" id="qb-search-starfield"></div>
+      <div class="qb-story-section__cosmos-overlay"></div>
+    </div>
+    <div class="qb-story-section__inner qb-story-search__inner qb-story-search__inner--cosmos">
       <h2 id="story-search-heading" class="qb-story-section__title">Find a place</h2>
       <p class="qb-story-section__text qb-story-search__hint">
         Type at least two letters of any zone, state, district, tehsil, or village name — then choose a
-        result to open its statistics page.
+        result to open its geography page.
       </p>
       <label class="form-label visually-hidden" for="geo-q">Search geography</label>
       <input
@@ -215,9 +304,9 @@
 <script src="{{ url_for('static', filename='dashboard.js') }}"></script>
 <script>
   (function () {
-    var starfield = document.getElementById("qb-hero-starfield");
-    if (starfield) {
-      var count = 160;
+    function fillStarfield(containerId, count) {
+      var starfield = document.getElementById(containerId);
+      if (!starfield) return;
       for (var i = 0; i < count; i++) {
         var star = document.createElement("span");
         star.className = "qb-hero-star";
@@ -230,6 +319,8 @@
         starfield.appendChild(star);
       }
     }
+    fillStarfield("qb-hero-starfield", 160);
+    fillStarfield("qb-search-starfield", 120);
 
     var inp = document.getElementById("geo-q");
     var ul = document.getElementById("geo-results");

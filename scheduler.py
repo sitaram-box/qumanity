@@ -40,6 +40,7 @@ _last_settlement_week_key: str | None = None
 _last_varna_recalc_month_key: str | None = None
 _last_planetary_update_key: str | None = None
 _last_age_update_key: str | None = None
+_last_monthly_election_key: str | None = None
 
 
 def _now_ist() -> datetime:
@@ -217,6 +218,47 @@ def run_daily_age_category_update_if_due(
         notify_fn=notify_fn,
     )
     mark_age_update_ran(ref)
+    return result
+
+
+def should_run_monthly_election(now: datetime | None = None) -> bool:
+    """True once per calendar month on day 1 at or after 01:00 IST."""
+    global _last_monthly_election_key
+    ref = now or _now_ist()
+    if ref.day != 1 or ref.hour < 1:
+        return False
+    key = f"{ref.year}-{ref.month:02d}"
+    if _last_monthly_election_key == key:
+        return False
+    return True
+
+
+def mark_monthly_election_ran(now: datetime | None = None) -> None:
+    global _last_monthly_election_key
+    ref = now or _now_ist()
+    _last_monthly_election_key = f"{ref.year}-{ref.month:02d}"
+
+
+def run_monthly_election_if_due(
+    conn: sqlite3.Connection,
+    *,
+    force: bool = False,
+) -> dict | None:
+    try:
+        import config
+        if not (config.DEMO_MODE or config.ELECTIONS_AUTO_DEMO or config.ELECTIONS_ENABLED):
+            return None
+    except ImportError:
+        return None
+    try:
+        import election_automation
+    except ImportError:
+        return None
+    ref = _now_ist()
+    if not force and not should_run_monthly_election(ref):
+        return None
+    result = election_automation.run_monthly_election_job(conn, today=ref.date())
+    mark_monthly_election_ran(ref)
     return result
 
 

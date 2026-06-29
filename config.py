@@ -126,6 +126,11 @@ def allowed_hosts() -> list[str]:
         hosts.append(railway_domain.lower())
     return hosts
 
+# ── Demo / elections automation ──────────────────────────────────────────────
+DEMO_MODE: bool = _get_bool("DEMO_MODE")
+ELECTIONS_ENABLED: bool = _get_bool("ELECTIONS_ENABLED", default=DEMO_MODE)
+ELECTIONS_AUTO_DEMO: bool = _get_bool("ELECTIONS_AUTO_DEMO", default=DEMO_MODE)
+
 # ── Razorpay (online donations) ──────────────────────────────────────────────
 RAZORPAY_KEY_ID: str = os.environ.get("RAZORPAY_KEY_ID", "").strip()
 RAZORPAY_KEY_SECRET: str = os.environ.get("RAZORPAY_KEY_SECRET", "").strip()

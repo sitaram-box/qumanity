@@ -3,7 +3,7 @@
 {% block title %}Register — Qumanity{% endblock %}
 
 {% block head_extra %}
-<link rel="stylesheet" href="{{ url_for('static', filename='register.css') }}?v=8" />
+<link rel="stylesheet" href="{{ url_for('static', filename='register.css') }}?v=9" />
 {% endblock %}
 
 {# Registration is English-only — no language dropdown (dashboard only). #}
@@ -26,64 +26,6 @@
 
 {% block body %}
 <div class="register-container">
-<section class="reg-stats" aria-labelledby="reg-stats-heading">
-  <h1 id="reg-stats-heading" class="reg-stats__title">Join Qumanity — The Roar Begins</h1>
-  <p class="reg-stats__subtitle">Join the roar of 1.4 billion citizens</p>
-  <div class="reg-stats__grid" id="reg-stats-grid">
-    <div class="reg-stats__card reg-stats__card--saffron">
-      <span class="reg-stats__icon" aria-hidden="true">🌍</span>
-      <span class="reg-stats__label">Earth</span>
-      <span class="reg-stats__value"><span id="total-users">—</span> Users</span>
-    </div>
-    <div class="reg-stats__card reg-stats__card--white">
-      <span class="reg-stats__icon" aria-hidden="true">🇮🇳</span>
-      <span class="reg-stats__label">India</span>
-      <span class="reg-stats__value"><span id="india-users">—</span> Users</span>
-    </div>
-    <div class="reg-stats__card reg-stats__card--green">
-      <span class="reg-stats__icon" aria-hidden="true">🏠</span>
-      <span class="reg-stats__label">Villages</span>
-      <span class="reg-stats__value">
-        <span id="active-villages">—</span> Active / <span id="total-villages">620,000</span>
-      </span>
-    </div>
-    <div class="reg-stats__card reg-stats__card--saffron">
-      <span class="reg-stats__icon" aria-hidden="true">📍</span>
-      <span class="reg-stats__label">Tehsils</span>
-      <span class="reg-stats__value">
-        <span id="active-tehsils">—</span> / <span id="total-tehsils">—</span>
-      </span>
-    </div>
-    <div class="reg-stats__card reg-stats__card--white">
-      <span class="reg-stats__icon" aria-hidden="true">📍</span>
-      <span class="reg-stats__label">Districts</span>
-      <span class="reg-stats__value">
-        <span id="active-districts">—</span> / <span id="total-districts">—</span>
-      </span>
-    </div>
-    <div class="reg-stats__card reg-stats__card--green">
-      <span class="reg-stats__icon" aria-hidden="true">📍</span>
-      <span class="reg-stats__label">States</span>
-      <span class="reg-stats__value">
-        <span id="active-states">—</span> / <span id="total-states">28</span>
-      </span>
-    </div>
-  </div>
-  <p class="reg-stats__callout">
-  <span id="empty-villages-callout">620,000</span> villages are waiting for their first voice.
-  Will yours be the one?
-  </p>
-</section>
-
-<div class="register-header">
-  <h2 class="register-header__title">Create Your Qumanity Account</h2>
-  <p>Your journey begins here — transparency, accountability, and dignity for every citizen.</p>
-  <p class="small text-muted">
-    You will receive a <strong>Private ID</strong> for future logins and a
-    <strong>Public ID</strong> on your dashboard.
-  </p>
-</div>
-
 {% if new_private_id %}
 <div class="qb-id-modal-backdrop" role="status">
   <div class="qb-id-modal">
@@ -144,6 +86,16 @@
   });
 </script>
 {% else %}
+<div class="register-layout">
+  <div class="register-layout__main">
+    <div class="register-header">
+      <h2 class="register-header__title">Create Your Qumanity Account</h2>
+      <p>Your journey begins here — transparency, accountability, and dignity for every citizen.</p>
+      <p class="small text-muted">
+        You will receive a <strong>Private ID</strong> for future logins and a
+        <strong>Public ID</strong> on your dashboard.
+      </p>
+    </div>
 {% if errors %}
 <div class="qb-alert qb-alert-error" id="register-error-alert" role="alert">
   {% for msg in errors %}
@@ -789,6 +741,59 @@
 
 <div class="register-footer">
   <p>Already have an account? <a href="{{ url_for('login') }}">Sign in</a></p>
+</div>
+  </div>
+
+  <aside class="register-layout__aside" aria-labelledby="reg-stats-heading">
+    <section class="reg-stats reg-stats--sidebar">
+      <h1 id="reg-stats-heading" class="reg-stats__title">Join Qumanity — The Roar Begins</h1>
+      <p class="reg-stats__subtitle">Join the roar of 1.4 billion citizens</p>
+      <div class="reg-stats__stack" id="reg-stats-grid">
+        <div class="reg-stats__card reg-stats__card--saffron">
+          <span class="reg-stats__icon" aria-hidden="true">🌍</span>
+          <span class="reg-stats__label">Earth</span>
+          <span class="reg-stats__value"><span id="total-users">—</span> Users</span>
+        </div>
+        <div class="reg-stats__card reg-stats__card--white">
+          <span class="reg-stats__icon" aria-hidden="true">🇮🇳</span>
+          <span class="reg-stats__label">India</span>
+          <span class="reg-stats__value"><span id="india-users">—</span> Users</span>
+        </div>
+        <div class="reg-stats__card reg-stats__card--green">
+          <span class="reg-stats__icon" aria-hidden="true">🏠</span>
+          <span class="reg-stats__label">Villages</span>
+          <span class="reg-stats__value">
+            <span id="active-villages">—</span> Active / <span id="total-villages">620,000</span>
+          </span>
+        </div>
+        <div class="reg-stats__card reg-stats__card--saffron">
+          <span class="reg-stats__icon" aria-hidden="true">📍</span>
+          <span class="reg-stats__label">Tehsils</span>
+          <span class="reg-stats__value">
+            <span id="active-tehsils">—</span> / <span id="total-tehsils">—</span>
+          </span>
+        </div>
+        <div class="reg-stats__card reg-stats__card--white">
+          <span class="reg-stats__icon" aria-hidden="true">📍</span>
+          <span class="reg-stats__label">Districts</span>
+          <span class="reg-stats__value">
+            <span id="active-districts">—</span> / <span id="total-districts">—</span>
+          </span>
+        </div>
+        <div class="reg-stats__card reg-stats__card--green">
+          <span class="reg-stats__icon" aria-hidden="true">📍</span>
+          <span class="reg-stats__label">States</span>
+          <span class="reg-stats__value">
+            <span id="active-states">—</span> / <span id="total-states">28</span>
+          </span>
+        </div>
+      </div>
+      <p class="reg-stats__callout">
+        <span id="empty-villages-callout">620,000</span> villages are waiting for their first voice.
+        Will yours be the one?
+      </p>
+    </section>
+  </aside>
 </div>
 {% endif %}
 </div>

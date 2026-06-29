@@ -3,12 +3,10 @@
  *
  * Reuses the existing dashboard geography API:
  *   - GET /api/locations/children?parent_id=<id>   -> [{ id, name }, ...]
- *   - GET /api/locations/stats_link?location_id=<id> -> { stats_url }
  *
  * Tree levels: India (root) -> State -> District -> Tehsil -> Village.
- * Click a location name to open its statistics page. Expand/collapse with the
- * chevron. The search box filters already-loaded nodes; the breadcrumb reflects
- * the deepest branch you expand or select.
+ * Click a location name to open its geography overview page. Expand/collapse with the
+ * chevron. The breadcrumb reflects the deepest branch you expand or select.
  */
 (function () {
   "use strict";
@@ -44,22 +42,18 @@
     });
   }
 
-  function fetchStatsLink(geoId) {
-    return fetch(
-      "/api/locations/stats_link?location_id=" + encodeURIComponent(geoId),
-      { credentials: "same-origin", headers: { Accept: "application/json" } }
-    ).then(function (r) {
-      return r.json().then(function (b) {
-        return { ok: r.ok, body: b || {} };
-      });
-    });
+  function locationPageUrl(kind, geoId) {
+    if (kind === "root" || geoId === ROOT_ID) {
+      return "/location/country/IND";
+    }
+    return "/location/" + kind + "/" + encodeURIComponent(geoId);
   }
 
   /* --- Breadcrumb --- */
   function renderBreadcrumb(path) {
     if (!els.breadcrumb) return;
     els.breadcrumb.innerHTML = "";
-    var full = [{ id: ROOT_ID, name: "India" }].concat(path || []);
+    var full = [{ id: ROOT_ID, name: "India", kind: "root" }].concat(path || []);
     full.forEach(function (node, i) {
       if (i > 0) {
         var sep = document.createElement("span");
@@ -74,22 +68,15 @@
       crumb.textContent = node.name;
       crumb.setAttribute("data-geo-id", node.id);
       crumb.addEventListener("click", function () {
-        openStats(node.id);
+        window.location.href = locationPageUrl(node.kind || "root", node.id);
       });
       els.breadcrumb.appendChild(crumb);
     });
   }
 
-  function openStats(geoId) {
-    fetchStatsLink(geoId).then(function (x) {
-      var url = x.ok && x.body && x.body.stats_url;
-      if (url) window.location.href = url;
-    });
-  }
-
   /* --- Tree nodes --- */
   function buildNode(item, kind, parentPath) {
-    var path = parentPath.concat([{ id: item.id, name: item.name }]);
+    var path = parentPath.concat([{ id: item.id, name: item.name, kind: kind }]);
 
     var node = document.createElement("div");
     node.className = "qb-ie-node";
@@ -155,7 +142,7 @@
       clearSelection();
       label.classList.add("is-selected");
       renderBreadcrumb(path);
-      openStats(item.id);
+      window.location.href = locationPageUrl(kind, item.id);
     });
 
     return node;
@@ -178,7 +165,6 @@
       if (els.empty) els.empty.hidden = true;
       return;
     }
-    // First hide everything, then reveal matches + their ancestors.
     nodes.forEach(function (n) {
       n.hidden = true;
     });
@@ -187,7 +173,6 @@
       var name = n.getAttribute("data-name") || "";
       if (name.indexOf(q) === -1) return;
       anyMatch = true;
-      // Reveal the matching node and walk up to reveal ancestors (expanding them).
       var cur = n;
       while (cur && cur.classList && cur.classList.contains("qb-ie-node")) {
         cur.hidden = false;
@@ -214,11 +199,8 @@
     els.empty = qs("qb-ie-empty");
     if (!els.tree) return;
 
-    // Root India breadcrumb is clickable to India stats.
     renderBreadcrumb([]);
 
-    // Load the states under India immediately so the first level is browsable
-    // (and searchable) without an extra click.
     fetchChildren(ROOT_ID)
       .then(function (rows) {
         els.tree.innerHTML = "";

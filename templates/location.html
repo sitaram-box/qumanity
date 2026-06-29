@@ -26,50 +26,274 @@
     </nav>
 
     <div class="qb-location-back-row mb-3 d-flex flex-wrap gap-2 align-items-center">
-      <a href="{{ url_for('dashboard') }}" class="qb-btn qb-btn-outline btn-sm text-decoration-none"
-        >← Dashboard</a
+      <a
+        href="{{ request.referrer or url_for('index') }}"
+        class="qb-location-back-btn text-decoration-none"
+        id="qb-location-back-link"
+        >← Back</a
       >
-      {% if admin_members_list_url %}
+      {% if session.get('is_admin') and admin_members_list_url and scope in ('village', 'tehsil') %}
       <a
         href="{{ admin_members_list_url }}"
         class="qb-btn qb-btn-primary btn-sm text-decoration-none"
-        >List all members in this location</a
+        >👥 Total List of Members</a
       >
       {% endif %}
     </div>
 
-    <section class="qb-hero mb-3">
-      <h1 class="h2 mb-1">{{ location_name }}</h1>
-      <p class="qb-lead mb-2">
-        Registered users counted by <strong>current village</strong> under this geography
-        (includes all descendant villages beneath the chosen unit).
-      </p>
-      {% if geo_meta and geo_meta.zodiac_sign %}
-      <p class="text-muted small mb-0">
-        Place zodiac / element (from geography hash):
-        <span class="text-info">{{ geo_meta.zodiac_sign }}</span> ·
-        <span class="text-info">{{ geo_meta.element }}</span>
-        <span class="d-block mt-1">
-          Charts use each user’s <strong>birth Sun sign</strong> and derived element —
-          not this place assignment.
-        </span>
-      </p>
-      {% endif %}
-      {% if scope == 'village' and village_wallet_qoins is defined %}
-      <p class="small mb-0 mt-2">
-        <strong>Village Wallet:</strong>
-        <span class="text-info">{{ village_wallet_qoins }}</span> Karma Points
-        <span class="text-muted">(₹{{ village_wallet_rupees }})</span>
-      </p>
-      {% endif %}
-      {% if session.get('user_pk') %}
-      <button type="button" class="qb-btn qb-btn-primary btn-sm mt-2" id="qb-location-donate-open">
-        Donate to this Location
-      </button>
+    <section class="qb-location-header mb-4">
+      <div class="qb-location-name-section">
+        <h1 class="qb-location-name">{{ location_name }}</h1>
+      </div>
+
+      {% if wallet_key or scope in ('village', 'tehsil', 'district', 'state', 'zone', 'country', 'continent', 'earth') %}
+      <div class="qb-location-wallet-section">
+        <div class="qb-location-wallet-card">
+          <div class="qb-location-wallet-icon" aria-hidden="true">
+            <img
+              src="{{ url_for('static', filename='images/wallet-icon.svg') }}"
+              alt=""
+              width="28"
+              height="28"
+            />
+          </div>
+          <div class="qb-location-wallet-info">
+            <div class="qb-location-wallet-row">
+              <span class="qb-location-wallet-label">💰 {{ scope|capitalize }} Wallet</span>
+              <span class="qb-location-wallet-amount">{{ location_wallet_qoins|default(0) }} Qoins</span>
+            </div>
+            <div class="qb-location-wallet-row">
+              <span class="qb-location-wallet-label">🌟 Karma Points</span>
+              <span class="qb-location-wallet-amount">{{ location_wallet_karma|default(wallet_balance|default(0)) }}</span>
+            </div>
+            {% if location_wallet_rupees|default(0) %}
+            <div class="qb-location-wallet-row">
+              <span class="qb-location-wallet-label">Value</span>
+              <span class="qb-location-wallet-amount">₹{{ location_wallet_rupees }}</span>
+            </div>
+            {% endif %}
+          </div>
+          {% if session.get('user_pk') %}
+          <button
+            type="button"
+            class="qb-location-donate-btn"
+            id="qb-location-donate-open"
+          >
+            💝 Donate
+          </button>
+          {% endif %}
+        </div>
+      </div>
       {% endif %}
     </section>
 
     {% include "_location_breakdowns.html" %}
+
+    {% if scope == 'earth' and continents %}
+    <section class="qb-panel qb-location-hierarchy mb-4" aria-labelledby="qb-location-continents-heading">
+      <h2 id="qb-location-continents-heading" class="h6 mb-3">Continents on {{ location_name }}</h2>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Continent Name</th>
+              <th class="text-end">Number of Users</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for continent in continents %}
+            <tr>
+              <td>
+                <a href="{{ url_for('location_continent', continent_id=continent.id) }}" class="text-info text-decoration-none">
+                  {{ continent.name }}
+                </a>
+              </td>
+              <td class="text-end font-monospace">{{ continent.user_count }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+    {% endif %}
+
+    {% if scope == 'continent' and countries %}
+    <section class="qb-panel qb-location-hierarchy mb-4" aria-labelledby="qb-location-countries-heading">
+      <h2 id="qb-location-countries-heading" class="h6 mb-3">Countries in {{ location_name }}</h2>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Country Name</th>
+              <th class="text-end">Number of Users</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for country in countries %}
+            <tr>
+              <td>
+                <a href="{{ url_for('location_country', country_id=country.id) }}" class="text-info text-decoration-none">
+                  {{ country.name }}
+                </a>
+              </td>
+              <td class="text-end font-monospace">{{ country.user_count }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+    {% endif %}
+
+    {% if scope == 'country' and country_children %}
+    <section class="qb-panel qb-location-hierarchy mb-4" aria-labelledby="qb-location-country-children-heading">
+      <h2 id="qb-location-country-children-heading" class="h6 mb-3">
+        {% if country_child_scope == 'zone' %}Zones{% else %}States{% endif %} in {{ location_name }}
+      </h2>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th>
+                {% if country_child_scope == 'zone' %}Zone Name{% else %}State Name{% endif %}
+              </th>
+              <th class="text-end">Number of Users</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for child in country_children %}
+            <tr>
+              <td>
+                {% if country_child_scope == 'zone' %}
+                <a href="{{ url_for('location_zone', zone_id=child.id) }}" class="text-info text-decoration-none">
+                  {{ child.name }}
+                </a>
+                {% else %}
+                <a href="{{ url_for('location_state', state_id=child.id) }}" class="text-info text-decoration-none">
+                  {{ child.name }}
+                </a>
+                {% endif %}
+              </td>
+              <td class="text-end font-monospace">{{ child.user_count }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+    {% endif %}
+
+    {% if scope == 'zone' and states %}
+    <section class="qb-panel qb-location-hierarchy mb-4" aria-labelledby="qb-location-states-heading">
+      <h2 id="qb-location-states-heading" class="h6 mb-3">States in {{ location_name }}</h2>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th>State Name</th>
+              <th class="text-end">Number of Users</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for state in states %}
+            <tr>
+              <td>
+                <a href="{{ url_for('location_state', state_id=state.id) }}" class="text-info text-decoration-none">
+                  {{ state.name }}
+                </a>
+              </td>
+              <td class="text-end font-monospace">{{ state.user_count }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+    {% endif %}
+
+    {% if scope == 'state' and districts %}
+    <section class="qb-panel qb-location-hierarchy mb-4" aria-labelledby="qb-location-districts-heading">
+      <h2 id="qb-location-districts-heading" class="h6 mb-3">Districts in {{ location_name }}</h2>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th>District Name</th>
+              <th class="text-end">Number of Users</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for district in districts %}
+            <tr>
+              <td>
+                <a href="{{ url_for('location_district', district_id=district.id) }}" class="text-info text-decoration-none">
+                  {{ district.name }}
+                </a>
+              </td>
+              <td class="text-end font-monospace">{{ district.user_count }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+    {% endif %}
+
+    {% if scope == 'district' and tehsils %}
+    <section class="qb-panel qb-location-hierarchy mb-4" aria-labelledby="qb-location-tehsils-heading">
+      <h2 id="qb-location-tehsils-heading" class="h6 mb-3">Tehsils in {{ location_name }}</h2>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Tehsil Name</th>
+              <th class="text-end">Number of Users</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for tehsil in tehsils %}
+            <tr>
+              <td>
+                <a href="{{ url_for('location_tehsil', tehsil_id=tehsil.id) }}" class="text-info text-decoration-none">
+                  {{ tehsil.name }}
+                </a>
+              </td>
+              <td class="text-end font-monospace">{{ tehsil.user_count }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+    {% endif %}
+
+    {% if scope == 'tehsil' and villages %}
+    <section class="qb-panel qb-location-hierarchy mb-4" aria-labelledby="qb-location-villages-heading">
+      <h2 id="qb-location-villages-heading" class="h6 mb-3">Villages in {{ location_name }}</h2>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Village Name</th>
+              <th class="text-end">Number of Users</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for village in villages %}
+            <tr>
+              <td>
+                <a href="{{ url_for('location_village', village_id=village.id) }}" class="text-info text-decoration-none">
+                  {{ village.name }}
+                </a>
+              </td>
+              <td class="text-end font-monospace">{{ village.user_count }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+    {% endif %}
   </div>
 
   <aside class="qb-location-zodiac-rail" aria-label="Zodiac sign counts by element">
@@ -100,18 +324,6 @@
       </ul>
     </div>
     {% endfor %}
-    {% endif %}
-    {% if wallet_key %}
-    <div class="qb-zodiac-rail-block qb-location-wallet-box">
-      <div class="qb-zodiac-rail-title">Village Wallet</div>
-      <div class="qb-location-wallet-name">{{ location_name }}</div>
-      <div class="qb-location-wallet-balance">
-        {{ wallet_balance }} <span>Karma Points</span>
-      </div>
-      {% if wallet_account_id %}
-      <div class="qb-location-wallet-id font-monospace">{{ wallet_account_id }}</div>
-      {% endif %}
-    </div>
     {% endif %}
   </aside>
 </div>
@@ -174,6 +386,6 @@
     locationName: {{ location_name|tojson }}
   };
 </script>
-<script src="{{ url_for('static', filename='location.js') }}?v=2"></script>
+<script src="{{ url_for('static', filename='location.js') }}?v=3"></script>
 <script src="{{ url_for('static', filename='planetary.js') }}?v=8"></script>
 {% endblock %}

@@ -1,0 +1,105 @@
+/* Zodiac election voting machine — fixed bottom-right */
+.qb-voting-machine {
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  z-index: 1040;
+  max-width: min(22rem, calc(100vw - 2rem));
+}
+
+.qb-voting-machine-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+
+.qb-voting-machine-panel {
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  background: var(--qb-surface, #1e293b);
+  border: 1px solid var(--qb-border, #475569);
+  border-radius: 0.5rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  color: var(--qb-text, #f8fafc);
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.qb-vm-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.qb-vm-header strong {
+  flex: 1;
+}
+
+.qb-vm-phase {
+  font-size: 0.75rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 0.25rem;
+  background: var(--qb-secondary, #3b82f6);
+  color: #fff;
+}
+
+.qb-vm-phase[data-phase="voting"] {
+  background: var(--qb-primary, #f59e0b);
+  color: #000;
+}
+
+.qb-vm-phase[data-phase="closed"] {
+  background: var(--qb-border, #475569);
+  color: #fff;
+}
+
+.qb-vm-close {
+  min-width: 2rem;
+  padding: 0.1rem 0.4rem;
+  line-height: 1.2;
+}
+
+.qb-vm-candidate {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid var(--qb-border, #475569);
+  font-size: 0.875rem;
+}
+
+.qb-vm-candidate:last-child {
+  border-bottom: none;
+}
+
+.qb-vm-candidate.is-winner {
+  color: var(--qb-success, #10b981);
+  font-weight: 600;
+}
+
+.qb-vm-countdown {
+  margin-bottom: 0.5rem;
+}
+
+.qb-vm-inactive {
+  margin: 0.5rem 0 0.75rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: 0.35rem;
+  background: rgba(71, 85, 105, 0.35);
+  color: var(--qb-muted, #94a3b8);
+  line-height: 1.4;
+}
+
+.qb-vm-phase[data-phase="inactive"] {
+  background: var(--qb-border, #475569);
+  color: #fff;
+}
+
+@media (max-width: 576px) {
+  .qb-voting-machine {
+    bottom: 0.5rem;
+    right: 0.5rem;
+  }
+}

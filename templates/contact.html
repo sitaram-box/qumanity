@@ -11,22 +11,195 @@
   </p>
 </section>
 
-<section class="qb-card qb-card-surface p-4 mt-3">
-  <h2 class="h5 mb-3">SITA Foundation</h2>
-  <p class="mb-2">Sekyor Intelligence Tantra Foundation</p>
-  <ul class="list-unstyled mb-0">
-    <li class="mb-2">
-      <strong>Website:</strong>
-      <a href="https://qumanity.in">https://qumanity.in</a>
-    </li>
-    <li class="mb-2">
-      <strong>Email:</strong>
-      <a href="mailto:founder@qumanity.in">founder@qumanity.in</a>
-    </li>
-    <li class="mb-2">
-      <strong>GitHub:</strong>
-      <a href="https://github.com/sitaram-box/QUMANITY">github.com/sitaram-box/QUMANITY</a>
-    </li>
-  </ul>
-</section>
+<div class="qb-contact-layout">
+  <section class="qb-card qb-card-surface p-4 qb-contact-info">
+    <h2 class="h5 mb-3">SITA Foundation</h2>
+    <p class="mb-2">Sekyor Intelligence Tantra Foundation</p>
+    <ul class="list-unstyled mb-0">
+      <li class="mb-2">
+        <strong>Website:</strong>
+        <a href="https://qumanity.in">https://qumanity.in</a>
+      </li>
+      <li class="mb-2">
+        <strong>Email:</strong>
+        <a href="mailto:founder@qumanity.in">founder@qumanity.in</a>
+      </li>
+      <li class="mb-2">
+        <strong>GitHub:</strong>
+        <a href="https://github.com/sitaram-box/QUMANITY">github.com/sitaram-box/QUMANITY</a>
+      </li>
+    </ul>
+  </section>
+
+  <section class="qb-card qb-card-surface p-4 qb-contact-form-wrap" aria-labelledby="contact-form-heading">
+    <h2 id="contact-form-heading" class="h5 mb-3">Send a Message</h2>
+    <p class="small text-muted mb-3">
+      Your message will be sent to <a href="mailto:founder@qumanity.in">founder@qumanity.in</a>.
+    </p>
+
+    <div
+      class="qb-alert qb-alert-success mb-3"
+      id="contact-success-alert"
+      role="status"
+      hidden
+    ></div>
+    <div
+      class="qb-alert qb-alert-error mb-3"
+      id="contact-error-alert"
+      role="alert"
+      hidden
+    ></div>
+
+    <form id="contact-form" class="qb-form qb-contact-form" novalidate>
+      <div class="visually-hidden" aria-hidden="true">
+        <label for="contact-website">Website</label>
+        <input type="text" id="contact-website" name="website" tabindex="-1" autocomplete="off" />
+      </div>
+      <div class="qb-form-group mb-3">
+        <label for="contact-name">Name <span class="text-danger">*</span></label>
+        <input
+          type="text"
+          class="form-control qb-form-control"
+          id="contact-name"
+          name="name"
+          required
+          maxlength="120"
+          autocomplete="name"
+        />
+        <p class="small text-danger mb-0 mt-1" id="contact-name-error" hidden></p>
+      </div>
+      <div class="qb-form-group mb-3">
+        <label for="contact-email">Email <span class="text-danger">*</span></label>
+        <input
+          type="email"
+          class="form-control qb-form-control"
+          id="contact-email"
+          name="email"
+          required
+          maxlength="254"
+          autocomplete="email"
+        />
+        <p class="small text-danger mb-0 mt-1" id="contact-email-error" hidden></p>
+      </div>
+      <div class="qb-form-group mb-3">
+        <label for="contact-message">Message <span class="text-danger">*</span></label>
+        <textarea
+          class="form-control qb-form-control"
+          id="contact-message"
+          name="message"
+          rows="6"
+          required
+          maxlength="5000"
+        ></textarea>
+        <p class="small text-danger mb-0 mt-1" id="contact-message-error" hidden></p>
+      </div>
+      <button type="submit" class="qb-btn qb-btn-primary" id="contact-submit-btn">
+        Send Message
+      </button>
+    </form>
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    var form = document.getElementById("contact-form");
+    if (!form) return;
+
+    var successAlert = document.getElementById("contact-success-alert");
+    var errorAlert = document.getElementById("contact-error-alert");
+    var submitBtn = document.getElementById("contact-submit-btn");
+
+    function hideFieldErrors() {
+      ["name", "email", "message"].forEach(function (field) {
+        var el = document.getElementById("contact-" + field + "-error");
+        if (el) {
+          el.hidden = true;
+          el.textContent = "";
+        }
+      });
+    }
+
+    function showFieldError(field, message) {
+      var el = document.getElementById("contact-" + field + "-error");
+      if (el) {
+        el.textContent = message;
+        el.hidden = false;
+      }
+    }
+
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      hideFieldErrors();
+      if (successAlert) successAlert.hidden = true;
+      if (errorAlert) errorAlert.hidden = true;
+
+      var payload = {
+        name: (document.getElementById("contact-name").value || "").trim(),
+        email: (document.getElementById("contact-email").value || "").trim(),
+        message: (document.getElementById("contact-message").value || "").trim(),
+        website: (document.getElementById("contact-website").value || "").trim(),
+      };
+
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Sending…";
+      }
+
+      fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        body: JSON.stringify(payload),
+      })
+        .then(function (response) {
+          return response.json().then(function (data) {
+            return { ok: response.ok, data: data };
+          });
+        })
+        .then(function (result) {
+          if (result.ok && result.data && result.data.ok) {
+            if (successAlert) {
+              successAlert.textContent =
+                result.data.message || "Thank you! Your message has been sent.";
+              successAlert.hidden = false;
+            }
+            form.reset();
+            if (window.qbToast) {
+              window.qbToast(result.data.message || "Message sent!", "success");
+            }
+            return;
+          }
+          if (result.data && result.data.errors) {
+            Object.keys(result.data.errors).forEach(function (field) {
+              showFieldError(field, result.data.errors[field]);
+            });
+          }
+          var errMsg =
+            (result.data && result.data.error) ||
+            "Could not send your message. Please try again or email founder@qumanity.in directly.";
+          if (errorAlert) {
+            errorAlert.textContent = errMsg;
+            errorAlert.hidden = false;
+          }
+          if (window.qbToast) window.qbToast(errMsg, "error");
+        })
+        .catch(function () {
+          var errMsg =
+            "Network error. Please try again or email founder@qumanity.in directly.";
+          if (errorAlert) {
+            errorAlert.textContent = errMsg;
+            errorAlert.hidden = false;
+          }
+          if (window.qbToast) window.qbToast(errMsg, "error");
+        })
+        .finally(function () {
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = "Send Message";
+          }
+        });
+    });
+  })();
+</script>
 {% endblock %}

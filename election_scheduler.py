@@ -18,8 +18,16 @@ from typing import Callable
 # --- Target scope (prototype) ------------------------------------------------
 TARGET_VILLAGE_ID = "0.राम|IND/CS/DL.5.4.1E"
 
-# Elections paused until Gemini month and explicit owner instruction.
-ELECTIONS_ENABLED = False
+# Elections: enabled via DEMO_MODE / ELECTIONS_ENABLED env (see config.py).
+try:
+    import config as _election_config
+
+    ELECTIONS_ENABLED = bool(
+        getattr(_election_config, "ELECTIONS_ENABLED", False)
+        or getattr(_election_config, "DEMO_MODE", False)
+    )
+except ImportError:
+    ELECTIONS_ENABLED = False
 
 SendFn = Callable[[sqlite3.Connection, str, str, str], str]
 

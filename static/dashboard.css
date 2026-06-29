@@ -1981,8 +1981,23 @@ body.qb-page-dashboard header.qb-navbar {
   font-size: 0.82rem;
 }
 
-.qb-view-stats-link {
+.qb-view-stats-link,
+.btn-statistics {
   font-size: 0.9rem;
+}
+
+.qb-public-action-btns .btn-statistics.qb-btn-primary {
+  background: var(--qb-topbar-accent);
+  color: #000000;
+  border: none;
+  font-weight: 600;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.qb-public-action-btns .btn-statistics.qb-btn-primary:hover {
+  background: #f5c800;
+  color: #000000;
+  transform: translateY(-1px);
 }
 
 /* Location explorer */

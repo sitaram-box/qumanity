@@ -1,10 +1,12 @@
-{# SITA Foundation + Qumanity wordmark — include inside .qb-brand link #}
+{# Top-left brand: Surya icon + Qumanity wordmark — include inside .qb-brand link #}
 <div class="qb-logo-container qb-logo-left">
-  <div class="qb-sita-block">
-    <span class="qb-sita-logo">SITA</span>
-    <span class="qb-foundation-logo">Foundation</span>
-  </div>
-  <div class="qb-logo-divider" aria-hidden="true"></div>
+  <img
+    src="{{ url_for('static', filename='images/surya.png') }}"
+    alt="Surya"
+    class="qb-header-surya-icon"
+    width="80"
+    height="80"
+  />
   <div class="qb-qumanity-block">
     <span class="qb-qumanity-logo">Qumanity</span>
   </div>

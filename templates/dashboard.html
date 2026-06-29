@@ -13,7 +13,7 @@
 />
 <link
   rel="stylesheet"
-  href="{{ url_for('static', filename='dashboard.css') }}?v=17"
+  href="{{ url_for('static', filename='dashboard.css') }}?v=18"
 />
 <link rel="stylesheet" href="{{ url_for('static', filename='qsi.css') }}?v=1" />
 {% endblock %}
@@ -21,9 +21,9 @@
 {% block header_inner %}
 <div class="qb-dash-header-inner d-flex flex-wrap align-items-center justify-content-between w-100 gap-3">
   <a
-    href="{{ url_for('index') }}"
+    href="{{ url_for('logo_redirect') }}"
     class="qb-brand qb-brand-with-logo text-decoration-none"
-    aria-label="Qumanity home"
+    aria-label="Qumanity"
   >
     {% include "_brand_logo.html" %}
   </a>
@@ -889,22 +889,18 @@
                 <p id="qb-public-feed-empty" class="small text-muted mb-0" hidden>No posts at this level yet.</p>
               </div>
             </div>
-            <aside class="qb-public-stats-col" aria-label="Statistics for selected tab">
-              <div class="qb-dash-inline-stats qb-panel qb-public-stats-panel">
-                <div class="qb-users-in-scope">
-                  <strong id="qb-public-total" class="text-info">—</strong>
-                  <span class="text-uppercase small ms-1">{{ 'human_member'|tr }}</span>
-                </div>
-                <div class="qb-public-action-btns d-flex flex-column gap-2 mb-2 mt-2">
-                {% if user.is_admin %}
-                  <button
-                    type="button"
-                    class="qb-btn qb-btn-primary btn-sm"
-                    id="qb-admin-village-members-btn"
+            <aside class="qb-public-actions-col" aria-label="Location actions">
+              <div class="qb-panel qb-public-actions-panel">
+                <div class="qb-public-action-btns d-flex flex-column gap-2 mb-2">
+                {% if show_public_location_statistics %}
+                  <a
+                    href="{{ user_village_stats_url or user_tehsil_stats_url or user_district_stats_url or user_state_stats_url or '#' }}"
+                    class="qb-btn qb-btn-primary btn-sm btn-statistics text-decoration-none"
+                    id="qb-public-location-stats-link"
                     hidden
                   >
-                    {{ 'all_village_members'|tr }}
-                  </button>
+                    📊 Statistics
+                  </a>
                 {% endif %}
                   <button type="button" class="qb-btn qb-btn-outline btn-sm" id="qb-village-services-btn">
                     {{ 'village_services'|tr }}
@@ -913,33 +909,9 @@
                     {{ 'elections'|tr }}
                   </button>
                 </div>
-                <p class="mb-2 mt-0">
-                  <a class="qb-view-stats-link" id="qb-public-village-stats-link" href="{{ user_village_stats_url }}"
-                    >{{ 'open_full_statistics_page'|tr }}</a
-                  >
-                  <span class="text-muted small"> {{ 'your_village_suffix'|tr }}</span>
-                </p>
                 {% with panel_id='public', show_appoint_buttons=user.is_admin %}
                 {% include 'leadership_section.html' %}
                 {% endwith %}
-                <h4 class="h6 mt-3 mb-2 text-secondary text-uppercase small">{{ 'by_gender'|tr }}</h4>
-                <div class="qb-mini-table-wrap">
-                  <table class="table table-sm table-borderless text-secondary mb-0" id="qb-public-gender-table">
-                    <tbody></tbody>
-                  </table>
-                </div>
-                <h4 class="h6 mt-3 mb-2 text-secondary text-uppercase small">{{ 'by_zodiac_element'|tr }}</h4>
-                <div class="qb-mini-table-wrap">
-                  <table class="table table-sm table-borderless text-secondary mb-0" id="qb-public-element-table">
-                    <tbody></tbody>
-                  </table>
-                </div>
-                <h4 class="h6 mt-3 mb-2 text-secondary text-uppercase small">{{ 'by_age_group'|tr }}</h4>
-                <div class="qb-mini-table-wrap">
-                  <table class="table table-sm table-borderless text-secondary mb-0" id="qb-public-life-table">
-                    <tbody></tbody>
-                  </table>
-                </div>
               </div>
             </aside>
           </div>
@@ -959,7 +931,7 @@
         hidden
       >
         <h2 id="dash-global-heading" class="visually-hidden">{{ 'global_account'|tr }}</h2>
-        <section class="qb-global-timeline no-gap" aria-label="Global statistics">
+        <section class="qb-global-timeline no-gap" aria-label="Global timeline">
           <div class="location-tabs-row qb-location-tabs qb-js-global-tabs" role="tablist" aria-label="Global levels">
             <button
               type="button"
@@ -1032,36 +1004,23 @@
                 <p id="qb-global-feed-empty" class="small text-muted mb-0" hidden>No posts at this level yet.</p>
               </div>
             </div>
-            <aside class="qb-public-stats-col" aria-label="Global statistics for selected tab">
-              <div class="qb-dash-inline-stats qb-panel qb-public-stats-panel">
-            <div class="qb-users-in-scope">
-              <strong id="qb-global-total" class="text-info">—</strong>
-              <span class="text-uppercase small ms-1">{{ 'human_member'|tr }}</span>
-            </div>
-            <p class="mb-2 mt-2">
-              <a class="qb-view-stats-link" id="qb-global-stats-link" href="#">{{ 'open_full_statistics_page'|tr }}</a>
-            </p>
-            {% with panel_id='global', show_appoint_buttons=user.is_admin %}
-            {% include 'leadership_section.html' %}
-            {% endwith %}
-            <h4 class="h6 mt-3 mb-2 text-secondary text-uppercase small">{{ 'by_gender'|tr }}</h4>
-            <div class="qb-mini-table-wrap">
-              <table class="table table-sm table-borderless text-secondary mb-0" id="qb-global-gender-table">
-                <tbody></tbody>
-              </table>
-            </div>
-            <h4 class="h6 mt-3 mb-2 text-secondary text-uppercase small">{{ 'by_zodiac_element'|tr }}</h4>
-            <div class="qb-mini-table-wrap">
-              <table class="table table-sm table-borderless text-secondary mb-0" id="qb-global-element-table">
-                <tbody></tbody>
-              </table>
-            </div>
-            <h4 class="h6 mt-3 mb-2 text-secondary text-uppercase small">{{ 'by_age_group'|tr }}</h4>
-            <div class="qb-mini-table-wrap">
-              <table class="table table-sm table-borderless text-secondary mb-0" id="qb-global-life-table">
-                <tbody></tbody>
-              </table>
-            </div>
+            <aside class="qb-public-actions-col" aria-label="Global location actions">
+              <div class="qb-panel qb-public-actions-panel">
+                {% if show_global_location_statistics %}
+                <div class="qb-public-action-btns d-flex flex-column gap-2 mb-2">
+                  <a
+                    href="{{ user_earth_stats_url or user_continent_stats_url or user_country_stats_url or user_zone_stats_url or '#' }}"
+                    class="qb-btn qb-btn-primary btn-sm btn-statistics text-decoration-none"
+                    id="qb-global-location-stats-link"
+                    hidden
+                  >
+                    📊 Statistics
+                  </a>
+                </div>
+                {% endif %}
+                {% with panel_id='global', show_appoint_buttons=user.is_admin %}
+                {% include 'leadership_section.html' %}
+                {% endwith %}
               </div>
             </aside>
           </div>

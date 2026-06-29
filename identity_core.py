@@ -719,9 +719,48 @@ def get_or_create_economic_account(
     return account_id
 
 
-def send_email_notification(to_email: str, subject: str, body: str) -> None:
-    logger.info("[EMAIL -> %s] %s\n%s", to_email, subject, body)
-    print(f"[EMAIL -> {to_email}] {subject}\n{body}")
+def send_email_notification(
+    to_email: str,
+    subject: str,
+    body: str,
+    *,
+    reply_to: str | None = None,
+) -> bool:
+    """Send email via SMTP when configured; otherwise log to console."""
+    import smtplib
+    from email.message import EmailMessage
+
+    import config
+
+    to_email = (to_email or "").strip()
+    if not to_email:
+        return False
+
+    if not (config.MAIL_SERVER or "").strip():
+        logger.info("[EMAIL -> %s] %s\n%s", to_email, subject, body)
+        print(f"[EMAIL -> {to_email}] {subject}\n{body}")
+        return True
+
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = (config.MAIL_DEFAULT_SENDER or config.MAIL_USERNAME or "").strip()
+    msg["To"] = to_email
+    if reply_to:
+        msg["Reply-To"] = reply_to.strip()
+    msg.set_content(body)
+
+    try:
+        with smtplib.SMTP(config.MAIL_SERVER, config.MAIL_PORT, timeout=30) as smtp:
+            if config.MAIL_USE_TLS:
+                smtp.starttls()
+            if config.MAIL_USERNAME:
+                smtp.login(config.MAIL_USERNAME, config.MAIL_PASSWORD)
+            smtp.send_message(msg)
+        logger.info("Email sent to %s: %s", to_email, subject)
+        return True
+    except Exception:
+        logger.exception("Failed to send email to %s", to_email)
+        raise
 
 
 def send_sms_notification(phone: str, message: str) -> None:

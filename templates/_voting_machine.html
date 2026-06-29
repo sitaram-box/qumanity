@@ -1,0 +1,56 @@
+{# Floating zodiac election voting machine — bottom-right on public / global pages #}
+<div
+  id="qb-voting-machine"
+  class="qb-voting-machine"
+  data-level-type="{{ voting_machine_level|default('earth') }}"
+  data-location-id="{{ voting_machine_location_id|default('0.राम|0') }}"
+  hidden
+>
+  <button
+    type="button"
+    class="qb-voting-machine-toggle qb-btn qb-btn-primary"
+    id="qb-voting-machine-toggle"
+    aria-expanded="false"
+    aria-controls="qb-voting-machine-panel"
+  >
+    <span class="qb-vm-icon" aria-hidden="true">🗳️</span>
+    <span class="qb-vm-label">Elections</span>
+  </button>
+  <div
+    id="qb-voting-machine-panel"
+    class="qb-voting-machine-panel"
+    role="region"
+    aria-label="Zodiac election voting machine"
+    hidden
+  >
+    <header class="qb-vm-header">
+      <strong id="qb-vm-sign">—</strong>
+      <span id="qb-vm-phase" class="qb-vm-phase">—</span>
+      <button
+        type="button"
+        class="qb-vm-close qb-btn qb-btn-neutral btn-sm"
+        id="qb-voting-machine-close"
+        aria-label="Close voting machine"
+      >
+        ×
+      </button>
+    </header>
+    <div id="qb-vm-inactive" class="qb-vm-inactive small" hidden></div>
+    <div id="qb-vm-active-body">
+      <div id="qb-vm-countdown" class="qb-vm-countdown small text-muted" hidden></div>
+      <div id="qb-vm-candidates" class="qb-vm-candidates"></div>
+      <div id="qb-vm-turnout" class="qb-vm-turnout small text-muted"></div>
+      <details class="qb-vm-past">
+        <summary>Past results</summary>
+        <ul id="qb-vm-past-list" class="list-unstyled small mb-0"></ul>
+      </details>
+      <a
+        href="{{ url_for('dashboard') }}"
+        class="qb-btn qb-btn-secondary btn-sm w-100 mt-2 text-decoration-none"
+        id="qb-vm-vote-link"
+      >
+        Vote in Dashboard
+      </a>
+    </div>
+  </div>
+</div>

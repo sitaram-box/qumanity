@@ -119,10 +119,30 @@
     });
   }
 
+  function buildLocationStatsUrl(scope, locationId) {
+    if (!scope || !locationId) return "#";
+    return (
+      "/location/" +
+      scope +
+      "/" +
+      String(locationId)
+        .split("/")
+        .map(function (part) {
+          return encodeURIComponent(part);
+        })
+        .join("/")
+    );
+  }
+
   var dashCfg = {
     userHierarchy: [],
-    villageStatsUrl: "#",
     defaultVillageId: "",
+    showPublicLocationStatistics: false,
+    showGlobalEarthStatistics: false,
+    showGlobalContinentStatistics: false,
+    showGlobalZoneStatistics: false,
+    showGlobalCountryStatistics: false,
+    showGlobalLocationStatistics: false,
     postFormLocationId: "",
     quantumPunchVillageId: "",
     userContinentId: "",
@@ -589,7 +609,7 @@
         setExplorerMode(tab);
         if (tab === "global") {
           initGlobalTreeOnce();
-          loadGlobalPanelStats();
+          loadGlobalPanel();
         }
       } else {
         if (exPublic) exPublic.hidden = true;
@@ -620,7 +640,7 @@
     }
     if (t0 === "global") {
       initGlobalTreeOnce();
-      loadGlobalPanelStats();
+      loadGlobalPanel();
     }
   }
 
@@ -669,72 +689,6 @@
       });
     });
   })();
-
-  /* --- Stats table helpers --- */
-  function fillMapTable(tbody, dataMap, order) {
-    if (!tbody) return;
-    tbody.innerHTML = "";
-    order.forEach(function (key) {
-      var tr = document.createElement("tr");
-      var c = (dataMap && dataMap[key]) || 0;
-      tr.innerHTML =
-        "<td>" +
-        escHtml(uiTrLabel(key)) +
-        "</td><td class='text-end font-monospace'>" +
-        c +
-        "</td>";
-      tbody.appendChild(tr);
-    });
-  }
-
-  var G_ORDER = ["Male", "Female"];
-  var E_ORDER = ["Fire", "Earth", "Air", "Water"];
-  var L_ORDER = ["Balak", "Yuvak", "Vridh", "Sanyas"];
-
-  function applyStatsPayload(prefix, payload) {
-    text(document.getElementById(prefix + "-total"), String(payload.total_users ?? 0));
-    var g = payload.gender_counts || {};
-    var e = payload.element_counts || {};
-    var l = payload.life_stage_counts || {};
-    fillMapTable(
-      document.querySelector("#" + prefix + "-gender-table tbody"),
-      g,
-      G_ORDER
-    );
-    fillMapTable(
-      document.querySelector("#" + prefix + "-element-table tbody"),
-      e,
-      E_ORDER
-    );
-    fillMapTable(
-      document.querySelector("#" + prefix + "-life-table tbody"),
-      l,
-      L_ORDER
-    );
-    if (prefix === "qb-global") {
-      var gl = document.getElementById("qb-global-stats-link");
-      if (gl && payload.stats_url) gl.setAttribute("href", payload.stats_url);
-      if (payload.zone_name) {
-        var zt = document.getElementById("qb-global-tab-zone");
-        if (zt && (payload.scope === "zone" || zt.classList.contains("is-active"))) {
-          zt.querySelector(".qb-location-tab-name").textContent = payload.zone_name;
-        }
-      }
-    }
-  }
-
-  function loadPublicStats(locationId) {
-    if (!locationId) return;
-    fetchJson("/api/dashboard/public_stats?location_id=" + encodeURIComponent(locationId))
-      .then(function (x) {
-        if (!x.ok) throw new Error(x.body.error || "stats failed");
-        applyStatsPayload("qb-public", x.body);
-      })
-      .catch(function (err) {
-        text(document.getElementById("qb-public-total"), "—");
-        console.error("Public stats failed:", err);
-      });
-  }
 
   function timeAgo(value) {
     if (!value) return "";
@@ -4230,9 +4184,19 @@
       });
       var lid = tab.getAttribute("data-location-id") || "";
       var sc = tab.getAttribute("data-scope") || "";
-      var villageMembersBtn = document.getElementById("qb-admin-village-members-btn");
-      if (villageMembersBtn) {
-        villageMembersBtn.hidden = !dashCfg.isAdmin || sc !== "village";
+      var statsBtn = document.getElementById("qb-public-location-stats-link");
+      if (statsBtn) {
+        var showStats =
+          dashCfg.showPublicLocationStatistics &&
+          (sc === "village" ||
+            sc === "tehsil" ||
+            sc === "district" ||
+            sc === "state") &&
+          lid;
+        statsBtn.hidden = !showStats;
+        if (showStats) {
+          statsBtn.href = buildLocationStatsUrl(sc, lid);
+        }
       }
       var svcBtn = document.getElementById("qb-village-services-btn");
       if (svcBtn) {
@@ -4240,7 +4204,6 @@
         var svcWord = uiTr("services");
         svcBtn.textContent = scopeKey ? uiTr(scopeKey) + " " + svcWord : svcWord;
       }
-      loadPublicStats(lid);
       loadCollectiveBoard(lid, sc);
       loadLeadershipCouncil("public", sc, lid);
       if (window.qbPlanetary && window.qbPlanetary.onLocationTabChange) {
@@ -6271,7 +6234,6 @@
   }
 
   /* --- India tree (public explorer) --- */
-  var publicStatsLink = document.getElementById("qb-explorer-public-stats-link");
   var selectedPublicLabels = [];
 
   function clearPublicSelection() {
@@ -6288,17 +6250,6 @@
     ).then(function (r) {
       if (!r.ok) throw new Error("children");
       return r.json();
-    });
-  }
-
-  function fetchStatsLink(geoId) {
-    return fetch("/api/locations/stats_link?location_id=" + encodeURIComponent(geoId), {
-      credentials: "same-origin",
-      headers: { Accept: "application/json" },
-    }).then(function (r) {
-      return r.json().then(function (b) {
-        return { ok: r.ok, b: b };
-      });
     });
   }
 
@@ -6358,11 +6309,6 @@
       clearPublicSelection();
       lab.classList.add("is-selected");
       selectedPublicLabels.push(lab);
-      fetchStatsLink(id).then(function (x) {
-        if (!x.ok || !publicStatsLink) return;
-        publicStatsLink.href = x.b.stats_url || "#";
-        publicStatsLink.hidden = false;
-      });
     });
   }
 
@@ -6510,7 +6456,7 @@
       });
   }
 
-  function loadGlobalPanelStats() {
+  function loadGlobalPanel() {
     var tab = document.querySelector(".qb-js-global-tab.is-active");
     if (!tab) return;
     var scope = tab.getAttribute("data-global-scope") || "earth";
@@ -6518,11 +6464,20 @@
     if (scope === "earth") gid = gid || "0";
     activeGlobalScope = scope;
     activeGlobalGeoId = gid;
-    if (scope !== "earth" && !gid) {
-      text(document.getElementById("qb-global-total"), "—");
-      loadGlobalCollectiveBoard();
-      loadLeadershipCouncil("global", scope, scope === "earth" ? "0" : gid);
-      return;
+    var globalStatsBtn = document.getElementById("qb-global-location-stats-link");
+    if (globalStatsBtn) {
+      var showGlobalStats =
+        dashCfg.showGlobalLocationStatistics &&
+        ((scope === "earth" && dashCfg.showGlobalEarthStatistics) ||
+          (scope === "continent" &&
+            dashCfg.showGlobalContinentStatistics &&
+            gid) ||
+          (scope === "country" && dashCfg.showGlobalCountryStatistics && gid) ||
+          (scope === "zone" && dashCfg.showGlobalZoneStatistics && gid));
+      globalStatsBtn.hidden = !showGlobalStats;
+      if (showGlobalStats) {
+        globalStatsBtn.href = buildLocationStatsUrl(scope, gid);
+      }
     }
     loadLeadershipCouncil("global", scope, scope === "earth" ? "0" : gid);
     var boardTitle = document.getElementById("qb-global-board-title");
@@ -6533,27 +6488,7 @@
     if (boardSub) {
       text(boardSub, uiTr("board_subtitle_live"));
     }
-    fetch(
-      "/api/dashboard/global_stats?scope=" +
-        encodeURIComponent(scope) +
-        "&geo_id=" +
-        encodeURIComponent(gid),
-      { credentials: "same-origin", headers: { Accept: "application/json" } }
-    )
-      .then(function (r) {
-        return r.json().then(function (b) {
-          return { ok: r.ok, b: b };
-        });
-      })
-      .then(function (x) {
-        if (!x.ok) throw new Error(x.b.error || "global stats");
-        applyStatsPayload("qb-global", x.b);
-        loadGlobalCollectiveBoard();
-      })
-      .catch(function () {
-        text(document.getElementById("qb-global-total"), "—");
-        loadGlobalCollectiveBoard();
-      });
+    loadGlobalCollectiveBoard();
   }
 
   document.querySelectorAll(".qb-js-global-tab").forEach(function (tab) {
@@ -6565,7 +6500,7 @@
         t.classList.toggle("active", on);
         t.setAttribute("aria-selected", on ? "true" : "false");
       });
-      loadGlobalPanelStats();
+      loadGlobalPanel();
       if (window.qbPlanetary && window.qbPlanetary.onLocationTabChange) {
         var scope = tab.getAttribute("data-global-scope") || "";
         var gid = tab.getAttribute("data-global-id") || "";
@@ -6587,7 +6522,6 @@
     });
   });
 
-  var globalStatsLinkEx = document.getElementById("qb-explorer-global-stats-link");
   var selectedGlobalLabels = [];
 
   function clearGlobalSelection() {
@@ -6659,9 +6593,8 @@
             t.classList.toggle("is-active", on);
             t.setAttribute("aria-selected", on ? "true" : "false");
           });
-          loadGlobalPanelStats();
+          loadGlobalPanel();
         }
-        if (globalStatsLinkEx) globalStatsLinkEx.hidden = true;
         return;
       }
       if (rowKind === "continent") {
@@ -6681,11 +6614,6 @@
         var zt = document.getElementById("qb-global-tab-zone");
         if (zt && !zt.hidden) zt.click();
       }
-      fetchStatsLink(id).then(function (x) {
-        if (!x.ok || !globalStatsLinkEx) return;
-        globalStatsLinkEx.href = x.b.stats_url || "#";
-        globalStatsLinkEx.hidden = false;
-      });
     });
   }
 
@@ -7597,7 +7525,7 @@
 
   if (document.querySelector(".qb-js-global-tab")) {
     updateGlobalTabsFromSelection();
-    loadGlobalPanelStats();
+    loadGlobalPanel();
   }
 
   function parseJsonResponse(r) {
