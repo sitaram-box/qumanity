@@ -13,11 +13,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,600;0,9..40,700;1,9..40,400&display=swap"
-      rel="stylesheet"
-    />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Noto+Sans+Devanagari:wght@400;600;700&display=swap"
       rel="stylesheet"
     />
     <link
@@ -28,8 +24,18 @@
     />
     <link
       rel="stylesheet"
-      href="{{ url_for('static', filename='style.css') }}?v=29"
+      href="{{ url_for('static', filename='style.css') }}?v=30"
     />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='q-design-system.css') }}?v=1"
+    />
+    <link rel="stylesheet" href="{{ url_for('static', filename='spiritual-marquee.css') }}?v=1" />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='styles/responsive.css') }}?v=1"
+    />
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}" />
     {% block head_extra %}{% endblock %}
   </head>
   <body class="{% block body_class %}{% endblock %}">
@@ -161,9 +167,9 @@
       </div>
 
       <div class="marquee-right">
-        <button type="button" id="qb-marquee-prev" class="marquee-arrow" aria-label="Rewind within poem" title="Rewind">&#9194;</button>
+        <button type="button" id="qb-marquee-prev" class="marquee-arrow" aria-label="Previous verse" title="Previous">&#9194;</button>
         <button type="button" id="qb-marquee-playpause" aria-label="Pause" title="Pause">&#10074;&#10074;</button>
-        <button type="button" id="qb-marquee-next" class="marquee-arrow" aria-label="Forward within poem" title="Forward">&#9193;</button>
+        <button type="button" id="qb-marquee-next" class="marquee-arrow" aria-label="Next verse" title="Next">&#9193;</button>
       </div>
     </div>
 
@@ -192,13 +198,24 @@
     ></script>
     <script src="{{ url_for('static', filename='toast.js') }}?v=1"></script>
     <script src="{{ url_for('static', filename='i18n.js') }}?v=6"></script>
-    <script src="{{ url_for('static', filename='marquee.js') }}?v=9"></script>
+    <script src="{{ url_for('static', filename='marquee.js') }}?v=10"></script>
+    <script src="{{ url_for('static', filename='js/spiritual_marquee.js') }}?v=1"></script>
     {% if is_admin %}
     <script src="{{ url_for('static', filename='admin_panel.js') }}?v=1"></script>
     {% endif %}
     {% if elections_are_enabled() %}
     <script src="{{ url_for('static', filename='voting_machine.js') }}?v=1"></script>
     {% endif %}
+    <script src="{{ url_for('static', filename='js/feedback_widget.js') }}?v=1"></script>
+    {% if body_class and 'qb-page-home' in body_class %}
+    <script src="{{ url_for('static', filename='js/welcome_flow.js') }}?v=1"></script>
+    <script src="{{ url_for('static', filename='js/product_tour.js') }}?v=1"></script>
+    {% endif %}
+    <script>
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("{{ url_for('static', filename='sw.js') }}").catch(function () {});
+      }
+    </script>
     {% block scripts %}{% endblock %}
   </body>
 </html>
