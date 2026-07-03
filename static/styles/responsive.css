@@ -1,0 +1,58 @@
+/* Mobile-first responsive enhancements — Qumanity refactor */
+@media (max-width: 639px) {
+  .qb-btn,
+  .qb-location-back-btn,
+  .qb-feedback-widget-btn {
+    min-height: 48px;
+    min-width: 48px;
+  }
+
+  .qb-demo-dashboard .row {
+    flex-direction: column;
+  }
+
+  .qb-location-header {
+    flex-direction: column;
+  }
+
+  .qb-location-wallet-section {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+.qb-feedback-widget-btn {
+  position: fixed;
+  bottom: 5.5rem;
+  left: 1rem;
+  right: auto;
+  z-index: 2500;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: none;
+  background: linear-gradient(135deg, var(--qb-primary, #f59e0b), #d97706);
+  color: var(--qb-bg, #0f172a);
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.qb-feedback-widget-btn .qb-feedback-star-icon {
+  width: 24px;
+  height: 24px;
+}
+
+.qb-feedback-widget-btn:hover {
+  transform: scale(1.1) rotate(15deg);
+  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.6);
+}
+
+@media (min-width: 640px) and (max-width: 1024px) {
+  .qb-public-main-stats-grid {
+    grid-template-columns: 1fr;
+  }
+}
