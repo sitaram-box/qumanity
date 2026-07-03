@@ -1,111 +1,135 @@
 {% extends "base.html" %}
 
-{% block title %}About Qumanity – For Humanity, Harmony & Peace{% endblock %}
+{% block title %}About Qumanity — India's Quantum Governance Protocol{% endblock %}
+
+{% block head_extra %}
+<meta name="description" content="How Qumanity was born — dharma in motion, sacred technology for every village, every citizen, and the world. Stewarded by SITA Foundation." />
+<link rel="stylesheet" href="{{ url_for('static', filename='home-v2.css') }}?v=3" />
+{% endblock %}
+
+{% block body_class %}qb-page-about qb-page-redesign{% endblock %}
 
 {% block body %}
-<div class="about-container">
-    <div class="about-header">
-        <h1>Qumanity</h1>
-        <p class="subtitle">Quantum + Humanity – For Harmony, Peace &amp; Self‑Rule</p>
-        <p class="foundation">An initiative by <strong>SITA Foundation</strong></p>
+<div class="qr-page">
+
+  <section class="qr-about-hero qr-reveal" aria-labelledby="about-hero-title">
+    <div class="qr-section__inner text-center">
+      <div class="qr-about-hero__chakra mb-3 d-flex justify-content-center">
+        {% with chakra_size='lg' %}{% include '_ashok_chakra_logo.html' %}{% endwith %}
+      </div>
+      <h1 id="about-hero-title" class="qr-headline">How Qumanity Was Born</h1>
+      <p class="qr-subhead mx-auto">Dharma in motion — sacred technology for every village, every citizen, and the world.</p>
     </div>
+  </section>
 
-    <div class="about-section">
-        <h2>What is Qumanity?</h2>
-        <p><strong>Qumanity</strong> is a governance and economic platform for the people, by the people. It combines quantum technology with human values – transparency, accountability, and collective welfare.</p>
-        <p>It is an <strong>Indian product for the world</strong> – built in India, for India, but designed to serve all of humanity.</p>
+  <section class="qr-section" aria-labelledby="origin-heading">
+    <div class="qr-section__inner">
+      <h2 id="origin-heading" class="qr-section-title qr-reveal">Origin Story</h2>
+      <div class="qr-about-timeline">
+        <article class="qr-about-milestone qr-reveal">
+          <p class="qr-about-milestone__year">2011 — The Seed</p>
+          <p class="text-muted mb-0">A single mind worked in isolation — designing a system that could heal India's broken governance: transparent, karma-based, where every citizen has a voice.</p>
+        </article>
+        <article class="qr-about-milestone qr-reveal">
+          <p class="qr-about-milestone__year">2016 — The Architecture</p>
+          <p class="text-muted mb-0">The four timelines emerged. The dual-key identity. The nested geography. The Qoin economy. Each piece tested against Vedic principle and modern engineering.</p>
+        </article>
+        <article class="qr-about-milestone qr-reveal">
+          <p class="qr-about-milestone__year">2023 — The Code</p>
+          <p class="text-muted mb-0">Flask, SQLite, open source. Built to run on a Raspberry Pi in a village with intermittent electricity.</p>
+        </article>
+        <article class="qr-about-milestone qr-reveal">
+          <p class="qr-about-milestone__year">2026 — The Awakening</p>
+          <p class="text-muted mb-0">Qumanity is ready — not just software, but a companion from birth to death, for every citizen of India and the world.</p>
+        </article>
+      </div>
     </div>
+  </section>
 
-    <div class="about-section">
-        <h2>Our Mission</h2>
-        <p><strong>Harmony, Peace, and Self‑Rule</strong> for every village, every citizen, and for humanity.</p>
-        <p>Qumanity replaces corruption with transparency, dependency with self‑reliance, and silence with voice.</p>
+  <section class="qr-section qr-pillars" aria-labelledby="tech-heading">
+    <div class="qr-section__inner text-center">
+      <h2 id="tech-heading" class="qr-section-title qr-reveal">The Technology</h2>
+      <p class="qr-subhead mx-auto qr-reveal">
+        Qumanity is built on Flask (Python), SQLite/PostgreSQL, and vanilla JavaScript. It is designed to be offline-first, running on village kiosks with biometric authentication. The Planetary Ledger Node Network (PLNN) ensures no single corporation owns your data. Your village node stores your village's truth.
+      </p>
+      <div class="qr-tech-grid qr-reveal">
+        <div class="qr-tech-item">Python</div>
+        <div class="qr-tech-item">Flask</div>
+        <div class="qr-tech-item">PostgreSQL</div>
+        <div class="qr-tech-item">Docker</div>
+        <div class="qr-tech-item">Bootstrap</div>
+        <div class="qr-tech-item">D3.js</div>
+      </div>
     </div>
+  </section>
 
-    <div class="about-section">
-        <h2>The Five Pillars</h2>
-        <ul>
-            <li><strong>Nested Governance</strong> – From Village to Earth, every community has a Quantum Punch Council.</li>
-            <li><strong>Karma Ledger</strong> – Every good deed earns Karma Points. Every action is recorded.</li>
-            <li><strong>Karma Points Economy</strong> – A digital currency that stays in the village and rewards ethical behaviour.</li>
-            <li><strong>Zodiac Elections</strong> – Monthly council elections aligned with the sun's journey.</li>
-            <li><strong>Collective Intelligence</strong> – AI that serves, not controls.</li>
-        </ul>
+  <section class="qr-section" aria-labelledby="steward-heading">
+    <div class="qr-section__inner" style="max-width:720px">
+      <h2 id="steward-heading" class="qr-section-title qr-reveal">Stewardship</h2>
+      <p class="text-muted text-center qr-reveal" style="line-height:1.8">
+        Qumanity is stewarded by the <a href="{{ url_for('sita_foundation_page') }}" class="text-gold">SITA Foundation</a> (Sekyor Intelligence Tantra Foundation) — a Section 8 non-profit with no shareholders, no extraction, no data monetization. We are philosophers, engineers, governance designers, and village agents. We do not own Qumanity. We maintain it for humanity.
+      </p>
     </div>
+  </section>
 
-    <div class="philosophy-section">
-        <h2>The Five Elements of Qumanity</h2>
-        <p>
-            Qumanity is built on the ancient Vedic understanding of the five elements
-            (Pañca Mahābhūta) that constitute all existence — Space, Fire, Earth, Air
-            and Water.
-        </p>
-
-        <div class="elements-grid">
-            <div class="element-card space">
-                <h3>Space (Ākāśa)</h3>
-                <p>
-                    The container of all existence. Stores the soul and consciousness of all
-                    beings — living and departed — every past action, frozen posts, planets,
-                    nakshatras, and time itself (past, present and future).
-                </p>
-            </div>
-            <div class="element-card fire">
-                <h3>Fire (Agni)</h3>
-                <p>
-                    Represents energy, transformation, and leadership. All actions of Fire
-                    zodiac beings (Aries, Leo, Sagittarius) are recorded here.
-                </p>
-            </div>
-            <div class="element-card earth">
-                <h3>Earth (Pṛthvī)</h3>
-                <p>
-                    Represents physical form, locations, and matter. All locations — from
-                    villages to continents — and Earth zodiac beings (Taurus, Virgo,
-                    Capricorn) exist here.
-                </p>
-            </div>
-            <div class="element-card air">
-                <h3>Air (Vāyu)</h3>
-                <p>
-                    Represents communication, thoughts, and movement. All posts, messages,
-                    and ideas of Air zodiac beings (Gemini, Libra, Aquarius) flow here.
-                </p>
-            </div>
-            <div class="element-card water">
-                <h3>Water (Apas)</h3>
-                <p>
-                    Represents emotions, relationships, and community. Family trees and
-                    social connections of Water zodiac beings (Cancer, Scorpio, Pisces)
-                    live here.
-                </p>
-            </div>
-        </div>
-
-        <div class="philosophy-hierarchy">
-            <p>
-                <strong>Space (Ākāśa)</strong> contains everything — including
-                <strong>Earth (Pṛthvī)</strong>, the physical realm of villages, tehsils,
-                districts, states, zones, countries and continents. Within Earth lives the
-                <strong>human body</strong>, itself composed of the four elements: Fire,
-                Earth, Air and Water. Every human action — every emotion, feeling, thought
-                and karma from birth to death — is stored in these elements.
-            </p>
-            <p><strong>Your body is made of these five elements. Your soul resides in Space. Your actions are recorded in the elements.</strong></p>
-            <p><em>This is not just software. This is a mirror of the cosmos.</em></p>
-        </div>
+  <section class="qr-section qr-elections" aria-labelledby="philosophy-heading">
+    <div class="qr-section__inner">
+      <h2 id="philosophy-heading" class="qr-section-title qr-reveal">The Philosophy</h2>
+      <p class="text-center text-muted mb-4 qr-reveal">We draw from five sources:</p>
+      <ol class="qr-philosophy-list qr-reveal">
+        <li><strong>Vedanta</strong> — The self is one; the world is family.</li>
+        <li><strong>Quantum Physics</strong> — Reality is relational; observation creates outcome.</li>
+        <li><strong>Panchayati Raj</strong> — Power nests locally.</li>
+        <li><strong>Constitutional Democracy</strong> — Every citizen is sovereign.</li>
+        <li><strong>Open Source</strong> — Code is law; law must be transparent.</li>
+      </ol>
     </div>
+  </section>
 
-    <div class="about-section">
-        <h2>From India, for the World</h2>
-        <p>Qumanity begins in the villages of India – the cradle of Dharma, Karma, and Democracy. But its architecture is planetary. What starts as a village collective board becomes a global conversation.</p>
-        <p><strong>Qumanity is not a product. It is a promise – that technology can serve humanity, not exploit it.</strong></p>
+  <section class="qr-section" aria-labelledby="docs-heading">
+    <div class="qr-section__inner">
+      <h2 id="docs-heading" class="qr-section-title qr-reveal">Documentation</h2>
+      <p class="text-center text-muted mb-4 qr-reveal">Last updated: July 2026</p>
+      <div class="qr-download-grid qr-reveal">
+        <article class="qr-download-card">
+          <h3 class="h5 mb-2">White Paper v4.0</h3>
+          <p class="text-muted small mb-3">Complete research proposal covering governance crisis, Qumanity solution, system architecture, and implementation roadmap.</p>
+          <a
+            href="{{ url_for('white_paper') }}"
+            class="qr-btn qr-btn--primary"
+            download="Qumanity_White_Paper_v4.0.pdf"
+            target="_blank"
+            rel="noopener noreferrer"
+          >Download PDF (v4.0)</a>
+          <p class="text-muted small mt-2 mb-0">July 2026</p>
+        </article>
+        <article class="qr-download-card">
+          <h3 class="h5 mb-2">Technical Architecture v4.0</h3>
+          <p class="text-muted small mb-3">Complete engineering specification for developers, system architects, security auditors, and DevOps engineers.</p>
+          <a
+            href="{{ url_for('technical_architecture') }}"
+            class="qr-btn qr-btn--ghost"
+            download="Qumanity_Technical_Architecture_v4.0.pdf"
+            target="_blank"
+            rel="noopener noreferrer"
+          >Download PDF (v4.0)</a>
+          <p class="text-muted small mt-2 mb-0">July 2026</p>
+        </article>
+      </div>
     </div>
+  </section>
 
-    <div class="about-section">
-        <h2>Join the Movement</h2>
-        <p>Qumanity is open source. Whether you are a coder, a council member, a farmer, or a dreamer – there is a place for you here.</p>
-        <p><a href="{{ url_for('register') }}" class="qb-btn qb-btn-primary">Register your account</a> | <a href="https://github.com/sitaram-box/QUMANITY" target="_blank" rel="noopener">GitHub</a></p>
+  <section class="qr-section qr-join" aria-labelledby="about-cta-heading">
+    <div class="qr-section__inner text-center qr-reveal">
+      <h2 id="about-cta-heading" class="qr-join__title h3">There Is a Place for You Here</h2>
+      <p class="text-muted mb-4">Whether you are a coder, a council member, a farmer, or a dreamer — join the movement.</p>
+      <div class="d-flex flex-wrap gap-2 justify-content-center">
+        <a href="{{ url_for('register') }}" class="qr-btn qr-btn--primary">Register</a>
+        <a href="https://github.com/sitaram-box/QUMANITY" class="qr-btn qr-btn--dark" target="_blank" rel="noopener noreferrer">GitHub</a>
+        <a href="{{ url_for('contact') }}" class="qr-btn qr-btn--ghost">Contact</a>
+      </div>
     </div>
+  </section>
+
 </div>
 {% endblock %}

@@ -18,6 +18,7 @@ import subprocess
 import sys
 import threading
 import time
+from contextlib import contextmanager
 from datetime import date, datetime, timedelta, timezone
 from functools import wraps
 from pathlib import Path
@@ -30,7 +31,7 @@ import admin_bootstrap
 import config  # loads .env at import time; single source of truth for settings
 from blockchain_adapter import blockchain
 from blockchain_core import migrate_blockchain_schema
-from db_path import ensure_database_parent, resolve_database_path
+from db_path import configure_sqlite_connection, ensure_database_parent, resolve_database_path
 import birth_chart
 import calendar_time
 import election_scheduler
@@ -62,6 +63,7 @@ from flask import (
     redirect,
     render_template,
     request,
+    send_from_directory,
     session,
     url_for,
 )
@@ -75,7 +77,8 @@ DB_PATH = Path(DATABASE_PATH)
 def _init_db_if_needed() -> None:
     """Initialize database tables if they don't exist — runs in background."""
     try:
-        conn = sqlite3.connect(str(DB_PATH), timeout=15)
+        conn = sqlite3.connect(str(DB_PATH), timeout=15, check_same_thread=False)
+        configure_sqlite_connection(conn)
         cursor = conn.cursor()
         cursor.execute(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='users'"
@@ -960,8 +963,30 @@ def _bind_ui_language() -> None:
 
 @app.context_processor
 def inject_homepage_nav() -> dict[str, bool]:
-    """Homepage always shows Login/Register — not Dashboard — even if a session cookie exists."""
-    return {"show_public_nav": request.endpoint == "index"}
+    """Public marketing pages use guest nav (Login/Register) unless authenticated."""
+    public_endpoints = {
+        "index",
+        "about",
+        "about_details",
+        "contact",
+        "login",
+        "register",
+        "sita_foundation_page",
+    }
+    return {"show_public_nav": request.endpoint in public_endpoints and not _session_user_is_authenticated()}
+
+
+def _session_user_is_authenticated() -> bool:
+    """True only when session has a user_pk that exists in the database."""
+    pk = session.get("user_pk")
+    if not pk:
+        return False
+    try:
+        conn = get_db()
+        row = conn.execute("SELECT 1 FROM users WHERE id = ?", (int(pk),)).fetchone()
+        return row is not None
+    except Exception:
+        return False
 
 
 @app.context_processor
@@ -995,7 +1020,7 @@ def inject_language_context() -> dict[str, Any]:
         "preferred_language": lang,
         "current_language": lang,
         "language_options": options,
-        "is_logged_in": bool(session.get("user_pk")),
+        "is_logged_in": _session_user_is_authenticated(),
     }
 
 
@@ -1003,8 +1028,8 @@ def inject_language_context() -> dict[str, Any]:
 def inject_council_context() -> dict[str, Any]:
     """Expose council / mentor flags to templates (hamburger menu, Space sections)."""
     try:
-        if not session.get("user_pk"):
-            return {"is_council_member": False, "is_mentor": False}
+        if not _session_user_is_authenticated():
+            return {"is_council_member": False, "is_mentor": False, "is_admin": False}
         conn = get_db()
         user_row = getattr(g, "current_user", None)
         if user_row is None:
@@ -1078,11 +1103,27 @@ def get_db() -> sqlite3.Connection:
             ensure_database_parent(DB_PATH)
         except OSError as exc:
             app.logger.warning("ensure_database_parent: %s", exc)
-        conn = sqlite3.connect(DB_PATH, timeout=15)
+        conn = sqlite3.connect(DB_PATH, timeout=15, check_same_thread=False)
         conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA foreign_keys = ON")
+        configure_sqlite_connection(conn)
         g.db = conn
     return g.db
+
+
+@contextmanager
+def get_db_connection():
+    """Standalone connection for scripts — always closed on exit."""
+    try:
+        ensure_database_parent(DB_PATH)
+    except OSError:
+        pass
+    conn = sqlite3.connect(DB_PATH, timeout=15, check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    configure_sqlite_connection(conn)
+    try:
+        yield conn
+    finally:
+        conn.close()
 
 
 @app.teardown_appcontext
@@ -3987,6 +4028,22 @@ def _before_request() -> None:
         import qsi_core
 
         qsi_core.migrate_qsi_schema(conn)
+        import qv_core
+
+        qv_core.migrate_qv_schema(conn)
+        import family_tree_core
+
+        family_tree_core.migrate_family_tree_enhanced_schema(conn)
+        try:
+            qoin_scheduler.run_qv_auto_close_referendums_if_due(conn)
+        except sqlite3.Error:
+            app.logger.exception("qv referendum auto-close failed")
+        try:
+            qoin_scheduler.run_monthly_qv_credit_reset_if_due(
+                conn, notify_fn=send_system_message
+            )
+        except sqlite3.Error:
+            app.logger.exception("monthly QV credit reset failed")
         try:
             qsi_core.process_pending_karma_awards(conn)
         except sqlite3.Error:
@@ -4116,6 +4173,10 @@ def _geo_statistics_page(scope: str, geo_id: str) -> str:
         qoin_core.ensure_wallet(conn, "village", vid)
         village_wallet_qoins = qoin_core.wallet_balance(conn, "village", vid)
         village_wallet_rupees = qoin_core.wallet_rupee_total(conn, "village", vid)
+        try:
+            conn.commit()
+        except sqlite3.Error:
+            pass
     if scope in wallet_scopes:
         direct_wallet_id = geo_id.strip()
         direct_wallet_row = conn.execute(
@@ -4135,6 +4196,10 @@ def _geo_statistics_page(scope: str, geo_id: str) -> str:
         wallet_balance = social_core.get_wallet_balance(
             conn, "location", wallet_key
         )
+        try:
+            conn.commit()
+        except sqlite3.Error:
+            pass
     chart_prefix = (
         "geo-" + scope + "-" + hashlib.md5(geo_id.encode("utf-8")).hexdigest()[:12]
     )
@@ -4185,6 +4250,10 @@ def _geo_statistics_page(scope: str, geo_id: str) -> str:
         qoin_core.ensure_wallet(conn, scope, geo_id.strip())
         location_wallet_qoins = qoin_core.wallet_balance(conn, scope, geo_id.strip())
         location_wallet_rupees = qoin_core.wallet_rupee_total(conn, scope, geo_id.strip())
+        try:
+            conn.commit()
+        except sqlite3.Error:
+            pass
     return render_template(
         "location.html",
         scope=scope,
@@ -4431,6 +4500,63 @@ def api_location_count():
     pred, tup = user_location_predicate(conn, scope, location_id)
     row = conn.execute(f"SELECT COUNT(*) AS c FROM users u WHERE ({pred})", tup).fetchone()
     return jsonify({"count": int(row["c"]) if row else 0})
+
+
+def count_users_at_scope(
+    conn: sqlite3.Connection, scope: str, full_id: str | None
+) -> int:
+    """Count registered users whose location matches the given geo scope."""
+    pred, tup = user_location_predicate(conn, scope, full_id)
+    row = conn.execute(f"SELECT COUNT(*) AS c FROM users u WHERE ({pred})", tup).fetchone()
+    return int(row["c"]) if row else 0
+
+
+def format_compact_member_count(count: int) -> str:
+    """Human-readable compact count for location UI (e.g. 8.5K, 1.2M)."""
+    n = max(0, int(count))
+    if n >= 1_000_000:
+        return f"{n / 1_000_000:.1f}M"
+    if n >= 1_000:
+        return f"{n / 1_000:.1f}K"
+    return str(n)
+
+
+def _hierarchy_with_member_counts(
+    conn: sqlite3.Connection, hierarchy: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    enriched: list[dict[str, Any]] = []
+    for item in hierarchy:
+        row = dict(item)
+        scope = str(row.get("scope") or "").strip().lower()
+        loc_id = str(row.get("id") or "").strip()
+        members = count_users_at_scope(conn, scope, loc_id) if scope and loc_id else 0
+        row["member_count"] = members
+        row["member_count_formatted"] = format_compact_member_count(members)
+        enriched.append(row)
+    return enriched
+
+
+def _global_member_counts(
+    conn: sqlite3.Connection,
+    *,
+    continent_id: str,
+    country_id: str,
+    zone_id: str,
+    show_zone_tab: bool,
+) -> dict[str, int]:
+    counts = {
+        "earth": count_users_at_scope(conn, "earth", "0"),
+        "continent": count_users_at_scope(conn, "continent", continent_id)
+        if continent_id
+        else 0,
+        "country": count_users_at_scope(conn, "country", country_id)
+        if country_id
+        else 0,
+        "zone": 0,
+    }
+    if show_zone_tab and zone_id:
+        counts["zone"] = count_users_at_scope(conn, "zone", zone_id)
+    return counts
 
 
 def _api_create_post_core() -> tuple[Any, int]:
@@ -7715,6 +7841,111 @@ def api_family_initial_setup():
     return jsonify({"ok": True, **_family_tree_graph_payload(conn, pid)})
 
 
+@app.route("/family-setup")
+@login_required
+def family_setup_page():
+    """Dynamic family tree creation wizard."""
+    conn = get_db()
+    user_row = g.current_user
+    pid = str(user_row["private_id"])
+    profile = _family_profile_to_dict(_family_profile_row(conn, pid))
+    if profile.get("form_completed") or _initial_setup_meta(conn, pid)["completed"]:
+        return redirect(url_for("family_tree_page"))
+    ln = str(user_row["last_name"] or "").strip()
+    fn = str(user_row["first_name"] or "").strip()
+    if ln:
+        default_tree = f"{ln} Family"
+    elif fn:
+        default_tree = f"{fn}'s Family"
+    else:
+        default_tree = "My Family"
+    return render_template(
+        "family_setup.html",
+        user=user_row,
+        default_tree_name=default_tree,
+    )
+
+
+@app.post("/api/family/setup")
+@login_required
+def api_family_setup():
+    """Save dynamic family setup wizard and seed the family graph."""
+    import family_tree_core
+
+    conn = get_db()
+    pid = str(g.current_user["private_id"])
+    profile = _family_profile_to_dict(_family_profile_row(conn, pid))
+    if profile.get("form_completed"):
+        return jsonify({"error": "Family form already completed"}), 400
+    if _initial_setup_meta(conn, pid)["completed"]:
+        return jsonify({"error": "Family setup already completed"}), 400
+
+    payload = request.get_json(silent=True) or {}
+    self_id = _ensure_account_self_row(conn, pid, g.current_user)
+    try:
+        meta = family_tree_core.process_family_setup(conn, pid, self_id, payload)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    rs = meta["relationship_status"]
+    now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    answers = {
+        "relationship_status": rs,
+        "tree_name": meta.get("tree_name"),
+        "setup_version": 2,
+    }
+    j = json.dumps(answers, ensure_ascii=False)
+    ex = conn.execute(
+        "SELECT user_private_id FROM user_family_setup WHERE user_private_id = ?",
+        (pid,),
+    ).fetchone()
+    if ex:
+        conn.execute(
+            """
+            UPDATE user_family_setup
+               SET completed = 1, answers_json = ?, updated_at = ?
+             WHERE user_private_id = ?
+            """,
+            (j, now_iso, pid),
+        )
+    else:
+        conn.execute(
+            """
+            INSERT INTO user_family_setup (
+                user_private_id, completed, answers_json, created_at, updated_at
+            ) VALUES (?, 1, ?, ?, ?)
+            """,
+            (pid, j, now_iso, now_iso),
+        )
+
+    prow = _family_profile_row(conn, pid)
+    if prow:
+        conn.execute(
+            """
+            UPDATE family_profile
+               SET relationship_status = ?, updated_at = ?
+             WHERE user_private_id = ?
+            """,
+            (rs, now_iso, pid),
+        )
+    else:
+        conn.execute(
+            """
+            INSERT INTO family_profile (
+                user_private_id, form_data, form_completed, relationship_status, updated_at
+            ) VALUES (?, '{}', 0, ?, ?)
+            """,
+            (pid, rs, now_iso),
+        )
+
+    conn.commit()
+    return jsonify({
+        "ok": True,
+        "redirect": url_for("family_tree_page"),
+        **_family_tree_graph_payload(conn, pid),
+    })
+
+
 @app.post("/api/family/submit_form")
 @login_required
 def api_family_submit_form():
@@ -8371,6 +8602,212 @@ def _ensure_family_graph_defaults(
     return sid
 
 
+def _gender_to_chart_code(gender: str) -> str:
+    gl = str(gender or "").strip().lower()
+    if gl in {"male", "m"}:
+        return "M"
+    if gl in {"female", "f"}:
+        return "F"
+    return "O"
+
+
+def _dedupe_str_list(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    out: list[str] = []
+    for v in values:
+        if not v or v in seen:
+            continue
+        seen.add(v)
+        out.append(v)
+    return out
+
+
+def _chart_rels_for_member(
+    mid: int,
+    relationships: list[dict[str, Any]],
+) -> dict[str, list[str]]:
+    rels = {"parents": [], "children": [], "spouses": []}
+    for r in relationships:
+        s = int(r["source"])
+        t = int(r["target"])
+        typ = str(r.get("type") or r.get("relation_type") or "").lower()
+        if typ == "parent":
+            if t == mid:
+                rels["parents"].append(str(s))
+            if s == mid:
+                rels["children"].append(str(t))
+        elif typ == "child":
+            if s == mid:
+                rels["parents"].append(str(t))
+            if t == mid:
+                rels["children"].append(str(s))
+        elif typ == "spouse" and (s == mid or t == mid):
+            other = t if s == mid else s
+            rels["spouses"].append(str(other))
+    rels["parents"] = _dedupe_str_list(rels["parents"])
+    rels["children"] = _dedupe_str_list(rels["children"])
+    rels["spouses"] = _dedupe_str_list(rels["spouses"])
+    return rels
+
+
+def _members_to_chart_nodes(
+    members: list[dict[str, Any]],
+    relationships: list[dict[str, Any]],
+    sentences: dict[str, str],
+) -> list[dict[str, Any]]:
+    chart: list[dict[str, Any]] = []
+    for m in members:
+        mid = int(m["id"])
+        name = str(m.get("member_name") or m.get("display_name") or "").strip()
+        parts = name.split(None, 1)
+        first = parts[0] if parts else name or "Unknown"
+        last = parts[1] if len(parts) > 1 else ""
+        chart.append(
+            {
+                "id": str(mid),
+                "data": {
+                    "first name": first,
+                    "last name": last,
+                    "gender": _gender_to_chart_code(str(m.get("gender") or "")),
+                    "birthday": str(m.get("date_of_birth") or m.get("dob") or ""),
+                    "avatar": str(m.get("profile_photo_url") or m.get("photo_url") or ""),
+                    "is_deceased": bool(m.get("is_dead") or m.get("is_deceased")),
+                    "relationship": str(
+                        m.get("relationship_to_user") or m.get("relationship") or ""
+                    ),
+                    "relationship_path": str(sentences.get(str(mid)) or ""),
+                    "age": m.get("age"),
+                    "bio": str(m.get("bio") or ""),
+                    "location": str(
+                        m.get("birth_location") or m.get("current_location") or ""
+                    ),
+                    "is_self": bool(m.get("is_self")),
+                    "is_placeholder": bool(m.get("is_placeholder")),
+                    "account_public_id": str(m.get("account_public_id") or ""),
+                    "source": str(m.get("source") or "manual"),
+                    "generation_level": int(m.get("generation_level") or 0),
+                },
+                "rels": _chart_rels_for_member(mid, relationships),
+            }
+        )
+    return chart
+
+
+def _chart_nodes_from_enhanced_tables(
+    conn: sqlite3.Connection, user_pid: str
+) -> list[dict[str, Any]] | None:
+    """Return family-chart nodes from enhanced tables when populated."""
+    tree_row = conn.execute(
+        """
+        SELECT id, tree_name, privacy_level, root_node_id
+        FROM family_trees
+        WHERE owner_private_id = ?
+        LIMIT 1
+        """,
+        (user_pid,),
+    ).fetchone()
+    if not tree_row:
+        return None
+    tree_id = int(tree_row["id"])
+    node_rows = conn.execute(
+        """
+        SELECT id, display_name, gender, date_of_birth, date_of_death, is_deceased,
+               birth_location, current_location, bio, profile_photo_url, generation_level,
+               linked_user_private_id
+        FROM family_tree_nodes
+        WHERE tree_id = ?
+        ORDER BY id
+        """,
+        (tree_id,),
+    ).fetchall()
+    if not node_rows:
+        return None
+    rel_rows = conn.execute(
+        """
+        SELECT from_node_id, to_node_id, relationship_type
+        FROM family_tree_relationships
+        WHERE tree_id = ?
+        """,
+        (tree_id,),
+    ).fetchall()
+    rels_by_node: dict[int, dict[str, list[str]]] = {}
+    for nr in node_rows:
+        nid = int(nr["id"])
+        rels_by_node[nid] = {"parents": [], "children": [], "spouses": []}
+    for rr in rel_rows:
+        s = int(rr["from_node_id"])
+        t = int(rr["to_node_id"])
+        typ = str(rr["relationship_type"] or "").lower()
+        if typ == "parent":
+            if t in rels_by_node:
+                rels_by_node[t]["parents"].append(str(s))
+            if s in rels_by_node:
+                rels_by_node[s]["children"].append(str(t))
+        elif typ == "child":
+            if s in rels_by_node:
+                rels_by_node[s]["parents"].append(str(t))
+            if t in rels_by_node:
+                rels_by_node[t]["children"].append(str(s))
+        elif typ == "spouse":
+            if s in rels_by_node:
+                rels_by_node[s]["spouses"].append(str(t))
+            if t in rels_by_node:
+                rels_by_node[t]["spouses"].append(str(s))
+    chart: list[dict[str, Any]] = []
+    for nr in node_rows:
+        nid = int(nr["id"])
+        name = str(nr["display_name"] or "").strip()
+        parts = name.split(None, 1)
+        first = parts[0] if parts else name or "Unknown"
+        last = parts[1] if len(parts) > 1 else ""
+        rels = rels_by_node.get(nid, {"parents": [], "children": [], "spouses": []})
+        for key in rels:
+            rels[key] = _dedupe_str_list(rels[key])
+        chart.append(
+            {
+                "id": str(nid),
+                "data": {
+                    "first name": first,
+                    "last name": last,
+                    "gender": _gender_to_chart_code(str(nr["gender"] or "")),
+                    "birthday": str(nr["date_of_birth"] or ""),
+                    "avatar": str(nr["profile_photo_url"] or ""),
+                    "is_deceased": bool(nr["is_deceased"]),
+                    "relationship": "",
+                    "relationship_path": "",
+                    "age": None,
+                    "bio": str(nr["bio"] or ""),
+                    "location": str(nr["birth_location"] or nr["current_location"] or ""),
+                    "is_self": tree_row["root_node_id"] == nid,
+                    "is_placeholder": False,
+                    "account_public_id": "",
+                    "source": "enhanced",
+                    "generation_level": int(nr["generation_level"] or 0),
+                },
+                "rels": rels,
+            }
+        )
+    return chart
+
+
+def _family_tree_meta(conn: sqlite3.Connection, user_pid: str) -> dict[str, Any]:
+    row = conn.execute(
+        """
+        SELECT tree_name, privacy_level
+        FROM family_trees
+        WHERE owner_private_id = ?
+        LIMIT 1
+        """,
+        (user_pid,),
+    ).fetchone()
+    if not row:
+        return {"tree_name": "My Family Tree", "privacy_level": "family"}
+    return {
+        "tree_name": str(row["tree_name"] or "My Family Tree"),
+        "privacy_level": str(row["privacy_level"] or "family"),
+    }
+
+
 def _family_tree_graph_payload(conn: sqlite3.Connection, user_pid: str) -> dict[str, Any]:
     profile = _family_profile_to_dict(_family_profile_row(conn, user_pid))
     user_row = g.current_user
@@ -8473,6 +8910,10 @@ def _family_tree_graph_payload(conn: sqlite3.Connection, user_pid: str) -> dict[
             sentences[str(mid)] = " · ".join(parts_v) if parts_v else "You"
         else:
             sentences[str(mid)] = get_relationship_sentence(nm, str(gen or ""), rel_rows)
+    meta = _family_tree_meta(conn, user_pid)
+    chart_nodes = _chart_nodes_from_enhanced_tables(conn, user_pid)
+    if chart_nodes is None:
+        chart_nodes = _members_to_chart_nodes(members_out, rel_json, sentences)
     return {
         "members": members_out,
         "relationships": rel_json,
@@ -8484,6 +8925,9 @@ def _family_tree_graph_payload(conn: sqlite3.Connection, user_pid: str) -> dict[
         "sentences": sentences,
         "form_completed": profile["form_completed"],
         "relationship_status": profile["relationship_status"],
+        "tree_name": meta["tree_name"],
+        "privacy_level": meta["privacy_level"],
+        "chart": chart_nodes,
     }
 
 
@@ -8524,6 +8968,22 @@ def _family_tree_graph_fallback_payload() -> dict[str, Any]:
         "sentences": {str(vid): viewer_name or "You"},
         "form_completed": False,
         "relationship_status": "",
+        "tree_name": "My Family Tree",
+        "privacy_level": "family",
+        "chart": _members_to_chart_nodes(
+            [
+                {
+                    "id": vid,
+                    "member_name": viewer_name,
+                    "gender": str(ug("gender") or ""),
+                    "is_dead": False,
+                    "is_self": True,
+                    "source": "viewer",
+                }
+            ],
+            [],
+            {str(vid): viewer_name or "You"},
+        ),
     }
 
 
@@ -12803,7 +13263,7 @@ def debug_post_visibility():
 @app.route("/logo-redirect")
 def logo_redirect():
     """Logo click: dashboard when logged in, homepage when logged out (no logout)."""
-    if session.get("user_pk"):
+    if _session_user_is_authenticated():
         return redirect(url_for("dashboard"))
     return redirect(url_for("index"))
 
@@ -12884,6 +13344,30 @@ def about():
     return render_template("about.html")
 
 
+WHITE_PAPER_PDF = "Qumanity_White_Paper_v4.0.pdf"
+TECH_ARCHITECTURE_PDF = "Qumanity_Technical_Architecture_v4.0.pdf"
+
+
+@app.route("/white-paper")
+def white_paper():
+    """Serve the current White Paper PDF."""
+    return send_from_directory(
+        BASE_DIR / "static" / "docs",
+        WHITE_PAPER_PDF,
+        as_attachment=False,
+    )
+
+
+@app.route("/technical-architecture")
+def technical_architecture():
+    """Serve the current Technical Architecture PDF."""
+    return send_from_directory(
+        BASE_DIR / "static" / "docs",
+        TECH_ARCHITECTURE_PDF,
+        as_attachment=False,
+    )
+
+
 @app.route("/contact")
 def contact():
     """Contact page."""
@@ -12915,9 +13399,10 @@ def contact_submit():
     if errors:
         return jsonify({"ok": False, "errors": errors}), 400
 
-    subject = f"Qumanity contact from {name}"
+    subject = f"Qumanity contact [{data.get('subject', 'General')}] from {name}"
     body = (
         f"Contact form submission on Qumanity\n\n"
+        f"Subject: {data.get('subject', 'General')}\n"
         f"Name: {name}\n"
         f"Email: {email}\n\n"
         f"Message:\n{message}\n"
@@ -12951,6 +13436,7 @@ def contact_submit():
 
 
 @app.route("/settings")
+@login_required
 def settings_page():
     """Settings placeholder — mother tongue & notification preferences (coming soon)."""
     return render_template("settings.html")
@@ -13950,6 +14436,26 @@ def register():
                 payment_method="none",
             )
             conn.commit()
+    except sqlite3.OperationalError:
+        conn.rollback()
+        app.logger.exception("registration failed (database)")
+        errors.append(
+            "We could not complete your registration. Please try again or contact support."
+        )
+        _enrich_register_form_geo(conn, form)
+        return render_template(
+            "register.html",
+            gender_options=GENDER_OPTIONS,
+            continents=continents_form,
+            language_choices=language_choices,
+            form=form,
+            errors=errors,
+            field_errors=field_errors,
+            new_private_id=None,
+            new_public_id=None,
+            show_donation_step=False,
+            pending_registration=False,
+        )
     except sqlite3.IntegrityError:
         conn.rollback()
         errors.append("Could not create account. Try again.")
@@ -14217,6 +14723,13 @@ def _finalize_registration(
         present_path=present_path,
     )
     qoin_core.ensure_wallet(conn, "user", private_id)
+    try:
+        import qv_core
+
+        qv_core.migrate_qv_schema(conn)
+        qv_core.grant_welcome_bonus(conn, private_id)
+    except Exception:
+        app.logger.exception("QV welcome bonus failed for %s", private_id)
     referral_code = referral_core.generate_referral_code(conn)
     conn.execute(
         "UPDATE users SET referral_code = ? WHERE private_id = ?",
@@ -14301,15 +14814,17 @@ def _finalize_registration_with_donation(
         continent_id=str(pending.get("curr_cont") or ""),
     )
     referral_code_input = str(pending.get("referral_code_input") or "").strip()
+    donation_rupees = donation_core.parse_donation_amount(donation_rupees)
     if not referrer_private_id:
-        donation_core.process_no_referral_registration(
-            conn,
-            user_private_id=private_id,
-            donation_amount_rupees=int(donation_rupees),
-            location_context=loc_ctx,
-            payment_method=method,
-            referral_code=referral_code_input,
-        )
+        if donation_rupees > 0:
+            donation_core.process_no_referral_registration(
+                conn,
+                user_private_id=private_id,
+                donation_amount_rupees=donation_rupees,
+                location_context=loc_ctx,
+                payment_method=method,
+                referral_code=referral_code_input,
+            )
     else:
         distribution = donation_core.calculate_donation_distribution(
             int(donation_rupees),
@@ -14509,12 +15024,11 @@ def api_register_donate():
     if not pending:
         return jsonify({"error": "No pending registration. Complete the form first."}), 400
     payload = request.get_json(silent=True) or {}
-    try:
-        amount = int(payload.get("amount") if payload.get("amount") is not None else payload.get("donation_amount", 0))
-    except (TypeError, ValueError):
-        return jsonify({"error": "amount must be an integer"}), 400
-    if amount < 0 or amount > 200:
-        return jsonify({"error": "Donation must be between ₹0 and ₹200"}), 400
+    amount = donation_core.parse_donation_amount(
+        payload.get("amount")
+        if payload.get("amount") is not None
+        else payload.get("donation_amount", 0)
+    )
     method = str(payload.get("method") or payload.get("payment_method") or "qr").strip().lower()
     allowed_methods = ("qr", "cash")
     if method not in allowed_methods:
@@ -14577,6 +15091,12 @@ def api_register_donate():
     except sqlite3.IntegrityError:
         conn.rollback()
         return jsonify({"error": "Could not create account. Try again."}), 400
+    except sqlite3.OperationalError:
+        conn.rollback()
+        app.logger.exception("registration donation operational error")
+        return jsonify(
+            {"error": "We could not complete your registration. Please try again."}
+        ), 500
     except ValueError as exc:
         conn.rollback()
         return jsonify({"error": str(exc)}), 400
@@ -15794,6 +16314,7 @@ def dashboard():
     current_hierarchy, default_vid = public_hierarchy_for_user(
         conn, user_row, language_code=preferred_lang
     )
+    current_hierarchy = _hierarchy_with_member_counts(conn, current_hierarchy)
     language_choices = language_core.all_language_choices(conn)
     loc_mode = "present"
     can_toggle_loc = identity_core.can_toggle_location(user_row)
@@ -15857,6 +16378,9 @@ def dashboard():
     )
     referral_qr = referral_core.generate_qr_base64(referral_reg_url)
     referral_leaderboard = referral_core.get_leaderboard(conn, limit=10)
+    import qv_core
+
+    qv_summary = qv_core.dashboard_qv_summary(conn, pid)
     volunteer_status = referral_core.get_volunteer_status(conn, pid)
     is_council = is_council_member(conn, user_row)
     is_mentor = deceased_core.is_mentor_user(conn, user_row)
@@ -15945,6 +16469,18 @@ def dashboard():
         or show_global_zone_statistics
     )
 
+    global_member_counts = _global_member_counts(
+        conn,
+        continent_id=user_continent_id,
+        country_id=user_country_id,
+        zone_id=user_zone_id,
+        show_zone_tab=bool(geo_displays.get("user_show_zone_tab")),
+    )
+    global_member_formatted = {
+        scope: format_compact_member_count(count)
+        for scope, count in global_member_counts.items()
+    }
+
     dash_client_config: dict[str, Any] = {
         "userHierarchy": [dict(item) for item in current_hierarchy],
         "defaultVillageId": default_vid or "",
@@ -15999,6 +16535,10 @@ def dashboard():
         "referralQrBase64": referral_qr,
         "referralLeaderboard": referral_leaderboard,
         "publicBaseUrl": public_base,
+        "qvCredits": qv_summary["current_credits"],
+        "qvActiveReferendums": qv_summary["active_referendums"],
+        "qvUnvotedActive": qv_summary["unvoted_active"],
+        "globalMemberCounts": global_member_counts,
     }
 
     return render_template(
@@ -16010,6 +16550,8 @@ def dashboard():
         birth_location_label=birth_location_label,
         current_location_label=current_location_label,
         current_hierarchy=current_hierarchy,
+        global_member_counts=global_member_counts,
+        global_member_formatted=global_member_formatted,
         default_active_location_id=default_vid,
         user_present_village_id=user_present_village_id,
         user_present_tehsil_id=user_present_tehsil_id,
@@ -16048,6 +16590,7 @@ def dashboard():
         referral_registration_url=referral_reg_url,
         referral_qr_base64=referral_qr,
         referral_leaderboard=referral_leaderboard,
+        qv_summary=qv_summary,
         volunteer_status=volunteer_status,
         is_council_member=is_council,
         is_mentor=is_mentor,
@@ -16055,6 +16598,23 @@ def dashboard():
         varna_profile=varna_profile,
         **geo_displays,
     )
+
+
+@app.route("/family-tree")
+@login_required
+def family_tree_page():
+    """Standalone full-page family tree visualization."""
+    conn = get_db()
+    user_row = g.current_user
+    pid = user_row["private_id"]
+    tree_name = "My Family Tree"
+    row = conn.execute(
+        "SELECT tree_name FROM family_trees WHERE owner_private_id = ? LIMIT 1",
+        (pid,),
+    ).fetchone()
+    if row and row["tree_name"]:
+        tree_name = row["tree_name"]
+    return render_template("family_tree.html", tree_name=tree_name, user=user_row)
 
 
 @app.route("/admin/location_members/<path:location_type>/<path:location_id>")
@@ -16235,6 +16795,16 @@ register_qsi_routes(
     admin_required,
     admin_page_required,
     is_admin_user,
+)
+
+from routes_qv import register_qv_routes
+
+register_qv_routes(
+    app,
+    get_db,
+    login_required,
+    is_admin_user_fn=is_admin_user,
+    send_system_message_fn=send_system_message,
 )
 
 _geography_seeded = False
@@ -16725,6 +17295,10 @@ app.cli.add_command(migrate_user_ids_cli)
 
 # Defer heavy startup until after Railway healthcheck window.
 _schedule_deferred_startup()
+
+import platform_extensions
+
+platform_extensions.register(app, get_db=get_db, login_required=login_required)
 
 
 if __name__ == "__main__":

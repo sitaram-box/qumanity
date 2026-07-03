@@ -2,53 +2,50 @@
 
 {% block title %}Contact — Qumanity{% endblock %}
 
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='contact-v2.css') }}?v=1" />
+{% endblock %}
+
 {% block body %}
-<section class="qb-hero">
-  <h1>Contact</h1>
+<section class="contact-hero qb-hero">
+  <h1 class="q-display">Contact</h1>
   <p class="qb-lead">
-    Reach SITA Foundation for questions about Qumanity, partnerships, pilot deployment, or open-source
-    contributions.
+    Reach SITA Foundation for questions about Qumanity, partnerships, pilot deployment, or open-source contributions.
   </p>
 </section>
 
-<div class="qb-contact-layout">
-  <section class="qb-card qb-card-surface p-4 qb-contact-info">
-    <h2 class="h5 mb-3">SITA Foundation</h2>
-    <p class="mb-2">Sekyor Intelligence Tantra Foundation</p>
-    <ul class="list-unstyled mb-0">
-      <li class="mb-2">
-        <strong>Website:</strong>
-        <a href="https://qumanity.in">https://qumanity.in</a>
-      </li>
-      <li class="mb-2">
-        <strong>Email:</strong>
-        <a href="mailto:founder@qumanity.in">founder@qumanity.in</a>
-      </li>
-      <li class="mb-2">
-        <strong>GitHub:</strong>
-        <a href="https://github.com/sitaram-box/QUMANITY">github.com/sitaram-box/QUMANITY</a>
-      </li>
+<div class="contact-v2-layout">
+  <section class="q-card contact-info-card" aria-labelledby="contact-info-heading">
+    <header class="contact-info-header">
+      <span class="contact-info-om" aria-hidden="true">ॐ</span>
+      <h2 id="contact-info-heading" class="h5 mb-1">SITA Foundation</h2>
+      <p class="contact-info-fullname mb-0">Sekyor Intelligence Tantra Foundation</p>
+    </header>
+    <ul class="contact-info-list list-unstyled mb-3">
+      <li><span aria-hidden="true">🌐</span> <a href="https://qumanity.in">qumanity.in</a></li>
+      <li><span aria-hidden="true">📧</span> <a href="mailto:founder@qumanity.in">founder@qumanity.in</a></li>
+      <li><span aria-hidden="true">💻</span> <a href="https://github.com/sitaram-box/QUMANITY" target="_blank" rel="noopener">github.com/sitaram-box/QUMANITY</a></li>
+      <li><span aria-hidden="true">🏢</span> Section 8 (Not-for-Profit) Company</li>
     </ul>
+    <div class="contact-quick-links">
+      <p class="small text-muted mb-1">Quick links</p>
+      <div class="d-flex flex-wrap gap-2">
+        <a href="{{ url_for('white_paper') }}" class="q-btn q-btn-ghost btn-sm" target="_blank" rel="noopener noreferrer">White Paper</a>
+        <a href="{{ url_for('technical_architecture') }}" class="q-btn q-btn-ghost btn-sm" target="_blank" rel="noopener noreferrer">Technical Architecture</a>
+        <a href="https://github.com/sitaram-box/QUMANITY/blob/main/CONTRIBUTING.md" class="q-btn q-btn-ghost btn-sm" target="_blank" rel="noopener">Contributing</a>
+        <a href="{{ url_for('security_page') }}" class="q-btn q-btn-ghost btn-sm">Security</a>
+      </div>
+    </div>
+    <div class="contact-social mt-3">
+      <a href="https://github.com/sitaram-box/QUMANITY" class="contact-social-link" target="_blank" rel="noopener" aria-label="GitHub">GitHub</a>
+    </div>
   </section>
 
-  <section class="qb-card qb-card-surface p-4 qb-contact-form-wrap" aria-labelledby="contact-form-heading">
+  <section class="q-card contact-form-card" aria-labelledby="contact-form-heading">
     <h2 id="contact-form-heading" class="h5 mb-3">Send a Message</h2>
-    <p class="small text-muted mb-3">
-      Your message will be sent to <a href="mailto:founder@qumanity.in">founder@qumanity.in</a>.
-    </p>
 
-    <div
-      class="qb-alert qb-alert-success mb-3"
-      id="contact-success-alert"
-      role="status"
-      hidden
-    ></div>
-    <div
-      class="qb-alert qb-alert-error mb-3"
-      id="contact-error-alert"
-      role="alert"
-      hidden
-    ></div>
+    <div class="qb-alert qb-alert-success mb-3" id="contact-success-alert" role="status" hidden></div>
+    <div class="qb-alert qb-alert-error mb-3" id="contact-error-alert" role="alert" hidden></div>
 
     <form id="contact-form" class="qb-form qb-contact-form" novalidate>
       <div class="visually-hidden" aria-hidden="true">
@@ -57,48 +54,64 @@
       </div>
       <div class="qb-form-group mb-3">
         <label for="contact-name">Name <span class="text-danger">*</span></label>
-        <input
-          type="text"
-          class="form-control qb-form-control"
-          id="contact-name"
-          name="name"
-          required
-          maxlength="120"
-          autocomplete="name"
-        />
+        <input type="text" class="q-input" id="contact-name" name="name" required maxlength="120" autocomplete="name" />
         <p class="small text-danger mb-0 mt-1" id="contact-name-error" hidden></p>
       </div>
       <div class="qb-form-group mb-3">
         <label for="contact-email">Email <span class="text-danger">*</span></label>
-        <input
-          type="email"
-          class="form-control qb-form-control"
-          id="contact-email"
-          name="email"
-          required
-          maxlength="254"
-          autocomplete="email"
-        />
+        <input type="email" class="q-input" id="contact-email" name="email" required maxlength="254" autocomplete="email" />
         <p class="small text-danger mb-0 mt-1" id="contact-email-error" hidden></p>
       </div>
       <div class="qb-form-group mb-3">
+        <label for="contact-subject">Subject</label>
+        <select class="q-input" id="contact-subject" name="subject">
+          <option value="General">General</option>
+          <option value="Partnership">Partnership</option>
+          <option value="Pilot Village">Pilot Village</option>
+          <option value="Bug Report">Bug Report</option>
+          <option value="Feature Request">Feature Request</option>
+        </select>
+        <p class="small text-muted mt-1 mb-0" id="contact-subject-hint" hidden></p>
+      </div>
+      <div class="qb-form-group mb-3">
         <label for="contact-message">Message <span class="text-danger">*</span></label>
-        <textarea
-          class="form-control qb-form-control"
-          id="contact-message"
-          name="message"
-          rows="6"
-          required
-          maxlength="5000"
-        ></textarea>
+        <textarea class="q-input" id="contact-message" name="message" rows="6" required maxlength="5000"></textarea>
+        <p class="small text-muted mb-0 mt-1 text-end"><span id="contact-char-count">0</span> / 5000</p>
         <p class="small text-danger mb-0 mt-1" id="contact-message-error" hidden></p>
       </div>
-      <button type="submit" class="qb-btn qb-btn-primary" id="contact-submit-btn">
-        Send Message
-      </button>
+      <button type="submit" class="q-btn q-btn-primary" id="contact-submit-btn">Send Message</button>
+      <p class="small text-muted mt-3 mb-0">
+        Prefer email? Write to <a href="mailto:founder@qumanity.in">founder@qumanity.in</a>
+      </p>
     </form>
   </section>
 </div>
+
+<section class="contact-faq q-card" aria-labelledby="contact-faq-heading">
+  <h2 id="contact-faq-heading" class="h5 mb-3">Frequently Asked Questions</h2>
+  <div class="contact-faq-list" id="contact-faq-list">
+    <details class="contact-faq-item">
+      <summary>How do I join my village council?</summary>
+      <p>Register with your village location, earn Karma Points through verified actions, and stand for election during your zodiac month from the Elections panel on your dashboard.</p>
+    </details>
+    <details class="contact-faq-item">
+      <summary>What are Karma Points?</summary>
+      <p>Karma Points reward verified positive actions — planting trees, teaching, council service, and more. They power the Qoin economy and election candidacy scores.</p>
+    </details>
+    <details class="contact-faq-item">
+      <summary>How do zodiac elections work?</summary>
+      <p>Each month aligns with a zodiac sign. Villages elect Nayak and Nayika council members monthly; higher levels hold annual aggregate elections.</p>
+    </details>
+    <details class="contact-faq-item">
+      <summary>Is my data secure?</summary>
+      <p>Qumanity uses dual-key identity (public + private IDs), encrypted wallets, and open-source code you can audit. See our <a href="{{ url_for('security_page') }}">Security</a> page.</p>
+    </details>
+    <details class="contact-faq-item">
+      <summary>How can I contribute code?</summary>
+      <p>Fork the repository on GitHub, read CONTRIBUTING.md, and open a pull request. We welcome developers, designers, and documentation writers.</p>
+    </details>
+  </div>
+</section>
 {% endblock %}
 
 {% block scripts %}
@@ -110,23 +123,43 @@
     var successAlert = document.getElementById("contact-success-alert");
     var errorAlert = document.getElementById("contact-error-alert");
     var submitBtn = document.getElementById("contact-submit-btn");
+    var subjectSelect = document.getElementById("contact-subject");
+    var subjectHint = document.getElementById("contact-subject-hint");
+    var messageField = document.getElementById("contact-message");
+    var charCount = document.getElementById("contact-char-count");
+
+    var subjectHints = {
+      "Bug Report": "For bugs, please include steps to reproduce. You can also file an issue on GitHub.",
+      "Feature Request": "Describe the problem you want solved and who benefits.",
+      "Pilot Village": "Tell us about your village, population, and current governance challenges.",
+    };
+
+    if (subjectSelect) {
+      subjectSelect.addEventListener("change", function () {
+        var hint = subjectHints[subjectSelect.value];
+        if (subjectHint) {
+          subjectHint.textContent = hint || "";
+          subjectHint.hidden = !hint;
+        }
+      });
+    }
+
+    if (messageField && charCount) {
+      messageField.addEventListener("input", function () {
+        charCount.textContent = String(messageField.value.length);
+      });
+    }
 
     function hideFieldErrors() {
       ["name", "email", "message"].forEach(function (field) {
         var el = document.getElementById("contact-" + field + "-error");
-        if (el) {
-          el.hidden = true;
-          el.textContent = "";
-        }
+        if (el) { el.hidden = true; el.textContent = ""; }
       });
     }
 
     function showFieldError(field, message) {
       var el = document.getElementById("contact-" + field + "-error");
-      if (el) {
-        el.textContent = message;
-        el.hidden = false;
-      }
+      if (el) { el.textContent = message; el.hidden = false; }
     }
 
     form.addEventListener("submit", function (event) {
@@ -138,18 +171,16 @@
       var payload = {
         name: (document.getElementById("contact-name").value || "").trim(),
         email: (document.getElementById("contact-email").value || "").trim(),
-        message: (document.getElementById("contact-message").value || "").trim(),
+        message: (messageField.value || "").trim(),
         website: (document.getElementById("contact-website").value || "").trim(),
+        subject: subjectSelect ? subjectSelect.value : "General",
       };
 
-      if (submitBtn) {
-        submitBtn.disabled = true;
-        submitBtn.textContent = "Sending…";
-      }
+      if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = "Sending…"; }
 
       fetch("/api/contact", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify(payload),
       })
         .then(function (response) {
@@ -159,15 +190,11 @@
         })
         .then(function (result) {
           if (result.ok && result.data && result.data.ok) {
-            if (successAlert) {
-              successAlert.textContent =
-                result.data.message || "Thank you! Your message has been sent.";
-              successAlert.hidden = false;
-            }
+            var msg = result.data.message || "Message sent! We typically respond within 24 hours.";
+            if (successAlert) { successAlert.textContent = msg; successAlert.hidden = false; }
             form.reset();
-            if (window.qbToast) {
-              window.qbToast(result.data.message || "Message sent!", "success");
-            }
+            if (charCount) charCount.textContent = "0";
+            if (window.qbToast) window.qbToast(msg, "success");
             return;
           }
           if (result.data && result.data.errors) {
@@ -175,29 +202,18 @@
               showFieldError(field, result.data.errors[field]);
             });
           }
-          var errMsg =
-            (result.data && result.data.error) ||
+          var errMsg = (result.data && result.data.error) ||
             "Could not send your message. Please try again or email founder@qumanity.in directly.";
-          if (errorAlert) {
-            errorAlert.textContent = errMsg;
-            errorAlert.hidden = false;
-          }
+          if (errorAlert) { errorAlert.textContent = errMsg; errorAlert.hidden = false; }
           if (window.qbToast) window.qbToast(errMsg, "error");
         })
         .catch(function () {
-          var errMsg =
-            "Network error. Please try again or email founder@qumanity.in directly.";
-          if (errorAlert) {
-            errorAlert.textContent = errMsg;
-            errorAlert.hidden = false;
-          }
+          var errMsg = "Network error. Please try again or email founder@qumanity.in directly.";
+          if (errorAlert) { errorAlert.textContent = errMsg; errorAlert.hidden = false; }
           if (window.qbToast) window.qbToast(errMsg, "error");
         })
         .finally(function () {
-          if (submitBtn) {
-            submitBtn.disabled = false;
-            submitBtn.textContent = "Send Message";
-          }
+          if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = "Send Message"; }
         });
     });
   })();

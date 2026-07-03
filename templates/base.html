@@ -1,13 +1,13 @@
 <!DOCTYPE html>
-<html lang="{{ preferred_language or 'en' }}">
+<html lang="{{ preferred_language or 'en' }}" class="dark" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{% block title %}Qumanity{% endblock %}</title>
-    <meta name="description" content="Qumanity — For Humanity, Harmony &amp; Peace. A sovereign digital governance and economic platform for India and the Earth." />
-    <meta property="og:title" content="Qumanity - India's Quantum Governance Platform" />
-    <meta property="og:description" content="Join the revolution. Earn Karma Points by doing good deeds. Transparent governance for every village." />
-    <meta property="og:image" content="{{ url_for('static', filename='images/logo-qumanity.png', _external=True) }}" />
+    <meta name="description" content="Qumanity — India's Quantum Governance Protocol. A decentralized, karma-based civilization infrastructure where every village governs itself." />
+    <meta property="og:title" content="Qumanity — India's Quantum Governance Protocol" />
+    <meta property="og:description" content="A decentralized, karma-based civilization infrastructure where every village governs itself, every action earns merit, and every voice rises through quadratic voting." />
+    <meta property="og:image" content="{{ url_for('static', filename='images/ashok_chakra_with_sun.png', _external=True) }}" />
     <meta property="og:url" content="{{ request.url }}" />
     <meta name="twitter:card" content="summary_large_image" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -36,9 +36,18 @@
       href="{{ url_for('static', filename='styles/responsive.css') }}?v=1"
     />
     <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}" />
+    <link rel="preload" href="{{ url_for('static', filename='images/ashok_chakra_rotating.gif') }}" as="image" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/qumanity-redesign.css') }}?v=6" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/logo.css') }}?v=4" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}?v=2" />
     {% block head_extra %}{% endblock %}
   </head>
   <body class="{% block body_class %}{% endblock %}">
+    <div id="qb-page-loader" aria-hidden="true">
+      <div class="qb-loader-chakra">
+        {% with chakra_size='lg' %}{% include '_ashok_chakra_logo.html' %}{% endwith %}
+      </div>
+    </div>
     <a href="#qb-main-content" class="qb-skip-link">Skip to content</a>
     <header class="qb-navbar d-flex flex-column align-items-stretch">
       {% block header_inner %}
@@ -54,7 +63,7 @@
       </a>
       <div class="qb-nav-cluster flex-shrink-0 d-flex flex-wrap align-items-center gap-2 justify-content-end">
         <nav class="qb-nav-actions">
-        {% if session.get('user_pk') and not show_public_nav %}
+        {% if is_logged_in and not show_public_nav %}
         <a href="{{ url_for('dashboard') }}" class="qb-btn qb-btn-outline"
           >{{ 'dashboard'|tr }}</a
         >
@@ -92,7 +101,10 @@
       {% block body %}{% endblock %}
     </main>
 
-    <footer class="qb-footer">
+    <footer class="qb-footer qb-footer--redesign">
+      <div class="qb-footer-chakra-watermark" aria-hidden="true">
+        {% with chakra_size='lg' %}{% include '_ashok_chakra_logo.html' %}{% endwith %}
+      </div>
       <div class="qb-footer-content">
         <div class="qb-footer-left">
           <div class="qb-sita-footer-logo">
@@ -112,6 +124,10 @@
         </div>
         <div class="qb-footer-right">
           <p class="qb-footer-text mb-0">
+            <a href="{{ url_for('white_paper') }}" class="qb-footer-link" target="_blank" rel="noopener noreferrer">White Paper</a>
+            ·
+            <a href="{{ url_for('technical_architecture') }}" class="qb-footer-link" target="_blank" rel="noopener noreferrer">Technical Architecture</a>
+            ·
             <a href="{{ url_for('contact') }}" class="qb-footer-link">{{ 'contact'|tr }}</a>
             ·
             <a href="{{ url_for('about') }}" class="qb-footer-link">{{ 'about'|tr }}</a>
@@ -206,7 +222,8 @@
     {% if elections_are_enabled() %}
     <script src="{{ url_for('static', filename='voting_machine.js') }}?v=1"></script>
     {% endif %}
-    <script src="{{ url_for('static', filename='js/feedback_widget.js') }}?v=1"></script>
+    <script src="{{ url_for('static', filename='js/feedback_widget.js') }}?v=3"></script>
+    <script src="{{ url_for('static', filename='js/qumanity-animations.js') }}?v=2"></script>
     {% if body_class and 'qb-page-home' in body_class %}
     <script src="{{ url_for('static', filename='js/welcome_flow.js') }}?v=1"></script>
     <script src="{{ url_for('static', filename='js/product_tour.js') }}?v=1"></script>

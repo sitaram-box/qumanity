@@ -2,8 +2,11 @@
 
 {% block title %}Register — Qumanity{% endblock %}
 
+{% block body_class %}qb-page-auth{% endblock %}
+
 {% block head_extra %}
-<link rel="stylesheet" href="{{ url_for('static', filename='register.css') }}?v=9" />
+<link rel="stylesheet" href="{{ url_for('static', filename='css/auth-redesign.css') }}?v=1" />
+<link rel="stylesheet" href="{{ url_for('static', filename='register.css') }}?v=10" />
 {% endblock %}
 
 {# Registration is English-only — no language dropdown (dashboard only). #}
@@ -25,6 +28,7 @@
 {% endblock %}
 
 {% block body %}
+<div class="auth-page register-page">
 <div class="register-container">
 {% if new_private_id %}
 <div class="qb-id-modal-backdrop" role="status">
@@ -86,7 +90,7 @@
   });
 </script>
 {% else %}
-<div class="register-layout">
+<div class="register-layout registration-layout">
   <div class="register-layout__main">
     <div class="register-header">
       <h2 class="register-header__title">Create Your Qumanity Account</h2>
@@ -97,10 +101,17 @@
       </p>
     </div>
 {% if errors %}
-<div class="qb-alert qb-alert-error" id="register-error-alert" role="alert">
-  {% for msg in errors %}
-  <div>{{ msg }}</div>
-  {% endfor %}
+<div class="error-toast" id="register-error-alert" role="alert">
+  <span class="error-toast__icon" aria-hidden="true">⚠️</span>
+  <div>
+    <div class="error-toast__title">Registration Error</div>
+    <div class="error-toast__message">
+      {% for msg in errors %}
+      <div>{{ msg }}</div>
+      {% endfor %}
+    </div>
+    <p class="small mb-0 mt-2"><a href="{{ url_for('contact') }}">Contact Support</a></p>
+  </div>
 </div>
 {% endif %}
 
@@ -111,21 +122,21 @@
 </p>
 {% endif %}
 
-<div class="register-steps" id="register-steps" role="list" aria-label="Registration progress">
-  <div class="step active" data-step-indicator="1" role="listitem">
-    <span class="step-number">1</span>
+<div class="step-indicator" id="register-steps" role="list" aria-label="Registration progress">
+  <div class="step step-active" data-step-indicator="1" role="listitem">
+    <span class="step-circle">1</span>
     <span class="step-label">Basic Info</span>
   </div>
   <div class="step" data-step-indicator="2" role="listitem">
-    <span class="step-number">2</span>
-    <span class="step-label">Birth Location</span>
+    <span class="step-circle">2</span>
+    <span class="step-label">Birth Loc</span>
   </div>
   <div class="step" data-step-indicator="3" role="listitem">
-    <span class="step-number">3</span>
-    <span class="step-label">Current Location</span>
+    <span class="step-circle">3</span>
+    <span class="step-label">Current Loc</span>
   </div>
   <div class="step" data-step-indicator="4" role="listitem">
-    <span class="step-number">4</span>
+    <span class="step-circle">4</span>
     <span class="step-label">Security</span>
   </div>
 </div>
@@ -234,15 +245,13 @@
   </div>
 
   <div class="qb-form-group mt-2">
-    <label for="live_profile_summary">Live profile summary</label>
-    <input
-      type="text"
-      class="form-control qb-form-control"
-      id="live_profile_summary"
-      readonly
-      value="Age: — | Element: — | Sun Sign: —"
-      aria-live="polite"
-    />
+    <label for="live_profile_summary">Live Profile Preview</label>
+    <div class="live-profile-preview" id="live_profile_preview_box" aria-live="polite">
+      <span id="preview-age">Age: —</span> ·
+      <span id="preview-element">Element: —</span> ·
+      <span id="preview-sun-sign">Sun Sign: —</span>
+    </div>
+    <input type="hidden" id="live_profile_summary" value="" />
     <div class="form-text">
       Updates automatically from Date of Birth and Birth Time.
     </div>
@@ -562,7 +571,7 @@
     {% endif %}
   </div>
 
-  <div class="qb-form-group{% if field_errors and field_errors.get('password') %} has-error{% endif %}">
+  <div class="qb-form-group{% if field_errors and field_errors.get('password') %} has-error{% endif %} password-group">
     <label for="password">Password</label>
     <input
       type="password"
@@ -573,6 +582,11 @@
       minlength="9"
       autocomplete="new-password"
     />
+    <button type="button" class="password-toggle" aria-label="Show password">👁️</button>
+    <div class="password-strength">
+      <div class="strength-bar"><div class="strength-fill"></div></div>
+      <span class="strength-label">Password strength</span>
+    </div>
     <div class="password-requirements qb-password-requirements">
       <small class="text-muted">Password must contain:</small>
       <ul class="qb-password-req-list mb-0">
@@ -607,21 +621,34 @@
   </div>
 
   <section
-    class="qb-panel p-3 mb-3{% if not show_donation_step %} d-none{% endif %}"
+    class="donation-section qb-panel p-3 mb-3{% if not show_donation_step %} d-none{% endif %}"
     id="reg-donation-section"
     aria-labelledby="reg-donation-heading"
   >
-    <h2 class="h6 mb-2" id="reg-donation-heading">💰 Donation (Optional)</h2>
+    <h2 class="h6 mb-2" id="reg-donation-heading">💰 Registration Donation (Optional)</h2>
     <p class="small text-muted mb-2" id="reg-donation-intro">
-      Select donation amount (₹0–₹200). Location shares credit immediately; your wallet share credits after your first village election vote.
+      Support your village infrastructure. Even ₹1 helps. No pressure.
     </p>
+    <p class="donation-zero-msg mb-2" id="donation-zero-msg" hidden>
+      You can always donate later from your dashboard.
+    </p>
+    <div class="donation-amounts" role="group" aria-label="Donation amount">
+      <button type="button" class="donation-chip donation-chip--zero active" data-amount="0">₹0 — No donation</button>
+      <button type="button" class="donation-chip" data-amount="10">₹10</button>
+      <button type="button" class="donation-chip" data-amount="50">₹50</button>
+      <button type="button" class="donation-chip" data-amount="100">₹100</button>
+      <button type="button" class="donation-chip" data-amount="200">₹200</button>
+    </div>
+    <div class="mb-2">
+      <label class="form-label small" for="custom-donation">Custom amount (₹1–₹200)</label>
+      <input type="number" id="custom-donation" class="form-control form-control-sm" min="0" max="200" placeholder="Optional" />
+    </div>
     <p class="small text-info mb-2" id="reg-no-referral-notice" hidden>
-      You are registering without a referral code. 80% goes to below locations (credited immediately); 20% goes to your wallet after your first vote.
-      {% if not pending_registration %}₹0 donation generates a system Karma Point worth ₹1.{% endif %}
+      Without a referral code, 80% goes to nested locations (credited immediately); 20% goes to your wallet after your first vote.
     </p>
-    <div class="donation-select-group qb-donation-select-group">
+    <div class="donation-select-group qb-donation-select-group visually-hidden">
       <label class="form-label small" for="donation-select">Donation Amount (₹)</label>
-      <select id="donation-select" class="form-select form-select-sm donation-dropdown qb-donation-dropdown" aria-describedby="reg-donation-intro">
+      <select id="donation-select" class="form-select form-select-sm donation-dropdown qb-donation-dropdown" aria-hidden="true" tabindex="-1">
         <option value="" disabled selected>-- Select Amount --</option>
         <option value="0">₹0 - No donation</option>
         <option value="1">₹1</option>
@@ -744,58 +771,70 @@
 </div>
   </div>
 
-  <aside class="register-layout__aside" aria-labelledby="reg-stats-heading">
+  <aside class="register-layout__aside registration-sidebar" aria-labelledby="reg-stats-heading">
     <section class="reg-stats reg-stats--sidebar">
-      <h1 id="reg-stats-heading" class="reg-stats__title">Join Qumanity — The Roar Begins</h1>
-      <p class="reg-stats__subtitle">Join the roar of 1.4 billion citizens</p>
+      <h1 id="reg-stats-heading" class="reg-stats__title h5">🌐 Join Qumanity — The Roar Begins</h1>
+      <p class="reg-stats__subtitle small text-muted">
+        Join the voice of 1.4 billion citizens building transparent governance.
+      </p>
+      <div class="network-pulse" aria-hidden="true"></div>
       <div class="reg-stats__stack" id="reg-stats-grid">
-        <div class="reg-stats__card reg-stats__card--saffron">
-          <span class="reg-stats__icon" aria-hidden="true">🌍</span>
-          <span class="reg-stats__label">Earth</span>
-          <span class="reg-stats__value"><span id="total-users">—</span> Users</span>
+        <div class="stat-card">
+          <span class="stat-icon" aria-hidden="true">🌍</span>
+          <div class="stat-info">
+            <div class="stat-label">Earth</div>
+            <div class="stat-value"><span id="total-users">—</span> Citizens</div>
+          </div>
         </div>
-        <div class="reg-stats__card reg-stats__card--white">
-          <span class="reg-stats__icon" aria-hidden="true">🇮🇳</span>
-          <span class="reg-stats__label">India</span>
-          <span class="reg-stats__value"><span id="india-users">—</span> Users</span>
+        <div class="stat-card">
+          <span class="stat-icon" aria-hidden="true">🇮🇳</span>
+          <div class="stat-info">
+            <div class="stat-label">India</div>
+            <div class="stat-value"><span id="india-users">—</span> Citizens</div>
+          </div>
         </div>
-        <div class="reg-stats__card reg-stats__card--green">
-          <span class="reg-stats__icon" aria-hidden="true">🏠</span>
-          <span class="reg-stats__label">Villages</span>
-          <span class="reg-stats__value">
-            <span id="active-villages">—</span> Active / <span id="total-villages">620,000</span>
-          </span>
+        <div class="stat-card">
+          <span class="stat-icon" aria-hidden="true">🏘️</span>
+          <div class="stat-info">
+            <div class="stat-label">Villages</div>
+            <div class="stat-value"><span id="active-villages">—</span> / <span id="total-villages">6,20,000</span></div>
+          </div>
         </div>
-        <div class="reg-stats__card reg-stats__card--saffron">
-          <span class="reg-stats__icon" aria-hidden="true">📍</span>
-          <span class="reg-stats__label">Tehsils</span>
-          <span class="reg-stats__value">
-            <span id="active-tehsils">—</span> / <span id="total-tehsils">—</span>
-          </span>
+        <div class="stat-card">
+          <span class="stat-icon" aria-hidden="true">📍</span>
+          <div class="stat-info">
+            <div class="stat-label">Tehsils</div>
+            <div class="stat-value"><span id="active-tehsils">—</span> / <span id="total-tehsils">—</span></div>
+          </div>
         </div>
-        <div class="reg-stats__card reg-stats__card--white">
-          <span class="reg-stats__icon" aria-hidden="true">📍</span>
-          <span class="reg-stats__label">Districts</span>
-          <span class="reg-stats__value">
-            <span id="active-districts">—</span> / <span id="total-districts">—</span>
-          </span>
+        <div class="stat-card">
+          <span class="stat-icon" aria-hidden="true">🏛️</span>
+          <div class="stat-info">
+            <div class="stat-label">Districts</div>
+            <div class="stat-value"><span id="active-districts">—</span> / <span id="total-districts">—</span></div>
+          </div>
         </div>
-        <div class="reg-stats__card reg-stats__card--green">
-          <span class="reg-stats__icon" aria-hidden="true">📍</span>
-          <span class="reg-stats__label">States</span>
-          <span class="reg-stats__value">
-            <span id="active-states">—</span> / <span id="total-states">28</span>
-          </span>
+        <div class="stat-card">
+          <span class="stat-icon" aria-hidden="true">🗺️</span>
+          <div class="stat-info">
+            <div class="stat-label">States</div>
+            <div class="stat-value"><span id="active-states">—</span> / <span id="total-states">—</span></div>
+          </div>
         </div>
       </div>
-      <p class="reg-stats__callout">
-        <span id="empty-villages-callout">620,000</span> villages are waiting for their first voice.
-        Will yours be the one?
+      <p class="reg-stats__callout small text-muted">
+        Every new citizen strengthens the chain. Your voice matters.
       </p>
+      <div class="did-you-know">
+        <strong>💡 Did You Know?</strong>
+        <p class="mb-0 mt-1" id="did-you-know-text">Qumanity's zodiac elections rotate leadership every month, preventing power capture.</p>
+      </div>
+      <a href="{{ url_for('white_paper') }}" class="qb-btn qb-btn-outline btn-sm mt-3 w-100 text-decoration-none text-center" target="_blank" rel="noopener noreferrer">Read the White Paper →</a>
     </section>
   </aside>
 </div>
 {% endif %}
+</div>
 </div>
 {% endblock %}
 
@@ -826,6 +865,7 @@
   };
 </script>
 <script src="{{ url_for('static', filename='register_geo.js') }}?v=7" defer></script>
-<script src="{{ url_for('static', filename='register.js') }}?v=27" defer></script>
+<script src="{{ url_for('static', filename='register.js') }}?v=28" defer></script>
+<script src="{{ url_for('static', filename='js/auth-enhancements.js') }}?v=1" defer></script>
 {% endif %}
 {% endblock %}
