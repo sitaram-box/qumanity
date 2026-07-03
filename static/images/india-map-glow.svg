@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 480" aria-hidden="true">
+  <defs>
+    <radialGradient id="indiaGlow" cx="50%" cy="45%" r="55%">
+      <stop offset="0%" stop-color="#FF9933" stop-opacity="0.35"/>
+      <stop offset="70%" stop-color="#138808" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#05080F" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="softGlow">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <ellipse cx="200" cy="220" rx="160" ry="200" fill="url(#indiaGlow)"/>
+  <path
+    fill="none"
+    stroke="#FF9933"
+    stroke-opacity="0.25"
+    stroke-width="2"
+    filter="url(#softGlow)"
+    d="M200 30 L240 70 L255 110 L270 150 L285 190 L275 230 L260 270 L245 310 L220 350 L200 400 L175 350 L150 310 L135 270 L120 230 L110 190 L125 150 L140 110 L160 70 Z"
+  />
+  <circle cx="200" cy="200" r="3" fill="#FFD700" opacity="0.6"/>
+  <circle cx="170" cy="250" r="2" fill="#FFD700" opacity="0.4"/>
+  <circle cx="230" cy="180" r="2" fill="#FFD700" opacity="0.4"/>
+  <circle cx="190" cy="300" r="2" fill="#FFD700" opacity="0.35"/>
+</svg>

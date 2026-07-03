@@ -584,6 +584,8 @@ _migration_startup_status: dict[str, Any] = {
 @app.get("/health")
 @app.route("/healthz")
 @app.get("/healthz")
+@app.route("/ping")
+@app.get("/ping")
 def health():
     """Railway liveness probe — no database access."""
     return "OK", 200
@@ -878,7 +880,7 @@ def _check_allowed_host() -> None:
     """Reject unknown host headers in production (custom domain + Railway fallback)."""
     if not config.IS_PRODUCTION:
         return
-    if request.path in ("/health", "/healthz", "/health/details", "/debug", "/favicon.ico"):
+    if request.path in ("/health", "/healthz", "/ping", "/health/details", "/debug", "/favicon.ico"):
         return
     if request.endpoint and str(request.endpoint).startswith("static"):
         return
@@ -899,6 +901,7 @@ def _ensure_admin_self_heal() -> None:
     skip = {
         "/health",
         "/healthz",
+        "/ping",
         "/health/details",
         "/debug",
         "/setup",
@@ -930,7 +933,7 @@ def _prune_invalid_session() -> None:
     """Drop stale session cookies when the user row no longer exists."""
     if request.endpoint and str(request.endpoint).startswith("static"):
         return
-    if request.path in ("/health", "/healthz", "/health/details", "/debug", "/setup", "/logout"):
+    if request.path in ("/health", "/healthz", "/ping", "/health/details", "/debug", "/setup", "/logout"):
         return
     pk = session.get("user_pk")
     if not pk:
@@ -946,7 +949,7 @@ def _prune_invalid_session() -> None:
 
 @app.before_request
 def _bind_ui_language() -> None:
-    if request.path in ("/health", "/healthz", "/health/details", "/debug"):
+    if request.path in ("/health", "/healthz", "/ping", "/health/details", "/debug"):
         g.ui_language = "en"
         return
     if request.path == "/setup":
@@ -3966,7 +3969,7 @@ def _before_request() -> None:
     """
     if request.endpoint and str(request.endpoint).startswith("static"):
         return
-    if request.path in ("/health", "/healthz", "/health/details", "/debug"):
+    if request.path in ("/health", "/healthz", "/ping", "/health/details", "/debug"):
         return
     if request.path == "/setup":
         return

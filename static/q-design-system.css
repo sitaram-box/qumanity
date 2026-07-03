@@ -1,0 +1,374 @@
+/**
+ * Qumanity v2 — spiritual design system components.
+ * Uses tokens from style.css :root (--q-* and mapped --qb-*).
+ */
+
+/* ── Typography ── */
+.q-display,
+h1.q-display,
+h2.q-display {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--q-text-primary);
+}
+
+.q-spiritual-text {
+  font-family: var(--font-devanagari);
+  line-height: 1.8;
+}
+
+/* ── Cards ── */
+.q-card {
+  background: var(--q-bg-card);
+  border: 1px solid var(--q-border-gold);
+  border-radius: var(--q-radius-lg);
+  padding: var(--q-space-6);
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+.q-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--q-shadow-glow);
+  border-color: rgba(212, 168, 83, 0.25);
+}
+
+.q-card--flat:hover {
+  transform: none;
+}
+
+/* ── Buttons ── */
+.q-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.55rem 1.15rem;
+  border-radius: var(--q-radius-md);
+  font-family: var(--font-sans);
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.2;
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-decoration: none;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+}
+
+.q-btn:focus-visible {
+  outline: 3px solid var(--q-focus-ring);
+  outline-offset: 2px;
+}
+
+.q-btn-primary {
+  background: var(--q-gold);
+  color: #0f1419;
+  border-color: var(--q-gold);
+}
+
+.q-btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--q-shadow-glow);
+  color: #0f1419;
+  text-decoration: none;
+}
+
+.q-btn-secondary {
+  background: var(--q-air);
+  color: #fff;
+  border-color: var(--q-air);
+}
+
+.q-btn-secondary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(90, 143, 168, 0.35);
+  color: #fff;
+  text-decoration: none;
+}
+
+.q-btn-ghost {
+  background: transparent;
+  color: var(--q-text-primary);
+  border-color: var(--q-border-gold);
+}
+
+.q-btn-ghost:hover {
+  background: rgba(212, 168, 83, 0.08);
+  transform: translateY(-2px);
+  color: var(--q-gold);
+  text-decoration: none;
+}
+
+/* ── Inputs ── */
+.q-input {
+  width: 100%;
+  padding: 0.65rem 1rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--q-border-gold);
+  border-radius: var(--q-radius-md);
+  color: var(--q-text-primary);
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.q-input::placeholder {
+  color: var(--q-text-secondary);
+}
+
+.q-input:focus {
+  outline: none;
+  border-color: rgba(212, 168, 83, 0.45);
+  box-shadow: 0 0 0 3px var(--q-focus-ring);
+}
+
+/* ── Element badges ── */
+.q-element-fire { --q-el: var(--q-fire); }
+.q-element-earth { --q-el: var(--q-earth); }
+.q-element-air { --q-el: var(--q-air); }
+.q-element-water { --q-el: var(--q-water); }
+.q-element-space { --q-el: var(--q-space); }
+
+.q-element-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--q-radius-full);
+  border: 1px solid var(--q-el, var(--q-gold));
+  color: var(--q-el, var(--q-gold));
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* ── Segmented pill nav ── */
+.q-segment-nav {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding: 0.35rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--q-border-gold);
+  border-radius: var(--q-radius-full);
+}
+
+.q-segment-nav__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 1rem;
+  border: 1px solid transparent;
+  border-radius: var(--q-radius-full);
+  background: transparent;
+  color: var(--q-text-secondary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.q-segment-nav__btn:hover {
+  color: var(--q-text-primary);
+  border-color: rgba(212, 168, 83, 0.2);
+}
+
+.q-segment-nav__btn.is-active {
+  background: linear-gradient(135deg, rgba(212, 168, 83, 0.25), rgba(212, 168, 83, 0.12));
+  border-color: var(--q-gold);
+  color: var(--q-gold);
+  box-shadow: var(--q-shadow-glow);
+}
+
+/* ── QSI gauge (replaces spinning wheel display) ── */
+.q-qsi-gauge {
+  position: relative;
+  width: 140px;
+  height: 140px;
+  margin: 0 auto;
+}
+
+.q-qsi-gauge svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.q-qsi-gauge__track {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.08);
+  stroke-width: 10;
+}
+
+.q-qsi-gauge__fill {
+  fill: none;
+  stroke-width: 10;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.8s ease, stroke 0.4s ease;
+}
+
+.q-qsi-gauge__label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.q-qsi-gauge__score {
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--q-gold);
+  line-height: 1;
+}
+
+.q-qsi-gauge__caption {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--q-text-secondary);
+  margin-top: 0.25rem;
+}
+
+/* ── Election calendar ── */
+.election-calendar {
+  padding: var(--q-space-4);
+}
+
+.election-calendar .calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--q-space-4);
+  margin: var(--q-space-6) 0;
+}
+
+.election-calendar .zodiac-card {
+  background: var(--q-bg-card);
+  border: 2px solid transparent;
+  border-radius: var(--q-radius-lg);
+  padding: var(--q-space-4);
+  text-align: center;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.election-calendar .zodiac-card[data-element="Fire"] { border-color: var(--q-fire); }
+.election-calendar .zodiac-card[data-element="Earth"] { border-color: var(--q-earth); }
+.election-calendar .zodiac-card[data-element="Air"] { border-color: var(--q-air); }
+.election-calendar .zodiac-card[data-element="Water"] { border-color: var(--q-water); }
+
+.election-calendar .zodiac-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--q-shadow-lg);
+}
+
+.election-calendar .zodiac-card.active {
+  background: linear-gradient(135deg, rgba(212, 168, 83, 0.12), transparent);
+}
+
+.election-calendar .zodiac-icon { font-size: 1.75rem; margin-bottom: 0.35rem; }
+.election-calendar .zodiac-name {
+  font-family: var(--font-display);
+  color: var(--q-text-primary);
+  font-size: 0.95rem;
+}
+.election-calendar .zodiac-sanskrit { color: var(--q-gold); font-size: 0.75rem; }
+.election-calendar .zodiac-dates { color: var(--q-text-secondary); font-size: 0.7rem; margin-top: 0.35rem; }
+
+.election-calendar .zodiac-status {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+  font-size: 0.65rem;
+  padding: 2px 8px;
+  border-radius: var(--q-radius-full);
+}
+
+.election-calendar .zodiac-status.completed {
+  background: rgba(90, 143, 90, 0.25);
+  color: var(--q-earth);
+}
+.election-calendar .zodiac-status.active {
+  background: rgba(212, 168, 83, 0.2);
+  color: var(--q-gold);
+}
+.election-calendar .zodiac-status.upcoming {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--q-text-secondary);
+}
+
+.election-calendar .current-election-panel {
+  background: var(--q-bg-card);
+  border: 1px solid rgba(212, 168, 83, 0.2);
+  border-radius: var(--q-radius-xl);
+  padding: var(--q-space-6);
+  text-align: center;
+}
+
+.election-calendar .timer-display {
+  display: flex;
+  justify-content: center;
+  gap: var(--q-space-4);
+  margin: var(--q-space-4) 0;
+  flex-wrap: wrap;
+}
+
+.election-calendar .timer-value {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 2rem;
+  color: var(--q-gold);
+}
+
+/* ── Planet position bar ── */
+.planet-position-bar {
+  background: linear-gradient(180deg, var(--q-bg-card), var(--q-bg-deep));
+  border-top: 1px solid rgba(212, 168, 83, 0.1);
+  padding: var(--q-space-3) var(--q-space-4);
+}
+
+.planet-position-bar .planet-positions {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--q-space-2);
+}
+
+@media (max-width: 768px) {
+  .planet-position-bar .planet-positions {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.planet-position-bar .element-group {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--q-space-2);
+  padding: var(--q-space-2) var(--q-space-3);
+  border-radius: var(--q-radius-md);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.planet-position-bar .element-group[data-element="Fire"] { border-left: 3px solid var(--q-fire); }
+.planet-position-bar .element-group[data-element="Earth"] { border-left: 3px solid var(--q-earth); }
+.planet-position-bar .element-group[data-element="Air"] { border-left: 3px solid var(--q-air); }
+.planet-position-bar .element-group[data-element="Water"] { border-left: 3px solid var(--q-water); }
+
+.planet-position-bar .planet-chip {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--q-text-secondary);
+  padding: 2px 8px;
+  border-radius: var(--q-radius-sm);
+  font-size: 0.7rem;
+  cursor: help;
+  transition: all 0.2s ease;
+}
+
+.planet-position-bar .planet-chip:hover {
+  background: rgba(212, 168, 83, 0.15);
+  color: var(--q-gold);
+}

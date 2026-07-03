@@ -1,0 +1,509 @@
+/* Qumanity v2 — homepage sections */
+
+.qb-page-home-story .qb-story-hero__base {
+  background: var(--q-bg-deep);
+}
+
+.qb-story-hero__india-outline {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  opacity: 0.08;
+}
+
+.qb-story-hero__india-outline svg {
+  width: min(55vw, 420px);
+  height: auto;
+  stroke: var(--q-gold);
+  fill: none;
+  stroke-width: 1.5;
+}
+
+.qb-story-hero__chakra-spin {
+  animation: qb-chakra-rotate 120s linear infinite;
+  opacity: 1;
+}
+
+/* Ashok Chakra — top-right corner */
+.qb-page-home-story .qb-story-hero__chakra-wrapper {
+  position: absolute;
+  top: clamp(4.5rem, 10vw, 5.5rem);
+  right: clamp(1rem, 3vw, 2rem);
+  z-index: 6;
+  width: min(140px, 28vw);
+  height: min(140px, 28vw);
+  flex: none;
+  min-height: 0;
+  pointer-events: none;
+}
+
+.qb-page-home-story .qb-story-hero__chakra-stage {
+  width: 100%;
+  height: 100%;
+}
+
+.qb-page-home-story .qb-chakra-outer-ring,
+.qb-page-home-story .qb-chakra-spoke {
+  stroke: #ffffff !important;
+}
+
+/* Hero readable text panel */
+.qb-page-home-story .qb-story-hero__content {
+  position: relative;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 55vh;
+  padding: 2rem 1.75rem;
+  text-align: center;
+  max-width: 720px;
+  margin: 0 auto;
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: var(--q-radius-xl);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+}
+
+.qb-page-home-story .qb-story-hero__content,
+.qb-page-home-story .qb-story-hero__content h1,
+.qb-page-home-story .qb-story-hero__subtitle,
+.qb-page-home-story .qb-story-hero__subtitle span,
+.qb-page-home-story .qb-hero-stat__value,
+.qb-page-home-story .qb-hero-stat__label {
+  color: #000000;
+}
+
+.qb-page-home-story .qb-hero-badge {
+  color: #1a1a1a;
+  border-color: rgba(0, 0, 0, 0.15);
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.qb-hero-join-btn {
+  background: #1a56db !important;
+  color: #ffffff !important;
+  border: none !important;
+  padding: 0.75rem 1.85rem !important;
+  border-radius: 8px !important;
+  font-weight: 700;
+  transition: background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.qb-hero-join-btn:hover {
+  background: #1e40af !important;
+  color: #ffffff !important;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(26, 86, 219, 0.4);
+  text-decoration: none;
+}
+
+.qb-hero-find-btn {
+  background: transparent !important;
+  color: #000000 !important;
+  border: 1px solid rgba(0, 0, 0, 0.25) !important;
+}
+
+.qb-hero-find-btn:hover {
+  background: rgba(0, 0, 0, 0.06) !important;
+  color: #000000 !important;
+}
+
+@keyframes qb-chakra-rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.qb-hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.85rem;
+  border-radius: var(--q-radius-full);
+  border: 1px solid var(--q-border-gold);
+  background: rgba(212, 168, 83, 0.08);
+  color: var(--q-gold);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 1rem;
+}
+
+.qb-hero-live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--q-earth);
+  animation: qb-live-pulse 2s ease-in-out infinite;
+}
+
+@keyframes qb-live-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.2); }
+}
+
+.qb-hero-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  justify-content: center;
+  margin: 1.5rem 0;
+}
+
+.qb-hero-stat {
+  text-align: center;
+}
+
+.qb-hero-stat__value {
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  color: #000000;
+  display: block;
+}
+
+.qb-hero-stat__label {
+  font-size: 0.8rem;
+  color: #1a1a1a;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.qb-hero-cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: center;
+  margin-top: 1.25rem;
+}
+
+.qb-scroll-indicator {
+  position: absolute;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--q-text-secondary);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  animation: qb-scroll-bob 2s ease-in-out infinite;
+}
+
+.qb-scroll-indicator__wheel {
+  width: 22px;
+  height: 34px;
+  border: 2px solid rgba(212, 168, 83, 0.35);
+  border-radius: 12px;
+  position: relative;
+}
+
+.qb-scroll-indicator__wheel::after {
+  content: "";
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  width: 4px;
+  height: 6px;
+  margin-left: -2px;
+  background: var(--q-gold);
+  border-radius: 2px;
+  animation: qb-scroll-dot 2s ease-in-out infinite;
+}
+
+@keyframes qb-scroll-bob {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  50% { transform: translateX(-50%) translateY(6px); }
+}
+
+@keyframes qb-scroll-dot {
+  0%, 100% { opacity: 1; top: 6px; }
+  50% { opacity: 0.3; top: 14px; }
+}
+
+/* Timeline — How Qumanity Was Born */
+.qb-story-timeline {
+  position: relative;
+  padding: 3rem 1.5rem;
+  background: var(--q-bg-card);
+}
+
+.qb-story-timeline::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 4rem;
+  bottom: 4rem;
+  width: 2px;
+  background: linear-gradient(180deg, transparent, var(--q-gold), transparent);
+  transform: translateX(-50%);
+  opacity: 0.35;
+}
+
+.qb-timeline-item {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 1.5rem;
+  align-items: center;
+  margin-bottom: 2.5rem;
+  max-width: 900px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.qb-timeline-item:nth-child(even) .qb-timeline-card { grid-column: 1; }
+.qb-timeline-item:nth-child(even) .qb-timeline-year { grid-column: 2; }
+.qb-timeline-item:nth-child(odd) .qb-timeline-card { grid-column: 3; }
+.qb-timeline-item:nth-child(odd) .qb-timeline-year { grid-column: 2; }
+
+.qb-timeline-year {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 2px solid var(--q-gold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--q-gold);
+  background: var(--q-bg-deep);
+  z-index: 1;
+}
+
+.qb-timeline-card {
+  background: var(--q-bg-deep);
+  border: 1px solid var(--q-border-gold);
+  border-radius: var(--q-radius-lg);
+  padding: 1.25rem 1.5rem;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.qb-timeline-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--q-shadow-glow);
+}
+
+.qb-timeline-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.75rem;
+}
+
+.qb-timeline-tag {
+  font-size: 0.7rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--q-radius-full);
+  border: 1px solid var(--q-border-gold);
+  color: var(--q-text-secondary);
+}
+
+/* Impact cards — Why It Matters */
+.qb-impact-section {
+  padding: 3rem 1.5rem;
+  background: var(--q-bg-deep);
+}
+
+.qb-impact-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.25rem;
+  max-width: 1100px;
+  margin: 0 auto 2rem;
+}
+
+.qb-impact-card {
+  background: var(--q-bg-card);
+  border-radius: var(--q-radius-lg);
+  padding: 1.5rem;
+  border-top: 3px solid var(--q-el, var(--q-gold));
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.qb-impact-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--q-shadow-glow);
+}
+
+.qb-impact-card--fire { --q-el: var(--q-fire); }
+.qb-impact-card--earth { --q-el: var(--q-earth); }
+.qb-impact-card--air { --q-el: var(--q-air); }
+.qb-impact-card--water { --q-el: var(--q-water); }
+
+.qb-impact-card__icon { font-size: 1.75rem; margin-bottom: 0.5rem; }
+.qb-impact-card__stat {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  color: var(--q-gold);
+  margin: 0.5rem 0;
+}
+
+.qb-impact-quote {
+  text-align: center;
+  max-width: 640px;
+  margin: 0 auto;
+  font-style: italic;
+  color: var(--q-text-secondary);
+  border-top: 1px solid var(--q-border-gold);
+  padding-top: 1.5rem;
+}
+
+/* Enhanced search */
+.qb-search-v2 {
+  position: relative;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.qb-search-v2__wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.qb-search-v2__icon {
+  position: absolute;
+  left: 1rem;
+  color: var(--q-text-secondary);
+  pointer-events: none;
+}
+
+.qb-search-v2__input {
+  padding-left: 2.75rem !important;
+  padding-right: 5rem !important;
+  font-size: 1.1rem !important;
+  min-height: 3rem;
+}
+
+.qb-search-v2__kbd {
+  position: absolute;
+  right: 0.75rem;
+  font-size: 0.7rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: var(--q-radius-sm);
+  border: 1px solid var(--q-border-gold);
+  color: var(--q-text-secondary);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.qb-search-v2__clear {
+  position: absolute;
+  right: 3.5rem;
+  background: none;
+  border: none;
+  color: var(--q-text-secondary);
+  cursor: pointer;
+  padding: 0.25rem;
+  display: none;
+}
+
+.qb-search-v2__clear.is-visible { display: block; }
+
+.qb-search-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  justify-content: center;
+  margin: 1rem 0;
+}
+
+.qb-search-pill {
+  padding: 0.3rem 0.75rem;
+  border-radius: var(--q-radius-full);
+  border: 1px solid var(--q-border-gold);
+  background: transparent;
+  color: var(--q-text-secondary);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.qb-search-pill:hover,
+.qb-search-pill.is-active {
+  background: rgba(212, 168, 83, 0.12);
+  border-color: var(--q-gold);
+  color: var(--q-gold);
+}
+
+.qb-search-dropdown {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  left: 0;
+  right: 0;
+  background: var(--q-bg-card);
+  border: 1px solid var(--q-border-gold);
+  border-radius: var(--q-radius-lg);
+  padding: 0.75rem;
+  z-index: 50;
+  box-shadow: var(--q-shadow-lg);
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.qb-search-dropdown[hidden] { display: none !important; }
+
+.qb-search-dropdown__section-title {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--q-text-secondary);
+  margin: 0.5rem 0 0.35rem;
+  padding: 0 0.5rem;
+}
+
+.qb-search-preview-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--q-radius-md);
+  border: 1px solid var(--q-border-gold);
+  margin-top: 0.75rem;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.qb-story-hero__subtitle {
+  max-width: 520px;
+  color: #000000;
+  font-size: 1.05rem;
+  margin: 0.75rem auto 0;
+}
+
+.text-gold { color: var(--q-gold) !important; }
+
+.qb-page-home-story .qb-story-hero__credit-right {
+  color: rgba(255, 255, 255, 0.85);
+  z-index: 5;
+}
+
+@media (max-width: 768px) {
+  .qb-page-home-story .qb-story-hero__chakra-wrapper {
+    width: min(100px, 22vw);
+    height: min(100px, 22vw);
+    top: 4.25rem;
+    right: 0.75rem;
+  }
+
+  .qb-page-home-story .qb-story-hero__content {
+    padding: 1.5rem 1.25rem;
+    margin-top: 1rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .qb-story-timeline::before { left: 2rem; }
+  .qb-timeline-item {
+    grid-template-columns: auto 1fr;
+    gap: 1rem;
+  }
+  .qb-timeline-item .qb-timeline-year { grid-column: 1; grid-row: 1; width: 48px; height: 48px; font-size: 0.85rem; }
+  .qb-timeline-item .qb-timeline-card { grid-column: 2; grid-row: 1; }
+}

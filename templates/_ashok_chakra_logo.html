@@ -1,0 +1,18 @@
+{# Qumanity logo — revolving Ashok Chakra with Surya centre (generated asset) #}
+{% set chakra_size = chakra_size|default('md') %}
+{% set logo_gif = url_for('static', filename='images/ashok_chakra_rotating.gif') %}
+{% set logo_png = url_for('static', filename='images/ashok_chakra_with_sun.png') %}
+<div class="qb-chakra-logo qb-chakra-logo--{{ chakra_size }} logo-container">
+  <picture>
+    <source srcset="{{ logo_png }}" media="(prefers-reduced-motion: reduce)" />
+    <img
+      class="qb-chakra-logo-img"
+      src="{{ logo_gif }}"
+      alt=""
+      width="200"
+      height="200"
+      loading="eager"
+      decoding="async"
+    />
+  </picture>
+</div>

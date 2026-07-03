@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400" aria-hidden="true">
+  <defs>
+    <radialGradient id="originGlow" cx="62%" cy="48%" r="8%">
+      <stop offset="0%" stop-color="#FF9933" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#FF9933" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <ellipse cx="400" cy="200" rx="360" ry="170" fill="none" stroke="#334155" stroke-width="1.5" stroke-opacity="0.5"/>
+  <ellipse cx="400" cy="200" rx="280" ry="120" fill="none" stroke="#334155" stroke-width="1" stroke-opacity="0.3"/>
+  <path d="M120 180 Q200 120 320 150 T520 140 T680 170" fill="none" stroke="#334155" stroke-width="1" stroke-opacity="0.35"/>
+  <path d="M100 240 Q250 280 400 250 T700 230" fill="none" stroke="#334155" stroke-width="1" stroke-opacity="0.35"/>
+  <circle cx="500" cy="192" r="28" fill="url(#originGlow)"/>
+  <circle cx="500" cy="192" r="6" fill="#FF9933"/>
+  <line x1="500" y1="192" x2="280" y2="160" stroke="#FFD700" stroke-opacity="0.35" stroke-width="1"/>
+  <line x1="500" y1="192" x2="620" y2="150" stroke="#FFD700" stroke-opacity="0.35" stroke-width="1"/>
+  <line x1="500" y1="192" x2="340" y2="250" stroke="#FFD700" stroke-opacity="0.35" stroke-width="1"/>
+  <line x1="500" y1="192" x2="650" y2="240" stroke="#FFD700" stroke-opacity="0.35" stroke-width="1"/>
+  <line x1="500" y1="192" x2="180" y2="200" stroke="#FFD700" stroke-opacity="0.35" stroke-width="1"/>
+  <circle cx="280" cy="160" r="3" fill="#94A3B8" opacity="0.7"/>
+  <circle cx="620" cy="150" r="3" fill="#94A3B8" opacity="0.7"/>
+  <circle cx="340" cy="250" r="3" fill="#94A3B8" opacity="0.7"/>
+  <circle cx="650" cy="240" r="3" fill="#94A3B8" opacity="0.7"/>
+  <circle cx="180" cy="200" r="3" fill="#94A3B8" opacity="0.7"/>
+</svg>

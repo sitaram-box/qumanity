@@ -1,13 +1,7 @@
-{# Top-left brand: Surya icon + Qumanity wordmark — include inside .qb-brand link #}
-<div class="qb-logo-container qb-logo-left">
-  <img
-    src="{{ url_for('static', filename='images/surya.png') }}"
-    alt="Surya"
-    class="qb-header-surya-icon"
-    width="80"
-    height="80"
-  />
+{# Top-left brand: Ashok Chakra + Qumanity wordmark #}
+<div class="qb-logo-container qb-logo-left qb-brand-chakra header-logo">
+  {% with chakra_size='header' %}{% include '_ashok_chakra_logo.html' %}{% endwith %}
   <div class="qb-qumanity-block">
-    <span class="qb-qumanity-logo">Qumanity</span>
+    <span class="qb-qumanity-logo qb-wordmark-gradient brand-text">Qumanity</span>
   </div>
 </div>

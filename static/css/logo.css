@@ -1,0 +1,67 @@
+/**
+ * Qumanity logo — Ashok Chakra + Surya (GIF / static PNG)
+ */
+
+.qb-chakra-logo {
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.qb-chakra-logo--sm { width: 80px; height: 80px; }
+.qb-chakra-logo--header { width: 56px; height: 56px; }
+.qb-chakra-logo--md { width: 128px; height: 128px; }
+.qb-chakra-logo--lg { width: 300px; height: 300px; }
+
+.qb-chakra-logo picture,
+.qb-chakra-logo-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.qb-chakra-logo-img {
+  object-fit: contain;
+  border-radius: 50%;
+}
+
+.qb-brand-chakra .qb-chakra-logo-img {
+  filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.4));
+  transition: transform 0.3s ease, filter 0.3s ease;
+  animation: logo-glow 3s ease-in-out infinite;
+}
+
+@keyframes logo-glow {
+  0%, 100% { filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.3)); }
+  50% { filter: drop-shadow(0 0 14px rgba(245, 158, 11, 0.55)); }
+}
+
+.qb-brand:hover .qb-chakra-logo-img,
+.qb-brand:focus-visible .qb-chakra-logo-img {
+  transform: scale(1.05);
+}
+
+.logo-container:hover .qb-chakra-logo-img {
+  filter: brightness(1.08);
+}
+
+.qb-footer-chakra-watermark .qb-chakra-logo-img {
+  opacity: 0.12;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qb-brand-chakra .qb-chakra-logo-img {
+    animation: none;
+  }
+
+  .qb-brand:hover .qb-chakra-logo-img,
+  .qb-brand:focus-visible .qb-chakra-logo-img {
+    transform: none;
+  }
+
+  .logo-container:hover .qb-chakra-logo-img {
+    filter: none;
+  }
+}

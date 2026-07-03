@@ -1,0 +1,29 @@
+/**
+ * Qumanity — dark mode only (no light theme)
+ */
+:root,
+html,
+html[data-theme="dark"] {
+  --bg-primary: #0f172a;
+  --bg-secondary: #1e293b;
+  --bg-card: #1e293b;
+  --bg-elevated: #334155;
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+  --border-color: #334155;
+  --accent-primary: #f59e0b;
+  --accent-hover: #d97706;
+  --button-primary-bg: #f59e0b;
+  --button-primary-text: #0f172a;
+  --button-secondary-bg: #334155;
+  --button-secondary-text: #f8fafc;
+  --qb-bg: #0f172a;
+  --qb-surface: #1e293b;
+  --qb-surface-elevated: #334155;
+  --qb-border: #334155;
+  --qb-text: #f8fafc;
+  --qb-muted: #94a3b8;
+  --qb-primary: #f59e0b;
+  --qb-primary-hover: #d97706;
+}

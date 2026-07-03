@@ -1,0 +1,13 @@
+{
+  "name": "Qumanity — Village Governance",
+  "short_name": "Qumanity",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0F172A",
+  "theme_color": "#F59E0B",
+  "description": "India's quantum governance platform for villages and citizens.",
+  "icons": [
+    { "src": "/static/images/ashok_chakra_with_sun.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/static/images/ashok_chakra_with_sun.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
