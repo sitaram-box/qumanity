@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}How Karma Works — Qumanity{% endblock %}
+{% block body %}
+<div class="container py-4" style="max-width: 720px">
+  <h1 class="h2 mb-4">How Karma Points Work</h1>
+  <div class="qb-panel p-4 mb-4">
+    <ol class="mb-0">
+      <li class="mb-3"><strong>DO GOOD</strong> — Report issues, vote, volunteer, donate</li>
+      <li class="mb-3"><strong>EARN KARMA</strong> — Points verified by council or moderators</li>
+      <li><strong>USE KARMA</strong> — Unlock governance rights, reputation, village perks</li>
+    </ol>
+  </div>
+  <div class="table-responsive qb-panel p-3 mb-4">
+    <table class="table table-sm table-dark mb-0">
+      <thead><tr><th>Action</th><th>Points</th><th>Verification</th></tr></thead>
+      <tbody>
+        <tr><td>Vote in election</td><td>+10</td><td>Automatic</td></tr>
+        <tr><td>Report verified issue</td><td>+25</td><td>Photo + GPS</td></tr>
+        <tr><td>Volunteer (1 hour)</td><td>+50</td><td>Council sign-off</td></tr>
+        <tr><td>Donate ₹100</td><td>+5</td><td>Transaction record</td></tr>
+        <tr><td>Complete profile</td><td>+15</td><td>Automatic</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="qb-panel p-3">
+    <h2 class="h6">FAQ</h2>
+    <p class="small mb-2"><strong>Can I buy Karma?</strong> No. Karma is earned, not purchased.</p>
+    <p class="small mb-2"><strong>Do Karma Points expire?</strong> No, but inactive accounts pause accumulation.</p>
+    <p class="small mb-0"><strong>Can I transfer Karma?</strong> No. Karma is tied to your civic identity.</p>
+  </div>
+  <p class="mt-4 text-center">
+    <a href="/karma-ledger" class="qb-btn qb-btn-outline btn-sm">View Public Karma Ledger</a>
+  </p>
+</div>
+{% endblock %}

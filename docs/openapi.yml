@@ -1,0 +1,72 @@
+openapi: 3.0.3
+info:
+  title: Qumanity API
+  version: 0.1.0-alpha
+  description: Core endpoints for Qumanity village governance platform
+servers:
+  - url: https://qumanity.in
+  - url: http://127.0.0.1:5001
+paths:
+  /api/demo/village:
+    get:
+      summary: Demo village preview data
+      responses:
+        "200":
+          description: Demo Gram statistics and issues
+  /api/feedback:
+    post:
+      summary: Submit in-app page feedback
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                page_path: { type: string }
+                rating: { type: integer }
+                message: { type: string }
+      responses:
+        "200":
+          description: Feedback recorded
+  /api/pilot/villages:
+    get:
+      summary: List pilot villages
+      responses:
+        "200":
+          description: Pilot village list
+  /api/pilot/feedback:
+    post:
+      summary: Submit pilot program feedback
+      responses:
+        "200":
+          description: Recorded
+  /api/pilot/metrics:
+    get:
+      summary: Pilot metrics
+      parameters:
+        - name: village_id
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Metrics rows
+  /api/identity/level:
+    get:
+      summary: Current user progressive identity level
+      security: [{ sessionCookie: [] }]
+      responses:
+        "200":
+          description: Auth level 1-4 progress
+  /api/metrics/public:
+    get:
+      summary: Public platform counters
+      responses:
+        "200":
+          description: Aggregate metrics
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: session

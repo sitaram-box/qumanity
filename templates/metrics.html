@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Qumanity in Numbers{% endblock %}
+{% block body %}
+<div class="container py-4">
+  <h1 class="h2 mb-4">Qumanity in Numbers</h1>
+  <div class="row g-3">
+    <div class="col-md-4">
+      <div class="qb-panel p-3 text-center">
+        <div class="h3 mb-0">{{ platform_metrics.users_registered }}</div>
+        <div class="small text-muted">Citizens Registered</div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="qb-panel p-3 text-center">
+        <div class="h3 mb-0">{{ platform_metrics.villages_in_db }}</div>
+        <div class="small text-muted">Villages in Database</div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="qb-panel p-3 text-center">
+        <div class="h3 mb-0">{{ platform_metrics.demo_karma_issued }}</div>
+        <div class="small text-muted">Karma Points (demo aggregate)</div>
+      </div>
+    </div>
+  </div>
+  <div class="qb-panel p-4 mt-4">
+    <h2 class="h6">Governance (Demo / Pilot)</h2>
+    <ul class="small mb-0">
+      <li>Issues Resolved (demo): {{ platform_metrics.demo_issues_resolved }}</li>
+      <li>Active Councils (pilot): {{ platform_metrics.demo_active_councils }}</li>
+    </ul>
+  </div>
+  <p class="small text-muted mt-3">Live GitHub stars and contributor counts: see repository README.</p>
+</div>
+{% endblock %}

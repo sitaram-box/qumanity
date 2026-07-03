@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Security — Qumanity{% endblock %}
+{% block body %}
+<div class="container py-4" style="max-width: 800px">
+  <h1 class="h2 mb-4">Security at Qumanity</h1>
+  <div class="qb-panel p-4 mb-4">
+    <h2 class="h5">Our Commitments</h2>
+    <ul class="mb-0">
+      <li>✅ <strong>Open Source</strong> — Code auditable at github.com/sitaram-box/qumanity</li>
+      <li>✅ <strong>Data Sovereignty</strong> — Village data on Indian servers</li>
+      <li>✅ <strong>No Third-Party Tracking</strong> — No Google Analytics, no Facebook Pixel</li>
+      <li>✅ <strong>Encryption</strong> — Data encrypted at rest and in transit</li>
+      <li>✅ <strong>Blockchain Verification</strong> — Karma Ledger immutable and verifiable</li>
+    </ul>
+  </div>
+  <div class="table-responsive qb-panel p-3 mb-4">
+    <h2 class="h6 mb-3">Security Audit Status</h2>
+    <table class="table table-sm table-dark mb-0">
+      <thead><tr><th>Component</th><th>Status</th><th>Last Audit</th></tr></thead>
+      <tbody>
+        <tr><td>Authentication</td><td>✅ Internal</td><td>Jul 2026</td></tr>
+        <tr><td>Blockchain Core</td><td>⏳ Planned</td><td>—</td></tr>
+        <tr><td>Identity System</td><td>⏳ Planned</td><td>—</td></tr>
+        <tr><td>API Endpoints</td><td>✅ Automated (CI)</td><td>Continuous</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="qb-panel p-3">
+    <h2 class="h6">Bug Bounty Program</h2>
+    <p class="small mb-2">Critical: ₹25,000 · High: ₹10,000 · Medium: ₹5,000 · Low: ₹1,000</p>
+    <p class="small mb-0">Report: <a href="mailto:security@qumanity.in">security@qumanity.in</a></p>
+  </div>
+</div>
+{% endblock %}

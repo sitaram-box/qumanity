@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Karma Ledger — Qumanity{% endblock %}
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}?v=20" />
+{% endblock %}
+{% block body %}
+<div class="container py-4">
+  <h1 class="h2 mb-2">Public Karma Ledger</h1>
+  <p class="text-muted small mb-4">Read-only, anonymized civic actions. Hashed citizen IDs only.</p>
+  <div id="qb-karma-ledger-root" class="qb-panel p-3"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/karma_ledger.js') }}?v=1"></script>
+{% endblock %}

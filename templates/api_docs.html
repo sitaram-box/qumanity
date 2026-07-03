@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}API Documentation — Qumanity{% endblock %}
+{% block body %}
+<div class="container py-4">
+  <h1 class="h2 mb-2">API Documentation</h1>
+  <p class="text-muted small mb-4">OpenAPI specification for core Qumanity endpoints.</p>
+  <div class="qb-panel p-3">
+    <p class="small">Download: <a href="{{ url_for('api_openapi_json') }}">openapi.json / yaml</a></p>
+    <pre class="small mb-0" style="max-height: 60vh; overflow: auto"><code id="qb-openapi-preview">Loading…</code></pre>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+fetch("{{ url_for('api_openapi_json') }}")
+  .then(function (r) { return r.text(); })
+  .then(function (t) {
+    var el = document.getElementById("qb-openapi-preview");
+    if (el) el.textContent = t.slice(0, 12000);
+  });
+</script>
+{% endblock %}

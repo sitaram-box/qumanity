@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Demo Village — Qumanity{% endblock %}
+{% block body_class %}qb-akasha-space{% endblock %}
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='styles/responsive.css') }}?v=1" />
+<link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}?v=20" />
+{% endblock %}
+{% block body %}
+<div class="qb-demo-dashboard container py-4" id="qb-demo-dashboard">
+  <header class="qb-demo-header mb-4">
+    <p class="small text-warning mb-1">Preview mode — register to participate in real governance</p>
+    <h1 class="h3 mb-1">🏘️ {{ demo.name }}, {{ demo.district }}, {{ demo.state }}</h1>
+    <p class="text-muted small mb-0">
+      Next Election: {{ demo.next_election_days }} days ({{ demo.next_election_from }} → {{ demo.next_election_to }})
+    </p>
+  </header>
+
+  <div class="row g-3 mb-4">
+    <div class="col-md-6">
+      <div class="qb-panel p-3">
+        <h2 class="h6 text-secondary">📊 Village Stats</h2>
+        <ul class="list-unstyled small mb-0">
+          <li>Population: <strong>{{ demo.population }}</strong></li>
+          <li>Karma: <strong>{{ demo.karma_total }}</strong></li>
+          <li>Active Issues: <strong>{{ demo.active_issues }}</strong></li>
+          <li>Budget remaining: <strong>₹{{ demo.budget_remaining }}</strong></li>
+        </ul>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="qb-panel p-3">
+        <h2 class="h6 text-secondary">🏛️ Village Council</h2>
+        <ul class="list-unstyled small mb-0">
+          {% for m in demo.council %}
+          <li>{{ m.sign }} ({{ m.element }}) — {{ m.karma }} karma</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <section class="qb-panel p-3 mb-4">
+    <h2 class="h6 text-secondary mb-3">🗳️ Active Voting</h2>
+    {% for issue in demo.issues %}
+    <div class="qb-demo-issue mb-3 pb-3 border-bottom border-secondary">
+      <div class="d-flex justify-content-between flex-wrap gap-2">
+        <strong>{{ issue.title }}</strong>
+        <span class="small text-muted">{{ issue.status }}</span>
+      </div>
+      {% if issue.yes_pct %}
+      <div class="small mt-2">Yes: {{ issue.yes_pct }}% · No: {{ issue.no_pct }}%</div>
+      <div class="progress mt-1" style="height: 8px">
+        <div class="progress-bar bg-success" style="width: {{ issue.yes_pct }}%"></div>
+      </div>
+      {% endif %}
+      <div class="d-flex gap-2 mt-2">
+        <button type="button" class="qb-btn qb-btn-primary btn-sm qb-demo-action">Vote Yes</button>
+        <button type="button" class="qb-btn qb-btn-neutral btn-sm qb-demo-action">Vote No</button>
+      </div>
+      {% if issue.ends_in_days %}
+      <p class="small text-muted mb-0 mt-1">Ends in {{ issue.ends_in_days }} days</p>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </section>
+
+  <div class="row g-3 mb-4">
+    <div class="col-md-6">
+      <div class="qb-panel p-3">
+        <h2 class="h6 text-secondary">🏆 Karma Leaders</h2>
+        <ol class="small mb-0">
+          {% for l in demo.karma_leaders %}
+          <li>Citizen {{ l.citizen_hash }} — {{ l.points }} pts</li>
+          {% endfor %}
+        </ol>
+        <p class="small text-muted mb-0 mt-2">*Anonymized for privacy</p>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="qb-panel p-3">
+        <h2 class="h6 text-secondary">📅 Upcoming Events</h2>
+        <ul class="small mb-0">
+          {% for e in demo.events %}
+          <li>{{ e.title }} ({{ e.date }})</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="text-center">
+    <a href="{{ url_for('register') }}" class="qb-btn qb-btn-primary">🔐 Register to Participate</a>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/demo_dashboard.js') }}?v=1"></script>
+{% endblock %}
