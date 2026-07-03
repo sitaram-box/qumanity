@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block title %}QV Results — Qumanity{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='qv.css') }}?v=1" />
+{% endblock %}
+
+{% block header_inner %}
+<div class="d-flex flex-wrap align-items-center justify-content-between w-100 gap-2">
+  <a href="{{ url_for('qv_dashboard_page') }}" class="qb-btn qb-btn-neutral btn-sm">← Referendums</a>
+  <h1 class="h5 mb-0">Resolved Referendums</h1>
+</div>
+{% endblock %}
+
+{% block body %}
+<main class="qv-page">
+  <div class="table-responsive">
+    <table class="qv-table" id="qv-results-table">
+      <thead>
+        <tr>
+          <th><button type="button" class="btn btn-link btn-sm p-0 text-decoration-none" data-sort="title">Title</button></th>
+          <th><button type="button" class="btn btn-link btn-sm p-0 text-decoration-none" data-sort="level">Level</button></th>
+          <th><button type="button" class="btn btn-link btn-sm p-0 text-decoration-none" data-sort="support">Support</button></th>
+          <th><button type="button" class="btn btn-link btn-sm p-0 text-decoration-none" data-sort="date">Date</button></th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in referendums %}
+        <tr data-title="{{ r.title|lower }}" data-level="{{ r.level }}" data-support="{{ r.total_weighted_support or 0 }}" data-date="{{ r.resolved_at or r.created_at }}">
+          <td><a href="{{ url_for('qv_detail_page', ref_id=r.id) }}">{{ r.title }}</a></td>
+          <td>{{ r.level }}</td>
+          <td>{{ r.total_weighted_support or 0 }}</td>
+          <td>{{ r.resolved_at or r.created_at }}</td>
+          <td><span class="qv-badge qv-badge--{{ r.status }}">{{ r.status }}</span></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="text-muted">No resolved referendums yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const table = document.getElementById("qv-results-table");
+  if (!table) return;
+  const tbody = table.querySelector("tbody");
+  table.querySelectorAll("[data-sort]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const key = btn.dataset.sort;
+      const rows = Array.from(tbody.querySelectorAll("tr"));
+      rows.sort((a, b) => {
+        if (key === "support") {
+          return parseInt(b.dataset.support, 10) - parseInt(a.dataset.support, 10);
+        }
+        if (key === "date") {
+          return (b.dataset.date || "").localeCompare(a.dataset.date || "");
+        }
+        return (a.dataset[key] || "").localeCompare(b.dataset[key] || "");
+      });
+      rows.forEach((r) => tbody.appendChild(r));
+    });
+  });
+})();
+</script>
+{% endblock %}

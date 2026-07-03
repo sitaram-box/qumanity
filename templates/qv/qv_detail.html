@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block title %}{{ referendum.title }} — QV{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='qv.css') }}?v=1" />
+{% endblock %}
+
+{% block header_inner %}
+<div class="d-flex flex-wrap align-items-center justify-content-between w-100 gap-2">
+  <a href="{{ url_for('qv_dashboard_page') }}" class="qb-btn qb-btn-neutral btn-sm">← Referendums</a>
+  <span class="qv-badge qv-badge--{{ referendum.status }}">{{ referendum.status }}</span>
+</div>
+{% endblock %}
+
+{% block body %}
+<main class="qv-page">
+  <article class="qv-hero">
+    <h1 class="h4 mb-2">{{ referendum.title }}</h1>
+    <p class="mb-2">{{ referendum.description }}</p>
+    <p class="small text-muted mb-1">Level: {{ referendum.level }} · Location: {{ referendum.location_id }}</p>
+    <p class="small text-muted mb-0">Proposed by: {{ referendum.proposed_by }}</p>
+    <p class="qv-support mt-2 mb-0">Weighted support: {{ referendum.total_weighted_support or 0 }}</p>
+    {% if referendum.voting_end and referendum.status == 'active' %}
+    <p class="small mb-0 mt-1">Voting ends: {{ referendum.voting_end }}</p>
+    {% endif %}
+  </article>
+
+  {% if can_review and referendum.status == 'draft' %}
+  <section class="mb-4 d-flex flex-wrap gap-2">
+    <button type="button" class="qb-btn qb-btn-primary btn-sm" data-qv-approve="{{ referendum.id }}">Approve for voting</button>
+    <button type="button" class="qb-btn qb-btn-danger btn-sm" data-qv-reject="{{ referendum.id }}">Reject</button>
+  </section>
+  {% endif %}
+
+  {% if referendum.status == 'active' and is_human and referendum.proposed_by != user_private_id %}
+  <section class="qv-card mb-4">
+    <h2 class="h6">Cast your vote</h2>
+    <p class="small text-muted">Your balance: <strong>{{ credits }}</strong> QV credits</p>
+    <label class="form-label" for="qv-vote-slider">Votes (1–10)</label>
+    <input type="range" id="qv-vote-slider" class="qv-vote-slider" min="1" max="10" value="1" />
+    <p class="mb-3">Cost: <span id="qv-cost-display" class="qv-cost-display">1 credits</span></p>
+    <button
+      type="button"
+      id="qv-cast-vote-btn"
+      class="qb-btn qb-btn-primary"
+      data-referendum-id="{{ referendum.id }}"
+      data-credits="{{ credits }}"
+    >Cast Vote</button>
+  </section>
+  {% endif %}
+
+  {% if results %}
+  <section class="qv-card">
+    <h2 class="h6">Results</h2>
+    <p class="mb-1">Weighted support: <strong>{{ results.weighted_support }}</strong></p>
+    <p class="mb-1">Total voters: {{ results.total_voters }}</p>
+    {% if results.rank %}<p class="mb-1">Rank: {{ results.rank }}</p>{% endif %}
+    {% if referendum.resolution_notes %}
+    <p class="small text-muted mb-0">{{ referendum.resolution_notes }}</p>
+    {% endif %}
+  </section>
+  {% endif %}
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/qv.js') }}?v=1"></script>
+{% endblock %}

@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}Propose Referendum — Qumanity{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='qv.css') }}?v=1" />
+{% endblock %}
+
+{% block header_inner %}
+<div class="d-flex flex-wrap align-items-center justify-content-between w-100 gap-2">
+  <a href="{{ url_for('qv_dashboard_page') }}" class="qb-btn qb-btn-neutral btn-sm">← Back</a>
+  <h1 class="h5 mb-0">Propose Referendum</h1>
+</div>
+{% endblock %}
+
+{% block body %}
+<main class="qv-page">
+  <form id="qv-propose-form" class="qv-card" style="max-width: 640px">
+    <div class="mb-3">
+      <label class="form-label" for="qv-title">Title</label>
+      <input type="text" id="qv-title" name="title" class="form-control" maxlength="255" required />
+    </div>
+    <div class="mb-3">
+      <label class="form-label" for="qv-description">Description</label>
+      <textarea id="qv-description" name="description" class="form-control" rows="6" maxlength="5000" required></textarea>
+    </div>
+    <div class="mb-3">
+      <label class="form-label" for="qv-level">Geographic level</label>
+      <select id="qv-level" name="level" class="form-select" required>
+        {% for lv in levels %}
+        <option value="{{ lv }}"{% if lv == 'village' %} selected{% endif %}>{{ lv|capitalize }}</option>
+        {% endfor %}
+      </select>
+      <p class="small text-muted mt-1">You may propose at your present level or any parent level.</p>
+    </div>
+    <button type="submit" class="qb-btn qb-btn-primary">Submit for council review</button>
+  </form>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/qv.js') }}?v=1"></script>
+{% endblock %}

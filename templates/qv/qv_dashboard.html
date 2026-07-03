@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block title %}QV Referendums — Qumanity{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='qv.css') }}?v=1" />
+{% endblock %}
+
+{% block header_inner %}
+<div class="d-flex flex-wrap align-items-center justify-content-between w-100 gap-2">
+  <a href="{{ url_for('dashboard') }}" class="qb-btn qb-btn-neutral btn-sm">← Dashboard</a>
+  <h1 class="h5 mb-0">Quadratic Voting Referendums</h1>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('qv_credits_page') }}" class="qb-btn qb-btn-outline btn-sm">QV Credits</a>
+    {% if is_human %}
+    <a href="{{ url_for('qv_propose_page') }}" class="qb-btn qb-btn-primary btn-sm">Propose Referendum</a>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block body %}
+<main class="qv-page">
+  <section class="qv-hero">
+    <p class="mb-1 small text-muted">Public Timeline governance · present location</p>
+    <p class="mb-0">
+      Balance: <strong class="qv-widget-balance">{{ credits.current_credits or 0 }}</strong> QV credits
+    </p>
+  </section>
+
+  <div class="row g-2 mb-3">
+    <div class="col-12 col-md-4">
+      <label class="form-label small" for="qv-filter-level">Level</label>
+      <select id="qv-filter-level" class="form-select form-select-sm">
+        <option value="">All levels</option>
+        {% for lv in levels %}
+        <option value="{{ lv }}">{{ lv|capitalize }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-12 col-md-4">
+      <label class="form-label small" for="qv-filter-status">Status</label>
+      <select id="qv-filter-status" class="form-select form-select-sm">
+        <option value="">All statuses</option>
+        <option value="active" selected>Active</option>
+        <option value="draft">Draft</option>
+        <option value="resolved">Resolved</option>
+        <option value="escalated">Escalated</option>
+        <option value="closed">Closed</option>
+      </select>
+    </div>
+  </div>
+
+  <div id="qv-referendum-list" class="row g-3">
+    {% for r in referendums %}
+    <div class="col-12 col-md-6 col-lg-4">
+      <article class="qv-card">
+        <span class="qv-badge qv-badge--{{ r.status }}">{{ r.status }}</span>
+        <h3 class="qv-card-title">{{ r.title }}</h3>
+        <p class="small text-muted flex-grow-1">{{ r.description[:120] }}{% if r.description|length > 120 %}…{% endif %}</p>
+        <p class="small mb-0">Level: <strong>{{ r.level }}</strong></p>
+        <p class="qv-support mb-0">Support: {{ r.total_weighted_support or 0 }}</p>
+        <a href="{{ url_for('qv_detail_page', ref_id=r.id) }}" class="qb-btn qb-btn-primary btn-sm mt-2 align-self-start">View</a>
+      </article>
+    </div>
+    {% else %}
+    <p class="text-muted small">No referendums yet.</p>
+    {% endfor %}
+  </div>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/qv.js') }}?v=1"></script>
+{% endblock %}

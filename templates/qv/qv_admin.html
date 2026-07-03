@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}QV Admin — Qumanity{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='qv.css') }}?v=1" />
+{% endblock %}
+
+{% block header_inner %}
+<div class="d-flex flex-wrap align-items-center justify-content-between w-100 gap-2">
+  <a href="{{ url_for('admin_panel') }}" class="qb-btn qb-btn-neutral btn-sm">← Admin Panel</a>
+  <h1 class="h5 mb-0">QV Referendums Overview</h1>
+</div>
+{% endblock %}
+
+{% block body %}
+<main class="qv-page">
+  <div class="table-responsive">
+    <table class="qv-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Title</th>
+          <th>Level</th>
+          <th>Status</th>
+          <th>Support</th>
+          <th>Proposer</th>
+          <th>Created</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in referendums %}
+        <tr>
+          <td>{{ r.id }}</td>
+          <td><a href="{{ url_for('qv_detail_page', ref_id=r.id) }}">{{ r.title }}</a></td>
+          <td>{{ r.level }}</td>
+          <td><span class="qv-badge qv-badge--{{ r.status }}">{{ r.status }}</span></td>
+          <td>{{ r.total_weighted_support or 0 }}</td>
+          <td class="small">{{ r.proposed_by }}</td>
+          <td class="small">{{ r.created_at }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="text-muted">No referendums.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</main>
+{% endblock %}

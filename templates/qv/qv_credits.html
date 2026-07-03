@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block title %}QV Credits — Qumanity{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='qv.css') }}?v=1" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" crossorigin="anonymous"></script>
+{% endblock %}
+
+{% block header_inner %}
+<div class="d-flex flex-wrap align-items-center justify-content-between w-100 gap-2">
+  <a href="{{ url_for('qv_dashboard_page') }}" class="qb-btn qb-btn-neutral btn-sm">← Referendums</a>
+  <h1 class="h5 mb-0">QV Credits</h1>
+</div>
+{% endblock %}
+
+{% block body %}
+<main class="qv-page">
+  <section class="qv-hero text-center mb-4">
+    <p class="small text-muted mb-1">Available balance</p>
+    <p class="qv-widget-balance mb-0">{{ balance.current_credits or 0 }}</p>
+    <p class="small text-muted mt-2 mb-0">
+      Lifetime earned: {{ balance.lifetime_earned or 0 }} · Spent: {{ balance.lifetime_spent or 0 }}
+    </p>
+    <button type="button" id="qv-convert-karma-btn" class="qb-btn qb-btn-secondary btn-sm mt-3">Convert Karma (this month)</button>
+  </section>
+
+  <section class="mb-4">
+    <h2 class="h6">Monthly activity</h2>
+    <canvas id="qv-monthly-chart" height="120" aria-label="Monthly credit activity"></canvas>
+  </section>
+
+  <section>
+    <h2 class="h6">Transaction history</h2>
+    <div class="table-responsive">
+      <table class="qv-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Source</th>
+            <th>Amount</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for tx in transactions %}
+          <tr>
+            <td>{{ tx.timestamp }}</td>
+            <td>{{ tx.source }}</td>
+            <td class="{% if tx.amount > 0 %}text-success{% else %}text-danger{% endif %}">{{ tx.amount }}</td>
+            <td>{{ tx.description or '—' }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4" class="text-muted">No transactions yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const txs = {{ transactions | tojson }};
+  const byMonth = {};
+  txs.forEach((t) => {
+    const m = (t.timestamp || "").slice(0, 7);
+    if (!m) return;
+    byMonth[m] = (byMonth[m] || 0) + (t.amount > 0 ? t.amount : 0);
+  });
+  const labels = Object.keys(byMonth).sort();
+  const values = labels.map((k) => byMonth[k]);
+  const ctx = document.getElementById("qv-monthly-chart");
+  if (ctx && labels.length && window.Chart) {
+    new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels,
+        datasets: [{ label: "Credits earned", data: values, backgroundColor: "#F59E0B" }],
+      },
+      options: { responsive: true, plugins: { legend: { display: false } } },
+    });
+  }
+})();
+</script>
+<script src="{{ url_for('static', filename='js/qv.js') }}?v=1"></script>
+{% endblock %}
